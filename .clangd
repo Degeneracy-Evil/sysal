@@ -1,0 +1,6 @@
+CompileFlags:
+  CompilationDatabase: build
+
+  Add:
+    - -std=c++23
+    - -stdlib=libc++

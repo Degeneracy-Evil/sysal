@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+# pre-commit hook — 转发到统一质量检查脚本
+exec "$(git rev-parse --show-toplevel)/utils/check.sh" --hook

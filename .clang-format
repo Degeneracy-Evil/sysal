@@ -1,0 +1,12 @@
+BasedOnStyle: LLVM
+BreakBeforeBraces: Allman
+IndentWidth: 4
+AccessModifierOffset: -4
+ColumnLimit: 100
+PointerAlignment: Left
+FixNamespaceComments: true
+SortIncludes: true
+SpaceBeforeParens: Never
+TabWidth: 4
+UseTab: Never
+IndentPPDirectives: BeforeHash

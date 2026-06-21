@@ -1,0 +1,5 @@
+.xmake/
+build/
+output/
+.clangd/
+compile_commands.json
