@@ -122,6 +122,7 @@ std::optional<TopologyInfo> parse_topology_hwloc(Diagnostics& diag)
     }
     return info;
 #else
+    (void)diag;
     return std::nullopt;
 #endif
 }
