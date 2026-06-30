@@ -18,8 +18,7 @@ jobs:
           sudo apt-get install -y \
             build-essential \
             clang clang-format clang-tidy lld \
-            libc++-dev libc++abi-dev \
-            libhwloc-dev
+            libc++-dev libc++abi-dev
 
       - name: Install xmake
         uses: xmake-io/github-action-setup-xmake@v1

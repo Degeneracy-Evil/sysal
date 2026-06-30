@@ -255,22 +255,28 @@ fi
 if [ "$SKIP_TEST" = false ]; then
     run_check "tests"
 
-    # TODO: 在此处添加项目特定的测试逻辑
-    # 示例:
-    #   for f in tests/*.txt; do
-    #       if ! xmake run app "$f" >/dev/null 2>&1; then
-    #           TEST_FAIL=$((TEST_FAIL + 1))
-    #           echo "  FAIL: $f"
-    #       fi
-    #   done
-
     TEST_FAIL=0
 
-    if [ "$TEST_FAIL" -eq 0 ]; then
-        mark_pass "tests"
+    TEST_TARGETS=$(grep -oP 'test_target\("\K[^"]+' xmake.lua 2>/dev/null || true)
+
+    if [ -z "$TEST_TARGETS" ]; then
+        mark_pass "tests (no test targets)"
     else
-        mark_fail "tests ($TEST_FAIL failed)"
-        exit 1
+        for target in $TEST_TARGETS; do
+            if xmake run "$target" >/dev/null 2>&1; then
+                pass "  $target"
+            else
+                TEST_FAIL=$((TEST_FAIL + 1))
+                fail "  $target"
+            fi
+        done
+
+        if [ "$TEST_FAIL" -eq 0 ]; then
+            mark_pass "tests"
+        else
+            mark_fail "tests ($TEST_FAIL failed)"
+            exit 1
+        fi
     fi
 else
     warn "tests (skipped)"

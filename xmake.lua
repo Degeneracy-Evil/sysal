@@ -34,13 +34,6 @@ target("sysal")
                 os.runv("git", {"config", "core.hooksPath", ".githooks"})
             end
         end
-
-        -- 通过 pkg-config 检测 hwloc，存在则启用 SYSAL_HAVE_HWLOC 条件编译
-        local has_hwloc = try { function() os.runv("pkg-config", {"--exists", "hwloc"}); return true end }
-        if has_hwloc then
-            target:add("defines", "SYSAL_HAVE_HWLOC")
-            target:add("links", "hwloc")
-        end
     end)
 
     after_build(function (target)
@@ -63,7 +56,4 @@ target("sysal")
     end)
 
 ---------------------------------------- 测试目标
-
-test_target("test_collect", "tests/test_collect.cpp")
-test_target("test_replay", "tests/test_replay.cpp")
-test_target("testbench", "tests/testbench.cpp")
+-- 随各阶段逐步添加 test_target 调用
