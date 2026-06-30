@@ -1,5 +1,33 @@
 # 开发记录
 
+### 2026-06-30 重写 7 个数据模型设计文档以反映新架构
+
+- **变更类型**: docs
+- **涉及文件**: docs/design/data_model/system_snapshot.md, docs/design/data_model/platform_info.md, docs/design/data_model/resource_info.md, docs/design/data_model/software_stack_info.md, docs/design/data_model/execution_context.md, docs/design/data_model/raw_store.md, docs/design/data_model/diagnostics.md
+- **变更内容**:
+  1. system_snapshot.md：`SystemSnapshot` 改为 `std::vector<std::string> warnings` 替代 `Diagnostics`，`ResourceInfo` 不含 topology；新增 `System` 类说明（对象持有模式，构造时抛 `SysalError`，构造后不可变）；`SnapshotMeta::requested_spec` 改为 `requested_flags`（类型 `Collect`）
+  2. platform_info.md：保持内容，确认中文
+  3. resource_info.md：`ResourceInfo` 移除 `TopologyInfo topology` 字段；保留 `CpuCore::numa_node`、`LogicalCpu::numa_node`、`AcceleratorDevice::nearest_numa_node`、`PciDevice::numa_node`，注释改为"从 sysfs 直接读取"；移除所有 TopologyInfo 引用与"PciSubsystem 是清单 / TopologyInfo 是关系图"对比
+  4. software_stack_info.md：保持内容，确认中文
+  5. execution_context.md：保持内容，确认无拓扑引用
+  6. raw_store.md：`RawSource` 移除 `HwlocXml`，保留其余值；说明 `RawStore` 在 `SystemSnapshot` 中可选，通过 `Collect::Raw` 启用（替代 `CollectSpec::with_raw()`）
+  7. diagnostics.md：标题改为 Warnings（警告信息），移除 `Severity`/`ConflictDetail`/`Diagnostic`/`Diagnostics` 结构体，改为描述 `std::vector<std::string> warnings`，保留简化示例
+- **原因**: 反映 sysal 架构变更（System 类替代 collect/collect_or_throw、Collect 位掩码替代 CollectSpec、移除 Expected/SysalError 抛出、移除 TopologyInfo 等拓扑结构、Diagnostics 简化为 warnings、RawSource 移除 HwlocXml）
+- **验证**: 文档审查，确认无 TopologyInfo/NumaRelation/PciRelation/DeviceLocality/Diagnostics/ConflictDetail/Severity/Expected/CollectSpec/HwlocXml 残留
+
+### 2026-06-30 重写 5 个架构与规则设计文档以反映新架构
+
+- **变更类型**: docs
+- **涉及文件**: docs/design/architecture/pipeline.md, docs/design/architecture/backend_strategy.md, docs/design/rules/strong_typing.md, docs/design/rules/conflict_resolution.md, docs/design/rules/thread_safety.md
+- **变更内容**:
+  1. pipeline.md：管线改为 `Reader → RawStore → Parser → ParseResult → Resolver → System`；`ParsedFacts` 重命名为 `ParseResult`，字段改为公共类型，移除 topology 字段；更新源码布局为新命名（`cpu.hpp`、`procfs.hpp`、`resolve.hpp`、`system.cpp` 等），移除 `backend/` 目录
+  2. backend_strategy.md：移除 hwloc 与 Topology 行，更新后端策略为 procfs+sysfs+PCI / NVML / ROCm SMI / Level Zero / ibverbs，说明 NUMA 设备级 `numa_node` 从 sysfs 读取
+  3. strong_typing.md：保持不变（无 TopologyInfo 引用），确认中文
+  4. conflict_resolution.md：来源信任顺序移除 hwloc，移除 `ConflictDetail`/`Diagnostics`，冲突改为字符串形式记录到 `System::warnings()`
+  5. thread_safety.md：更新为对象持有模式（`System::collect()`、`System` 对象、`System::refresh()`、内部组件），实现约束改为 System 对象构造后只提供 const 访问
+- **原因**: 反映 sysal 架构变更（System 类替代双入口 API、Collect 位掩码、移除 Expected/Diagnostics/TopologyInfo/hwloc、ParseResult 重命名、文件命名调整）
+- **验证**: 文档审查，确认无拓扑/hwloc/Diagnostics/Expected/CollectSpec 及旧文件命名残留
+
 ### 2026-06-20 从 base_project 迁移脚手架
 
 - **变更类型**: chore / build / docs
@@ -175,3 +203,87 @@
   3. **错误处理补全**：5 个忽略 `diag` 参数的 parser 改为使用 `add_warning`：platform_parser（缺少 uname 架构信息时告警）、pci_parser（sysfs 记录存在但无设备时告警）、storage_parser（同上）、software_parser（NVIDIA 数据收集失败时告警）、execution_parser（无法确定 cgroup 路径时告警）
 - **原因**: 代码质量审计发现 7 项冗余 + 4 项 Bug + 5 个 parser 缺失错误处理
 - **验证**: `utils/check.sh` 4/4 通过；`xmake run test_replay` 9/9 PASS
+
+### 2026-06-27 为 parser 第一组文件添加中文 Doxygen 注释
+
+- **变更类型**: docs
+- **涉及文件**: src/parser/cpu_parser.hpp, src/parser/cpu_parser.cpp, src/parser/memory_parser.hpp, src/parser/memory_parser.cpp, src/parser/network_parser.hpp, src/parser/network_parser.cpp, src/parser/platform_parser.hpp, src/parser/platform_parser.cpp, src/parser/pci_parser.hpp, src/parser/pci_parser.cpp
+- **变更内容**:
+  1. 每个文件开头添加文件级 Doxygen 注释块（@file/@brief/@details）
+  2. 每个函数（含匿名命名空间内函数）添加 Doxygen 头注释（@brief/@param/@return）
+  3. 匿名命名空间内结构体（CpuInfoEntry）添加注释说明
+  4. 函数内部关键逻辑添加行内中文注释：CPU 拓扑去重与回退策略、NUMA meminfo 键前缀匹配、网络接口速率单位转换、/proc/version 字段位置解析等
+  5. 代码逻辑、缩进、换行、#include、命名空间结构均未改动
+- **原因**: 为解析器层补充中文 API 文档，便于团队理解解析逻辑
+- **验证**: `utils/check.sh` 4/4 通过（clang-format / clang-tidy / build / tests）；10 个文件均通过 clang-format 校验
+
+### 2026-06-27 为 reader/linux 与 detail 目录添加中文 Doxygen 注释
+
+- **变更类型**: docs
+- **涉及文件**: src/reader/linux/file_utils.hpp, src/reader/linux/procfs_reader.hpp, src/reader/linux/procfs_reader.cpp, src/reader/linux/sysfs_reader.hpp, src/reader/linux/sysfs_reader.cpp, src/detail/pipeline.hpp, src/detail/pipeline.cpp, src/detail/algorithm.hpp, src/detail/json.hpp
+- **变更内容**:
+  1. 9 个文件均添加文件级 `@file`/`@brief`/`@details` 注释块
+  2. 每个函数（含匿名命名空间内函数、模板函数、类成员函数）添加 `@brief`/`@param`/`@return` Doxygen 注释
+  3. 函数内部关键逻辑添加行内中文注释：procfs 各采集分支用途、sysfs 目录遍历与属性读取、pipeline 解析-组装流程、JSON 序列化/反序列化数据格式与转义/UTF-8 编码逻辑
+  4. json.hpp 说明 RawStore JSON 格式（records 数组、source/status 整数编码、collected_at epoch 毫秒）
+  5. 代码逻辑、#include、命名空间结构均未改动；仅添加注释，未删除已有注释
+- **原因**: 为采集层与基础设施层补充中文 API 文档，与解析器层注释风格保持一致
+- **验证**: `utils/check.sh` 4/4 通过（clang-format / clang-tidy / build / tests）
+
+### 2026-06-27 为 include/sysal 公共头文件添加中文 Doxygen 注释
+
+- **变更类型**: docs
+- **涉及文件**: include/sysal/ 下全部 21 个 .hpp 文件（enums.hpp, error.hpp, expected.hpp, units.hpp, strong_id.hpp, value_types.hpp, ids.hpp, platform_info.hpp, raw_store.hpp, diagnostics.hpp, collect_spec.hpp, collect.hpp, resource_info.hpp, topology_info.hpp, snapshot_meta.hpp, software_stack_info.hpp, execution_context_info.hpp, serialization.hpp, system_snapshot.hpp, sysal.hpp, test/replay.hpp）
+- **变更内容**:
+  1. 每个文件开头添加文件级 `@file`/`@brief`/`@details` 注释块
+  2. 每个结构体/类添加 `@brief`/`@details` Doxygen 注释
+  3. 每个结构体关键成员变量添加 `///<` 行尾注释
+  4. 每个函数声明/方法添加 `@brief`/`@param`/`@return`/`@throws` 注释（简单 getter/setter 仅 @brief）
+  5. 所有枚举类型与枚举值添加注释；类型别名（using）添加行尾注释
+  6. 保留 strong_id.hpp 已有英文 Doxygen 注释并补充其余注释
+  7. 代码逻辑、缩进、#include、#pragma once、命名空间结构均未改动
+- **原因**: 为公共 API 头文件补充完整中文 Doxygen 文档，提升 API 可发现性与可维护性
+- **验证**: `utils/check.sh` 4/4 通过（clang-format / clang-tidy / build / tests）
+
+### 2026-06-27 为核心文件、解析器、后端、公共 API、测试添加中文 Doxygen 注释
+
+- **变更类型**: docs
+- **涉及文件**: src/raw_store.cpp, src/serialization.cpp, src/resource_info.cpp, src/resolver/resolver.hpp, src/resolver/resolver.cpp, src/backend/hwloc_backend.hpp, src/backend/hwloc_backend.cpp, src/public_api/collect.cpp, src/test/replay.cpp, docs/devlog.md
+- **变更内容**:
+  1. 为 9 个核心文件添加文件级 Doxygen 注释块（@file/@brief/@details）
+  2. 为每个函数（含匿名命名空间内函数与条件编译分支内的函数）添加 Doxygen 头注释（@brief/@param/@return/@throws/@details）
+  3. 函数内部关键逻辑添加行内中文注释：
+     - resolver.cpp 说明从 ParsedFacts 构建 SystemSnapshot 的流程（子字段移动、默认可见性、cpuset 覆盖、可见资源汇总）
+     - serialization.cpp 每个 to_json_* 函数说明 JSON 输出格式（对象键名、数组结构、可选字段、枚举/数值/布尔/PCI 地址的表示方式）
+     - hwloc_backend.cpp 说明 NUMA 节点查找、PCI 设备遍历与拓扑加载流程
+   4. 代码逻辑、#include、#pragma once、命名空间结构均未改动；未删除已有注释（将 resolver.cpp 中原有英文行内注释译为中文以统一注释语言）
+- **原因**: 为库的核心实现层补充中文 API 文档，与已有头文件/解析器层 Doxygen 风格保持一致，便于维护与生成文档
+- **验证**: `utils/check.sh` 4/4 通过（clang-format / clang-tidy / build / tests）
+
+### 2026-06-27 数据模型设计文档中文化
+
+- **变更类型**: docs
+- **涉及文件**: docs/design/data_model/software_stack_info.md, docs/design/data_model/execution_context.md, docs/design/data_model/raw_store.md, docs/design/data_model/diagnostics.md
+- **变更内容**: 将 4 个数据模型设计文档从英文重写为中文。翻译正文、表格内容、代码块内注释；保持代码逻辑、字符串字面量、类型名/函数名/变量名、Markdown 结构不变；保留 examples 示例块（英文输出文本）原样以体现真实采集结果；专有名词（CUDA、ROCm、MPI、RDMA、UCX、NVML、Level Zero 等）保持英文。
+- **原因**: 统一设计文档语言为中文，与项目其余文档及代码注释风格一致
+- **验证**: 逐文件对照原文确认结构、代码块、表格、列表完整保留
+
+### 2026-06-30 重写测试相关设计文档以反映架构变更
+
+- **变更类型**: docs
+- **涉及文件**: docs/design/testing/serialization.md, docs/design/testing/raw_replay.md
+- **变更内容**: 重写 2 个测试相关设计文档为中文，反映新架构：`System` 类替代 `collect()`/`collect_or_throw()`，`Collect` 位掩码枚举替代 `CollectSpec`，移除 `Expected<T,E>`，所有接口失败时抛 `SysalError`。serialization.md 接口改为 `to_json(const System&, ...)` / `from_json(std::string_view)`，强调非侵入式自由函数、独立头文件、手写 JSON 序列化、`SnapshotMeta::sysal_version` 兼容性检查。raw_replay.md 接口改为 `load_raw_store` / `collect_from_raw` / `save_raw_store` 直接返回值；工作流使用 `System::collect` + `Collect::Raw`；管线对比更新为 `Reader → RawStore → Parser → ParseResult → Resolver → System`；保留 Fixture 布局。
+- **原因**: sysal 公共 API 架构变更（异常替代 Expected、System/Collect 替代旧 API），测试相关设计文档需同步
+- **验证**: 逐文件确认无 Expected/CollectSpec/collect_or_throw 残留，C++ 代码块语法正确，专有名词与类型名保持英文
+
+### 2026-06-30 重写 4 个核心设计文档反映架构变更
+
+- **变更类型**: docs
+- **涉及文件**: docs/design/index.md, docs/design/overview.md, docs/design/public_api.md, docs/design/roadmap.md
+- **变更内容**: 用 Write 覆盖重写 4 个核心设计文档以反映新架构：
+  1. index.md：目录结构移除 topology_info.md / diagnostics.md（diagnostics 改为 warnings 内嵌 System），文档索引表移除 topology_info 行、更新各文档描述（overview 移除拓扑、public_api 改为 System 类、pipeline 改为新文件命名 ParseResult、backend_strategy 移除 hwloc）、阅读顺序更新
+  2. overview.md：管线图改为 `Reader → RawStore → Parser → ParseResult → Resolver → System`，架构总结移除拓扑构建、改为 System 对象，API 调用示例改为 `System::collect()`
+  3. public_api.md：完整重写，描述 System 类（对象持有模式）、Collect 位掩码枚举、operator| 与 has()、basic/full 预设、System 完整接口、使用示例（链式 flags + 预设）、失败抛 SysalError 而非 Expected、公共 API 不暴露内部 reader/parser/backend
+  4. roadmap.md：v0.0.1 范围改为 System::collect/refresh + Collect bitmask、Core model 移除 Topology 与 Diagnostics（改为 warnings）、内部管线 ParseResult、移除 hwloc 后端、非目标添加"拓扑信息（已有 hwloc 等成熟库）"、未来扩展说明缓存已内置（System 对象即缓存）、拓扑作为独立可选模块
+- **原因**: API 重构（移除 collect/collect_or_throw 双入口、Expected、CollectSpec builder，引入 System 类 + Collect bitmask）、移除 hwloc 拓扑后端、ParsedFacts 重命名为 ParseResult、Diagnostics 简化为 warnings，设计文档需同步反映
+- **验证**: 逐文件确认无 CollectSpec / collect() / collect_or_throw() / Expected / TopologyInfo / hwloc 残留描述；代码块 C++ 语法正确；专有名词与类型名保持英文
