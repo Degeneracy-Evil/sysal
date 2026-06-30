@@ -1,114 +1,131 @@
-# Overview
+# 概览
 
-## Project Positioning
+## 项目定位
 
-**sysal** is a C++ library for collecting and representing server system information.
+**sysal** 是一个用于采集和表示服务器系统信息的 C++ 库。
 
-sysal is **not** a standalone executable by default.
-sysal is **not** a benchmark framework.
-sysal is **not** an operator scheduler.
-sysal is **not** a performance prediction system.
+sysal 默认**不是**独立可执行程序。
+sysal **不是**基准测试框架。
+sysal **不是**算子调度器。
+sysal **不是**性能预测系统。
 
-Its responsibility is:
-
-```txt
-Collect real system information.
-Normalize it into typed data structures.
-Return it to the caller through a simple API.
-```
-
-sysal should return **facts**, not **decisions**.
-
-For example, sysal may return:
+它的职责是：
 
 ```txt
-GPU0 is close to NUMA node 0.
-NIC mlx5_0 is associated with PCI address 0000:ca:00.0.
-CUDA driver version is available.
-The current process can only see GPU0 and GPU1.
+采集真实的系统信息。
+将其归一化为类型化数据结构。
+通过简单的 API 返回给调用方。
 ```
 
-sysal should not return:
+sysal 应当返回**事实**，而非**决策**。
+
+例如，sysal 可以返回：
 
 ```txt
-GPU0 is the best device for GEMM.
-NIC mlx5_0 should be selected for communication.
-This system has good performance.
+GPU0 关联到 NUMA node 0（设备级 numa_node 字段）。
+NIC mlx5_0 关联到 PCI 地址 0000:ca:00.0。
+CUDA 驱动版本可用。
+当前进程只能看到 GPU0 和 GPU1。
 ```
 
-Those decisions belong to higher-level projects such as opal or opbl.
-
-## Core Design Principle
-
-sysal follows this internal pipeline:
+sysal 不应返回：
 
 ```txt
-Read / Probe
-    ↓
-RawStore
-    ↓
-Parser
-    ↓
-ParsedFacts          (internal, per-domain structured facts)
-    ↓
-Resolver             (cross-reference + conflict resolution + visibility)
-    ↓
-SystemSnapshot
+GPU0 是 GEMM 的最佳设备。
+NIC mlx5_0 应被选用于通信。
+本系统性能良好。
 ```
 
-The core principle is:
+这些决策属于更高层的项目，例如 opal 或 opbl。
+
+## 核心设计原则
+
+sysal 遵循以下内部管线：
 
 ```txt
-Raw evidence first.
-Typed model second.
-Decision never.
+Reader → RawStore → Parser → ParseResult → Resolver → System
 ```
 
-All collected information should first enter the raw layer.
-The typed system model should be derived from raw evidence.
-
-This design improves:
-
-* debuggability
-* testability
-* reproducibility
-* raw data access
-* backend extensibility
-* future platform support
-
-## Relationship With Other Projects
+核心原则是：
 
 ```txt
-sysal:  What does this system have? What can the current process see?
-opal:   Which operator should be selected?
-opbl:   How fast does an operator run?
+原始证据优先。
+类型化模型其次。
+决策永不。
 ```
 
-sysal remains independent from opal and opbl.
-sysal may be used by opal, but contains no opal-specific scheduling logic.
+所有采集到的信息应首先进入 raw 层。
+类型化的系统模型应从原始证据中派生。
 
-## Architecture Summary
+此设计可改善：
+
+* 可调试性
+* 可测试性
+* 可复现性
+* 原始数据访问
+* 后端可扩展性
+* 未来平台支持
+
+## 与其他项目的关系
 
 ```txt
-sysal::collect(spec)
-    ↓
-Readers collect raw evidence
-    ↓
-RawStore records original data
-    ↓
-Parsers extract ParsedFacts (per-domain, no cross-references)
-    ↓
-Resolver merges facts, resolves conflicts, builds topology / visibility
-    ↓
-SystemSnapshot returned to caller
+sysal:  本系统拥有什么？当前进程能看到什么？
+opal:   应当选择哪个算子？
+opbl:   算子运行得多快？
 ```
 
-Core design principle:
+sysal 与 opal 和 opbl 保持独立。
+sysal 可能被 opal 使用，但不包含任何 opal 特定的调度逻辑。
+
+## 架构总结
 
 ```txt
-Typed system information library.
-Raw evidence based.
-Backend independent.
-LSP friendly.
-No scheduling decisions.
+sysal::System::collect(flags)
+    ↓
+Reader 采集原始证据
+    ↓
+RawStore 记录原始数据
+    ↓
+Parser 提取 ParseResult（按域划分，无交叉引用）
+    ↓
+Resolver 合并事实、解决冲突、构建可见性
+    ↓
+System 对象返回给调用方
 ```
+
+核心设计原则：
+
+```txt
+类型化的系统信息库。
+基于原始证据。
+后端无关。
+对 LSP 友好。
+不做调度决策。
+```
+
+## API 调用示例
+
+```cpp
+// 采集全部信息
+sysal::System sys = sysal::System::collect();
+
+// 访问各子系统的类型化模型
+const auto& cpu  = sys.info.cpu;
+const auto& mem  = sys.info.memory;
+const auto& gpus = sys.info.accelerators;
+
+// 仅采集基本子集
+sysal::System basic = sysal::System::collect(sysal::Collect::basic);
+
+// 细粒度控制：按位或组合
+using namespace sysal;
+sysal::System partial = sysal::System::collect(
+    Collect::Platform | Collect::Cpu | Collect::Raw
+);
+
+// 刷新已有对象
+sys.refresh();
+```
+
+失败时抛出 `SysalError`，不使用非抛出式 API。
+不需要全局 `init()`，后端初始化在 `collect()` 内部自动完成。

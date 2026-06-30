@@ -1,108 +1,111 @@
-# Internal Pipeline & Module Structure
+# 内部管线与模块结构
 
-## Pipeline
+## 管线
 
 ```txt
-Reader → RawStore → Parser → ParsedFacts → Resolver → SystemSnapshot
+Reader → RawStore → Parser → ParseResult → Resolver → System
 ```
 
-- **Reader**: collects raw evidence into `RawStore`.
-- **Parser**: converts `RawStore` into per-domain `ParsedFacts` (no cross-domain references).
-- **Resolver**: merges `ParsedFacts`, resolves conflicts, computes visibility, builds topology, assembles `SystemSnapshot`.
+- **Reader**：将原始信息收集到 `RawStore`。
+- **Parser**：将 `RawStore` 转换为按域划分的 `ParseResult`（无跨域引用，直接使用公共类型）。
+- **Resolver**：合并 `ParseResult`，解决冲突，计算可见性，组装 `System` 对象。
 
-## ParsedFacts (internal contract)
+## ParseResult（内部契约）
 
 ```cpp
 namespace sysal::detail
 {
 
-struct CpuFacts         { /* packages, cores, logical_cpus, numa_nodes, ... */ };
-struct MemoryFacts      { /* total, available, numa_memory */ };
-struct PciFacts         { /* devices */ };
-struct NetworkFacts     { /* interfaces */ };
-struct AcceleratorFacts { /* devices */ };
-struct StorageFacts     { /* devices */ };
-struct PlatformFacts    { /* host, os, kernel, arch, ... */ };
-struct SoftwareFacts    { /* drivers, runtimes, cuda, rocm, ... */ };
-struct ExecutionFacts   { /* process, env, cgroup, cpuset, ... */ };
-struct TopologyFacts    { /* numa_relations, pci_relations, device_localities */ };
-
-struct ParsedFacts
+struct ParseResult
 {
-    std::optional<PlatformFacts>    platform;
-    std::optional<CpuFacts>         cpu;
-    std::optional<MemoryFacts>      memory;
-    std::optional<PciFacts>         pci;
-    std::optional<NetworkFacts>     network;
-    std::optional<AcceleratorFacts> accelerators;
-    std::optional<StorageFacts>     storage;
-    std::optional<SoftwareFacts>    software;
-    std::optional<ExecutionFacts>   execution;
-    std::optional<TopologyFacts>    topology;
+    std::optional<PlatformInfo>          platform;
+    std::optional<CpuSubsystem>          cpu;
+    std::optional<MemorySubsystem>       memory;
+    std::optional<PciSubsystem>          pci;
+    std::optional<NetworkSubsystem>      network;
+    std::optional<AcceleratorSubsystem>  accelerators;
+    std::optional<StorageSubsystem>      storage;
+    std::optional<SoftwareStackInfo>     software;
+    std::optional<ExecutionContextInfo>  execution;
 };
 
 }  // namespace sysal::detail
 ```
 
-`ParsedFacts` lives in `src/parser/parsed_facts.hpp` (internal, not in `include/sysal/`).
-Each field is `optional` — the domain may have failed or was not requested.
+`ParseResult` 位于 `src/parser/parse_result.hpp`（内部，不在 `include/sysal/` 中）。
+每个字段都是 `optional` —— 该域可能失败或未被请求。
+各字段直接使用公共 API 中定义的类型，不再使用私有 `*Facts` 结构。
 
-## Source Layout
+## 源码布局
 
 ```txt
 sysal/
 ├── include/sysal/
 │   ├── sysal.hpp
-│   ├── collect_spec.hpp
-│   ├── system_snapshot.hpp
+│   ├── system.hpp               # System 类 + SystemInfo
+│   ├── collect.hpp              # Collect 位掩码枚举
 │   ├── snapshot_meta.hpp
 │   ├── platform_info.hpp
 │   ├── resource_info.hpp
 │   ├── software_stack_info.hpp
 │   ├── execution_context_info.hpp
-│   ├── topology_info.hpp
 │   ├── raw_store.hpp
-│   ├── diagnostics.hpp
 │   ├── error.hpp
-│   ├── serialization.hpp          (optional)
-│   └── test/replay.hpp             (test utility)
+│   ├── enums.hpp
+│   ├── ids.hpp
+│   ├── units.hpp
+│   ├── value_types.hpp
+│   ├── strong_id.hpp
+│   ├── serialization.hpp        # 可选
+│   └── test/replay.hpp          # 测试工具
 │
 └── src/
-    ├── public_api/
-    │   └── collect.cpp
+    ├── api/                     # 公共 API 实现
+    │   └── system.cpp           # System::collect() / refresh()
     │
-    ├── raw/
-    │   └── raw_store.cpp
+    ├── model/                   # 数据模型实现
+    │   ├── raw_store.cpp        # RawStore 方法
+    │   └── resource_info.cpp    # ResourceInfo 便利查询方法
     │
-    ├── reader/
-    │   └── linux/
-    │       ├── procfs_reader.cpp
-    │       ├── sysfs_reader.cpp
-    │       ├── command_reader.cpp
-    │       ├── hwloc_reader.cpp
-    │       ├── nvml_reader.cpp
-    │       └── ibverbs_reader.cpp
+    ├── reader/linux/            # 平台相关 Reader
+    │   ├── procfs.hpp / procfs.cpp
+    │   ├── sysfs.hpp / sysfs.cpp
+    │   └── file_utils.hpp
     │
-    ├── parser/
-    │   ├── parsed_facts.hpp        (internal)
-    │   ├── cpu_parser.cpp
-    │   ├── memory_parser.cpp
-    │   ├── pci_parser.cpp
-    │   ├── network_parser.cpp
-    │   ├── accelerator_parser.cpp
-    │   └── software_parser.cpp
+    ├── parser/                  # 原始数据 → 结构化事实
+    │   ├── parse_utils.hpp
+    │   ├── parse_result.hpp     # ParseResult 定义
+    │   ├── cpu.hpp / cpu.cpp
+    │   ├── memory.hpp / memory.cpp
+    │   ├── pci.hpp / pci.cpp
+    │   ├── network.hpp / network.cpp
+    │   ├── accelerator.hpp / accelerator.cpp
+    │   ├── storage.hpp / storage.cpp
+    │   ├── software.hpp / software.cpp
+    │   └── execution.hpp / execution.cpp
     │
-    ├── resolver/
-    │   ├── resource_resolver.cpp
-    │   ├── topology_resolver.cpp
-    │   ├── visibility_resolver.cpp
-    │   └── software_stack_resolver.cpp
+    ├── resolver/                # 结构化事实 → 最终快照
+    │   └── resolve.hpp / resolve.cpp
     │
-    └── backend/
-        ├── hwloc_backend.cpp
-        ├── nvml_backend.cpp
-        └── ibverbs_backend.cpp
+    ├── serialization/           # JSON 序列化
+    │   ├── json.hpp              # 手写 JSON 引擎
+    │   └── serialize.cpp         # System ↔ JSON
+    │
+    └── pipeline/                # 流程编排
+        └── pipeline.hpp / pipeline.cpp
 ```
 
-Platform-specific readers live under `src/reader/<platform>/`.
-xmake.lua selects the platform directory at build time.
+### 目录职责
+
+| 目录 | 职责 |
+|---|---|
+| `api/` | `System::collect()` / `refresh()` 实现，公共入口 |
+| `model/` | `RawStore`、`ResourceInfo` 等数据模型的方法实现 |
+| `reader/linux/` | 平台相关的原始数据采集（procfs / sysfs） |
+| `parser/` | 从 `RawStore` 解析出 `ParseResult`（按域独立） |
+| `resolver/` | 从 `ParseResult` 组装 `System`（可见性、冲突解决） |
+| `serialization/` | JSON 序列化引擎与 `System` 的序列化实现 |
+| `pipeline/` | 编排 Reader → Parser → Resolver 的完整流程 |
+
+平台相关的 reader 位于 `src/reader/<platform>/` 下。
+xmake 在构建时选择平台目录。

@@ -1,6 +1,6 @@
 # PlatformInfo
 
-Describes the basic identity of the system.
+描述系统的基本标识信息。
 
 ```cpp
 struct PlatformInfo
@@ -14,14 +14,14 @@ struct PlatformInfo
 };
 ```
 
-Sub-structs (`HostInfo`, `OsInfo`, `KernelInfo`, `ArchitectureInfo`, `FirmwareInfo`,
-`VirtualizationInfo`) are straightforward typed aggregates defined during implementation.
+子结构体（`HostInfo`、`OsInfo`、`KernelInfo`、`ArchitectureInfo`、`FirmwareInfo`、
+`VirtualizationInfo`）是在实现阶段定义的简单类型化聚合体。
 
-| Sub-struct | Example fields |
+| 子结构体 | 示例字段 |
 |---|---|
-| `HostInfo` | hostname |
-| `OsInfo` | OS name, version |
-| `KernelInfo` | kernel version |
-| `ArchitectureInfo` | CPU architecture, machine architecture |
-| `FirmwareInfo` | BIOS version, vendor |
-| `VirtualizationInfo` | hypervisor type, container base |
+| `HostInfo` | 主机名 |
+| `OsInfo` | 操作系统名称、版本 |
+| `KernelInfo` | 内核版本 |
+| `ArchitectureInfo` | CPU 架构、机器架构 |
+| `FirmwareInfo` | BIOS 版本、厂商 |
+| `VirtualizationInfo` | hypervisor 类型、容器基础信息 |

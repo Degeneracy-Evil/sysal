@@ -1,6 +1,6 @@
 # SoftwareStackInfo
 
-Describes whether system resources can be used by software.
+描述系统资源能否被软件使用。
 
 ```cpp
 struct SoftwareStackInfo
@@ -18,20 +18,20 @@ struct SoftwareStackInfo
 };
 ```
 
-Hardware resources and software stack are separated:
+硬件资源与软件栈分离：
 
 ```txt
 NVIDIA H20 GPU       → ResourceInfo
 CUDA driver/runtime  → SoftwareStackInfo
 ```
 
-Examples:
+示例：
 
-* NVIDIA driver version
-* CUDA runtime version
-* ROCm version
-* Level Zero availability
-* MPI implementation and version
-* UCX version
-* OpenBLAS / BLIS / MKL / cuBLAS availability
-* compiler versions
+* NVIDIA 驱动版本
+* CUDA 运行时版本
+* ROCm 版本
+* Level Zero 可用性
+* MPI 实现及版本
+* UCX 版本
+* OpenBLAS / BLIS / MKL / cuBLAS 可用性
+* 编译器版本

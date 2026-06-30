@@ -1,23 +1,22 @@
-# Conflict Resolution Strategy
+# 冲突解决策略
 
-## Source Trust Order (high → low)
+## 来源信任优先级（高 → 低）
 
 ```txt
-1. Dedicated backends (NVML, hwloc, ibverbs)   — direct hardware query
-2. sysfs                                        — kernel structured data
-3. procfs                                       — kernel text data
-4. Command output (lspci, nvidia-smi)           — may have version skew
-5. Inference / defaults                         — last resort
+1. Dedicated backends (NVML, ibverbs)              — direct hardware query
+2. sysfs                                           — kernel structured data
+3. procfs                                          — kernel text data
+4. Command output (lspci, nvidia-smi)              — may have version skew
+5. Inference / defaults                            — last resort
 ```
 
-## Rules by Conflict Category
+## 按冲突类别的规则
 
-| Category | Rule | Example |
+| 类别 | 规则 | 示例 |
 |---|---|---|
-| **Quantity** | Highest trust source wins | GPU memory: NVML 96GB vs sysfs 98GB → NVML |
-| **Visibility** | Execution context wins | CPU: procfs 192 vs cpuset 32 → cpuset 32 |
-| **Topology** | Prefer hwloc, fallback sysfs | NUMA affinity: hwloc vs sysfs → hwloc |
-| **Identity** | Highest trust wins, log warning on mismatch | GPU name: NVML "H20" vs lspci "GA140" → NVML + warning |
-| **State** | Most recent collection time wins | Link state: sysfs vs ethtool → latest |
+| **数量** | 最高信任来源胜出 | GPU 显存：NVML 96GB 对比 sysfs 98GB → NVML |
+| **可见性** | 执行上下文胜出 | CPU：procfs 192 对比 cpuset 32 → cpuset 32 |
+| **标识** | 最高信任胜出，不匹配时记录警告 | GPU 名称：NVML "H20" 对比 lspci "GA140" → NVML + 警告 |
+| **状态** | 最新采集时间胜出 | 链路状态：sysfs 对比 ethtool → 最新 |
 
-All conflicts are recorded in `Diagnostics` with `ConflictDetail`.
+所有冲突以警告字符串形式记录在 `System` 对象的 `warnings` 成员中。

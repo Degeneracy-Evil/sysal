@@ -1,4 +1,4 @@
-# sysal Design Documents
+# sysal 设计文档
 
 > 本目录存放 sysal 项目的全部设计文档，按架构层级拆分为独立小文件。
 > 每个文件负责一个明确的设计职能，互不重叠。
@@ -10,15 +10,14 @@ docs/design/
 ├── index.md                      ← 本文件（索引）
 ├── overview.md                   ← 项目定位与核心原则
 ├── public_api.md                 ← 公共 API 设计
-├── data_model/                   ← 数据模型（SystemSnapshot 各组成部分）
+├── data_model/                   ← 数据模型（System 各组成部分）
 │   ├── system_snapshot.md
 │   ├── platform_info.md
 │   ├── resource_info.md
-│   ├── topology_info.md
 │   ├── software_stack_info.md
 │   ├── execution_context.md
 │   ├── raw_store.md
-│   └── diagnostics.md
+│   └── warnings.md
 ├── architecture/                 ← 内部架构
 │   ├── pipeline.md
 │   └── backend_strategy.md
@@ -44,27 +43,26 @@ docs/design/
 
 | 文件 | 职能 |
 |---|---|
-| [public_api.md](public_api.md) | `collect` / `collect_or_throw` 入口、`CollectSpec` builder + preset、使用示例 |
+| [public_api.md](public_api.md) | `System` 类（对象持有模式）、`SystemInfo` 结构、`Collect` 位掩码枚举、公开成员访问 |
 
 ### 数据模型层
 
 | 文件 | 职能 |
 |---|---|
-| [data_model/system_snapshot.md](data_model/system_snapshot.md) | `SystemSnapshot` 顶层结构 + `SnapshotMeta` 元数据 |
+| [data_model/system_snapshot.md](data_model/system_snapshot.md) | `System` 类、`SystemInfo` 结构、`SnapshotMeta` 元数据 |
 | [data_model/platform_info.md](data_model/platform_info.md) | `PlatformInfo`：host / OS / kernel / arch / firmware / virt |
 | [data_model/resource_info.md](data_model/resource_info.md) | `ResourceInfo`：CPU / Memory / Accelerator / Network / PCI / Storage |
-| [data_model/topology_info.md](data_model/topology_info.md) | `TopologyInfo`：NUMA / PCI 关系图、设备亲和性、与 PciSubsystem 分工 |
 | [data_model/software_stack_info.md](data_model/software_stack_info.md) | `SoftwareStackInfo`：drivers / runtimes / CUDA / ROCm / MPI / RDMA |
 | [data_model/execution_context.md](data_model/execution_context.md) | `ExecutionContextInfo`：进程环境 / cgroup / cpuset / 可见性索引 |
 | [data_model/raw_store.md](data_model/raw_store.md) | `RawStore` / `RawRecord`：原始证据存储、多记录支持 |
-| [data_model/diagnostics.md](data_model/diagnostics.md) | `Diagnostics` / `Diagnostic` / `ConflictDetail`：采集问题与冲突记录 |
+| [data_model/warnings.md](data_model/warnings.md) | 采集过程中的警告信息（`std::vector<std::string>`） |
 
 ### 内部架构层
 
 | 文件 | 职能 |
 |---|---|
-| [architecture/pipeline.md](architecture/pipeline.md) | 内部管线 Reader→RawStore→Parser→ParsedFacts→Resolver→SystemSnapshot、源码布局 |
-| [architecture/backend_strategy.md](architecture/backend_strategy.md) | 后端选择策略：hwloc / NVML / ibverbs / procfs / sysfs |
+| [architecture/pipeline.md](architecture/pipeline.md) | 内部管线 Reader→RawStore→Parser→ParseResult→Resolver→System、源码布局（api/model/reader/parser/resolver/serialization/pipeline） |
+| [architecture/backend_strategy.md](architecture/backend_strategy.md) | 后端选择策略：NVML / procfs / sysfs |
 
 ### 设计规则层
 
@@ -72,7 +70,7 @@ docs/design/
 |---|---|
 | [rules/strong_typing.md](rules/strong_typing.md) | 强类型规则：Unit types / StrongId / Value types / Enumerations |
 | [rules/conflict_resolution.md](rules/conflict_resolution.md) | 冲突解决策略：source trust order + 分类规则 |
-| [rules/thread_safety.md](rules/thread_safety.md) | 线程安全保证与实现约束 |
+| [rules/thread_safety.md](rules/thread_safety.md) | 线程安全保证（对象持有模式）、无全局 init() |
 
 ### 测试层
 
@@ -85,7 +83,7 @@ docs/design/
 
 | 文件 | 职能 |
 |---|---|
-| [roadmap.md](roadmap.md) | v0.0.1 实现范围、非目标、未来扩展（缓存 / 跨平台） |
+| [roadmap.md](roadmap.md) | v0.0.1 实现范围、非目标、未来扩展（缓存内置 / 跨平台 / 拓扑模块） |
 
 ## 阅读顺序
 

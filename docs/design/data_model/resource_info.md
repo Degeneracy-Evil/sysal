@@ -1,6 +1,6 @@
 # ResourceInfo
 
-Describes the physical and logical resources of the system.
+描述系统的物理与逻辑资源。
 
 ```cpp
 struct ResourceInfo
@@ -11,13 +11,12 @@ struct ResourceInfo
     NetworkSubsystem network;
     StorageSubsystem storage;
     PciSubsystem pci;
-    TopologyInfo topology;
 };
 ```
 
 ## CPU
 
-CPU topology uses parent IDs to express the package → core → logical CPU hierarchy.
+CPU 拓扑通过父 ID 表达 package → core → 逻辑 CPU 的层次结构。
 
 ```cpp
 using CpuPackageId = StrongId<uint32_t>;
@@ -38,17 +37,17 @@ struct CpuPackage
 struct CpuCore
 {
     CpuCoreId id;
-    CpuPackageId package_id;               // parent
+    CpuPackageId package_id;               // 父节点
     uint32_t logical_threads;
-    std::optional<NumaNodeId> numa_node;
+    std::optional<NumaNodeId> numa_node;    // 直接从 sysfs 读取
 };
 
 struct LogicalCpu
 {
     LogicalCpuId id;
-    CpuCoreId core_id;                     // parent
-    CpuPackageId package_id;               // denormalized for convenience
-    std::optional<NumaNodeId> numa_node;
+    CpuCoreId core_id;                     // 父节点
+    CpuPackageId package_id;               // 为便利而反范式化
+    std::optional<NumaNodeId> numa_node;   // 直接从 sysfs 读取
     bool visible_to_current_process;
 };
 
@@ -61,7 +60,7 @@ struct CpuSubsystem
     std::vector<NumaNode> numa_nodes;
     std::vector<IsaExtension> isa_extensions;
 
-    // convenience queries
+    // 便利查询方法
     const CpuPackage* find_package(CpuPackageId id) const;
     const CpuCore* find_core(CpuCoreId id) const;
     const LogicalCpu* find_logical_cpu(LogicalCpuId id) const;
@@ -72,8 +71,11 @@ struct CpuSubsystem
 };
 ```
 
-`LogicalCpu::package_id` is denormalized — derivable via `core_id → CpuCore::package_id` —
-but stored directly to avoid two-step lookups on hot paths.
+`LogicalCpu::package_id` 是反范式化字段——可通过 `core_id → CpuCore::package_id` 推导得到——
+但直接存储以避免在热路径上进行两步查找。
+
+`CpuCore::numa_node` 与 `LogicalCpu::numa_node` 是设备级 NUMA 归属信息，
+直接从 sysfs 读取，不依赖任何拓扑关系构建过程。
 
 ## Memory
 
@@ -112,7 +114,7 @@ struct AcceleratorDevice
     DeviceName name;
 
     std::optional<PciAddress> pci_address;
-    std::optional<NumaNodeId> nearest_numa_node;
+    std::optional<NumaNodeId> nearest_numa_node;  // 直接从 sysfs 读取
     std::optional<MemorySize> memory_size;
     std::optional<DriverId> driver;
 
@@ -132,7 +134,10 @@ struct AcceleratorSubsystem
 };
 ```
 
-`devices` is the source of truth; convenience methods are non-owning filters.
+`devices` 是数据真源；便利方法均为非持有型的过滤查询。
+
+`AcceleratorDevice::nearest_numa_node` 是设备级 NUMA 归属信息，
+直接从 sysfs 读取，不依赖任何拓扑关系构建过程。
 
 ## Network
 
@@ -170,7 +175,7 @@ struct PciDevice
     Vendor vendor;
     DeviceName device_name;
     PciClass device_class;
-    std::optional<NumaNodeId> numa_node;   // denormalized from DeviceLocality
+    std::optional<NumaNodeId> numa_node;   // 从 sysfs 直接读取
 };
 
 struct PciSubsystem
@@ -181,9 +186,8 @@ struct PciSubsystem
 };
 ```
 
-`PciSubsystem` is the device inventory ("what exists").
-`TopologyInfo` is the relationship graph ("how they connect").
-`PciDevice::numa_node` is denormalized from `DeviceLocality` for convenience.
+`PciSubsystem` 是设备清单（"存在什么"）。
+`PciDevice::numa_node` 是设备级 NUMA 归属信息，从 sysfs 直接读取，便于直接访问。
 
 ## Storage
 
@@ -194,7 +198,7 @@ struct StorageDevice
     DeviceName name;
     std::optional<MemorySize> capacity;
     std::optional<PciAddress> pci_address;
-    StorageKind kind;                     // Nvme, Sata, Sas, ...
+    StorageKind kind;                     // Nvme, Sata, Sas 等
 };
 
 struct StorageSubsystem
@@ -203,4 +207,4 @@ struct StorageSubsystem
 };
 ```
 
-Storage is minimal in v0.0.1.
+在 v0.0.1 中，Storage 仅提供基本的设备清单信息。

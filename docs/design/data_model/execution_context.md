@@ -1,6 +1,6 @@
 # ExecutionContextInfo
 
-Describes restrictions and environment of the current process.
+描述当前进程的限制与环境。
 
 ```cpp
 struct ExecutionContextInfo
@@ -12,14 +12,14 @@ struct ExecutionContextInfo
     PermissionInfo permissions;
     std::optional<ContainerInfo> container;
 
-    // pre-computed visible resource IDs (convenience index)
+    // 预计算的可见资源 ID（便利索引）
     std::vector<LogicalCpuId> visible_logical_cpu_ids;
     std::vector<AcceleratorId> visible_accelerator_ids;
     std::vector<InterfaceName> visible_network_interface_names;
 };
 ```
 
-This section is important because the current process may not see the full machine.
+本节很重要，因为当前进程不一定能看到整台机器。
 
 ```txt
 Host has 8 GPUs.
@@ -29,16 +29,16 @@ Host has 192 logical CPUs.
 Current process is restricted to 32 logical CPUs.
 ```
 
-Upper-layer libraries should usually use visible resources rather than physical resources.
+上层库通常应使用可见资源而非物理资源。
 
-## Visibility Model
+## 可见性模型
 
-Every resource type carries a `visible_to_current_process` flag (source of truth).
-`ExecutionContextInfo` provides pre-computed ID lists for quick lookup (convenience).
+每个资源类型都携带一个 `visible_to_current_process` 标志（事实来源）。
+`ExecutionContextInfo` 提供预计算的 ID 列表，便于快速查找（便利用途）。
 
-| Resource | Visibility determined by |
+| 资源 | 可见性判定依据 |
 |---|---|
-| CPU | cpuset / cgroup restrictions |
-| GPU | `CUDA_VISIBLE_DEVICES` / `HIP_VISIBLE_DEVICES` / cgroup device controller |
-| Network | network namespace isolation / cgroup |
-| Memory | follows CPU visibility (NUMA node has visible CPUs) |
+| CPU | cpuset / cgroup 限制 |
+| GPU | `CUDA_VISIBLE_DEVICES` / `HIP_VISIBLE_DEVICES` / cgroup 设备控制器 |
+| 网络 | 网络命名空间隔离 / cgroup |
+| 内存 | 跟随 CPU 可见性（NUMA 节点含有可见 CPU） |
