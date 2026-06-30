@@ -257,7 +257,7 @@ if [ "$SKIP_TEST" = false ]; then
 
     TEST_FAIL=0
 
-    TEST_TARGETS=$(grep -oP 'test_target\("\K[^"]+' xmake.lua 2>/dev/null || true)
+    TEST_TARGETS=$(grep -oP '(?:test_target|test_target_shared)\("\K[^"]+' xmake.lua 2>/dev/null || true)
 
     if [ -z "$TEST_TARGETS" ]; then
         mark_pass "tests (no test targets)"

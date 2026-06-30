@@ -11,22 +11,16 @@ add_ldflags("-stdlib=libc++", "-fuse-ld=lld", "-rtlib=compiler-rt", "-unwindlib=
             {force = true})
 add_includedirs("include")
 
--- 辅助函数：创建测试 binary target
-local function test_target(name, source)
-    target(name)
-        set_kind("binary")
-        add_files(source)
-        add_deps("sysal")
-        add_includedirs("src")
-        -- 测试必须启用 assert：显式取消 NDEBUG
-        add_cxxflags("-UNDEBUG", {force = true})
-end
+-- 源文件列表（共享给静态库和动态库）
+local SYSAL_SOURCES = {
+    "src/**.cpp"
+}
 
----------------------------------------- 主库
+---------------------------------------- 静态库
 
-target("sysal")
+target("sysal_static")
     set_kind("static")
-    add_files("src/**.cpp")
+    add_files(SYSAL_SOURCES)
     add_includedirs("src")
 
     on_load(function (target)
@@ -58,7 +52,35 @@ target("sysal")
         end
     end)
 
+---------------------------------------- 动态库
+
+target("sysal_shared")
+    set_kind("shared")
+    add_files(SYSAL_SOURCES)
+    add_includedirs("src")
+
 ---------------------------------------- 测试目标
+
+-- 辅助函数：创建测试 binary target（链接静态库）
+local function test_target(name, source)
+    target(name)
+        set_kind("binary")
+        add_files(source)
+        add_deps("sysal_static")
+        add_includedirs("src")
+        -- 测试必须启用 assert：显式取消 NDEBUG
+        add_cxxflags("-UNDEBUG", {force = true})
+end
+
+-- testbench 链接动态库
+local function test_target_shared(name, source)
+    target(name)
+        set_kind("binary")
+        add_files(source)
+        add_deps("sysal_shared")
+        add_includedirs("src")
+        add_cxxflags("-UNDEBUG", {force = true})
+end
 
 test_target("test_types", "tests/test_types.cpp")
 test_target("test_model", "tests/test_model.cpp")
@@ -79,4 +101,4 @@ test_target("test_resolve", "tests/test_resolve.cpp")
 test_target("test_collect", "tests/test_collect.cpp")
 test_target("test_serialization", "tests/test_serialization.cpp")
 test_target("test_replay", "tests/test_replay.cpp")
-test_target("testbench", "tests/testbench.cpp")
+test_target_shared("testbench", "tests/testbench.cpp")
