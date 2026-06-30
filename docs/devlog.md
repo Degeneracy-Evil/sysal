@@ -1,5 +1,13 @@
 # 开发记录
 
+### 2026-06-30 Phase 7: Software、Execution 域解析器
+
+- **变更类型**: src / build
+- **涉及文件**: src/parser/software.hpp, src/parser/software.cpp, src/parser/execution.hpp, src/parser/execution.cpp, tests/test_parse_software.cpp, tests/test_parse_execution.cpp, xmake.lua
+- **变更内容**: 新增 software 和 execution 两个域解析器。software 解析 NVIDIA 驱动版本（nvidia-smi）和 CUDA 版本（nvcc --version），构建 SoftwareStack。execution 解析 /proc/self/status（进程、权限、cpuset）、/proc/self/cgroup（cgroup v1/v2）、环境变量、容器检测，构建 ExecutionContext。两个解析器均遵循 parse_<domain>(const RawStore&, warnings) → optional<T> 接口，不调用任何 syscall。
+- **原因**: Phase 7 最后两个域解析器，完成全部 10 个域的解析器实现
+- **验证**: xmake -r 成功，xmake run test_parse_software 和 test_parse_execution 通过，utils/check.sh 全部 4 项检查通过
+
 ### 2026-06-30 Phase 7: Accelerator、Storage 域解析器
 
 - **变更类型**: src / build
