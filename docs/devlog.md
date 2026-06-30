@@ -1,5 +1,31 @@
 # 开发记录
 
+### 2026-06-30 Phase 6: Linux procfs 与 sysfs 采集器
+
+- **变更类型**: src / build
+- **涉及文件**: src/reader/linux/file_utils.hpp, src/reader/linux/procfs.hpp, src/reader/linux/procfs.cpp, src/reader/linux/sysfs.hpp, src/reader/linux/sysfs.cpp, tests/test_reader.cpp, xmake.lua, docs/devlog.md
+- **变更内容**:
+  1. `file_utils.hpp`：header-only 工具库，提供 `read_file`（读取文件全部内容）、`read_command`（popen 执行命令并读取标准输出）、`file_exists`（检查文件是否存在）、`add_record`（向 RawStore 添加 RawRecord 便利函数）
+  2. `procfs.hpp` + `procfs.cpp`：实现 `read_procfs(RawStore&, Collect flags)`，按 Collect 位掩码采集：Platform 域（/proc/cpuinfo、/proc/version、/etc/os-release、uname -m、/.dockerenv）、Memory 域（/proc/meminfo）、Accelerator 域（nvidia-smi、nvcc）、Network 域（lspci）、Storage 域（lsblk）、Pci 域（lspci 补充）、Software 域（nvidia-smi/nvcc 补充）、Execution 域（/proc/self/cgroup、/proc/self/status、/proc/1/cgroup、7 个环境变量）。跨域共享来源（如 ProcCpuInfo）仅采集一次
+  3. `sysfs.hpp` + `sysfs.cpp`：实现 `read_sysfs(RawStore&, Collect flags)`，按 Collect 位掩码采集：Cpu 域（遍历 /sys/devices/system/cpu/cpuN，读取 topology/physical_package_id、topology/core_id、online、cpufreq/base_frequency、cpufreq/scaling_max_freq）、Memory 域（遍历 /sys/devices/system/node/nodeN，读取 cpulist、meminfo）、Network 域（遍历 /sys/class/net，读取 address、operstate、speed）、Pci 域（遍历 /sys/bus/pci/devices，读取 vendor、device、class、numa_node）、Storage 域（遍历 /sys/block，读取 size、device/model）、Platform 域（/sys/class/dmi/id 下 6 个 DMI 文件）
+  4. `tests/test_reader.cpp`：file_utils 测试（read_file 成功/失败、file_exists）、procfs 采集测试（10 个 RawSource 断言）、sysfs 采集测试（6 个 RawSource 断言）、合并采集测试（记录数与采集状态验证）
+  5. xmake.lua 新增 `test_target("test_reader", "tests/test_reader.cpp")`
+- **原因**: Phase 6 重写计划要求实现 Reader 层，将所有原始数据采集到 RawStore，修复 C-1 bug（parser 不直接调用 syscall，而是从 Reader 采集的 /proc/self/status 中解析 PID/UID/GID）
+- **验证**: `utils/check.sh` 全部 4 项通过（clang-format + clang-tidy + build + tests）；`xmake run test_reader` 全部断言通过
+
+### 2026-06-30 Phase 5: RawStore JSON 序列化与 save/load 测试基础设施
+
+- **变更类型**: src / build
+- **涉及文件**: include/sysal/test/replay.hpp, src/serialization/serialize.cpp, tests/test_raw_store_io.cpp, xmake.lua, src/reader/linux/file_utils.hpp, src/reader/linux/procfs.cpp, src/reader/linux/sysfs.cpp, docs/devlog.md
+- **变更内容**:
+  1. `include/sysal/test/replay.hpp`：声明 `load_raw_store` 和 `save_raw_store`（`collect_from_raw` 留待 Phase 8）
+  2. `src/serialization/serialize.cpp`：实现 RawStore ↔ JSON 序列化。JSON 格式为顶层对象含 `records` 数组，每条记录含 `source`（RawSource 整数值）、`path_or_command`（字符串）、`payload`（字符串）、`status`（CollectStatus 整数值）、`collected_at`（epoch 毫秒）。实现 `save_raw_store`（写 JSON 到文件）和 `load_raw_store`（读文件并解析为 RawStore），失败时抛 `SysalError`
+  3. `tests/test_raw_store_io.cpp`：4 组测试——往返一致性（3 条不同来源记录 save→load→比较）、加载不存在文件抛 SysalError(FileNotFound)、加载畸形 JSON 抛 SysalError(DeserializationError)、空 RawStore 往返
+  4. xmake.lua 新增 `test_target("test_raw_store_io", "tests/test_raw_store_io.cpp")`
+  5. 修复预存文件的 clang-format 和 clang-tidy 问题（file_utils.hpp/procfs.cpp/sysfs.cpp 格式化，sysfs.cpp 中 `auto dir = entry.path()` 改为 `const auto& dir = entry.path()` 消除 unnecessary-copy-initialization 警告）
+- **原因**: Phase 5 重写计划要求实现 RawStore JSON 序列化与 save/load 测试基础设施，为 raw replay 测试策略提供持久化能力
+- **验证**: `utils/check.sh` 全部 4 项通过（clang-format + clang-tidy + build + tests）；`xmake run test_raw_store_io` 4/4 通过
+
 ### 2026-06-30 Phase 2: 数据模型头文件与实现
 
 - **变更类型**: src
