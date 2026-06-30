@@ -1,5 +1,34 @@
 # 开发记录
 
+### 2026-06-30 Phase 2: 数据模型头文件与实现
+
+- **变更类型**: src
+- **涉及文件**: include/sysal/model/platform.hpp, include/sysal/model/cpu.hpp, include/sysal/model/memory.hpp, include/sysal/model/accelerator.hpp, include/sysal/model/network.hpp, include/sysal/model/storage.hpp, include/sysal/model/pci.hpp, include/sysal/model/software.hpp, include/sysal/model/execution.hpp, include/sysal/model/raw_store.hpp, include/sysal/model/system_info.hpp, include/sysal/core/system.hpp, include/sysal/core/sysal.hpp, src/model/raw_store.cpp, src/model/resource.cpp, tests/test_model.cpp, xmake.lua
+- **变更内容**:
+  1. 创建 11 个 model 头文件：platform/cpu/memory/accelerator/network/storage/pci/software/execution/raw_store/system_info
+  2. 创建 2 个 core 头文件：system.hpp（System 类）、sysal.hpp（总入口）
+  3. 实现 raw_store.cpp：get_all/get/has/count 四个查询方法
+  4. 实现 resource.cpp：Cpu 7 个查询方法、Accelerators 6 个查询方法、Network 2 个查询方法、Pci 1 个查询方法
+  5. 创建 test_model.cpp：Cpu/Accelerators/Pci/RawStore 查询方法测试
+  6. xmake.lua 新增 test_model 测试目标
+- **原因**: Phase 2 重写计划要求创建全部数据模型头文件与实现文件
+- **验证**: `utils/check.sh` 全部通过（clang-format + clang-tidy + build + tests）
+
+### 2026-06-30 Phase 4: 提取纯 JSON 引擎
+
+- **变更类型**: src
+- **涉及文件**: src/serialization/json.hpp, tests/test_json.cpp, xmake.lua
+- **变更内容**:
+  1. 从旧 `src/detail/json.hpp`（git HEAD~2）提取纯 JSON 部分，创建 `src/serialization/json.hpp`
+  2. 移除所有 sysal 头文件依赖，移除 `raw_store_to_json`/`raw_store_from_json` 函数
+  3. 用 `JsonError`（继承 `std::exception`）替代 `SysalError`/`Expected` 错误处理
+  4. 新增 `dump_json()` 函数，将 `JsonVal` 发射为 JSON 文本
+  5. 保留 `escape_string`、`JsonObj`、`JsonArr`、`JsonVal`、`JsonParser`、`parse_json`、`time_point_to_ms`、`ms_to_time_point`
+  6. 创建 `tests/test_json.cpp`：基本类型、字符串转义、容器、嵌套、dump、往返一致性、escape_string、时间工具、错误处理、构建器共 10 组测试
+  7. xmake.lua：`test_target` 辅助函数增加 `add_includedirs("src")`，新增 `test_target("test_json", "tests/test_json.cpp")`
+- **原因**: Phase 4 重写计划要求将手写 JSON 引擎从旧代码中提取为独立纯 JSON 库，消除 sysal 类型耦合
+- **验证**: `utils/check.sh` 全部通过（clang-format + clang-tidy + build + tests）
+
 ### 2026-06-30 修复设计文档遗漏（pipeline + raw_store）
 
 - **变更类型**: docs

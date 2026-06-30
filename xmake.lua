@@ -17,6 +17,7 @@ local function test_target(name, source)
         set_kind("binary")
         add_files(source)
         add_deps("sysal")
+        add_includedirs("src")
 end
 
 ---------------------------------------- 主库
@@ -58,3 +59,5 @@ target("sysal")
 ---------------------------------------- 测试目标
 
 test_target("test_types", "tests/test_types.cpp")
+test_target("test_model", "tests/test_model.cpp")
+test_target("test_json", "tests/test_json.cpp")

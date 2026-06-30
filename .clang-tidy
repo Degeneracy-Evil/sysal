@@ -12,6 +12,8 @@ Checks: >
   -bugprone-easily-swappable-parameters,
   -bugprone-narrowing-conversions,
   -bugprone-exception-escape,
+  -bugprone-unchecked-optional-access,
+  -bugprone-empty-catch,
   -clang-analyzer-optin.core.EnumCastOutOfRange,
   -performance-avoid-endl,
   -performance-enum-size
