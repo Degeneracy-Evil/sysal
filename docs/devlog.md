@@ -1,5 +1,18 @@
 # 开发记录
 
+### 2026-06-30 Phase 7: Platform、CPU、Memory 域解析器
+
+- **变更类型**: src / build
+- **涉及文件**: src/parser/platform.hpp, src/parser/platform.cpp, src/parser/cpu.hpp, src/parser/cpu.cpp, src/parser/memory.hpp, src/parser/memory.cpp, tests/test_parse_platform.cpp, tests/test_parse_cpu.cpp, tests/test_parse_memory.cpp, xmake.lua, docs/devlog.md
+- **变更内容**:
+  1. `platform.hpp` + `platform.cpp`：实现 `parse_platform(RawStore&, warnings)` → `std::optional<Platform>`。解析 EtcOsRelease（os-release 键值对）→ Os，ProcVersion（内核发行号、编译时间）→ Kernel，Uname（架构名称、位宽、字节序）→ Architecture，SysfsDmi（BIOS 厂商/版本/日期、产品名/厂商/序列号）→ Firmware + Host，ProcOneCgroup + RootDockerenv（Docker/KVM 虚拟化检测）→ Virtualization
+  2. `cpu.hpp` + `cpu.cpp`：实现 `parse_cpu(RawStore&, warnings)` → `std::optional<Cpu>`。解析 ProcCpuInfo（逐行解析，空行分隔条目）→ CpuPackage/CpuCore/LogicalCpu 拓扑，flags → IsaExtension 列表，SysfsCpu（cpufreq base_frequency/scaling_max_freq）→ 频率，SysfsNuma（cpulist 范围解析）→ NumaNode 映射
+  3. `memory.hpp` + `memory.cpp`：实现 `parse_memory(RawStore&, warnings)` → `std::optional<Memory>`。解析 ProcMemInfo（MemTotal/MemAvailable kB→bytes）→ 总量/可用，SysfsNuma（nodeN/meminfo）→ NumaMemory 列表
+  4. 三个测试文件：手造 RawStore 载荷，断言结构化字段（6 组平台测试、6 组 CPU 测试、5 组内存测试）
+  5. xmake.lua 新增 test_parse_platform、test_parse_cpu、test_parse_memory 三个测试目标
+- **原因**: Phase 7 要求实现 Parser 层，将 RawStore 原始证据解析为强类型模型
+- **验证**: `utils/check.sh` 全部通过（clang-format + clang-tidy + build + 9 tests）
+
 ### 2026-06-30 Phase 6: Linux procfs 与 sysfs 采集器
 
 - **变更类型**: src / build
