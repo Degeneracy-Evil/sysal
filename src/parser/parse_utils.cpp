@@ -66,6 +66,10 @@ std::optional<std::uint64_t> parse_uint(std::string_view s)
     {
         return std::nullopt;
     }
+    if(ptr != trimmed.data() + trimmed.size())
+    {
+        return std::nullopt; // 部分消费：剩余字符非数字
+    }
     return value;
 }
 
@@ -81,6 +85,10 @@ std::optional<std::uint64_t> parse_hex(std::string_view s)
     if(ec != std::errc{})
     {
         return std::nullopt;
+    }
+    if(ptr != trimmed.data() + trimmed.size())
+    {
+        return std::nullopt; // 部分消费：剩余字符非十六进制
     }
     return value;
 }

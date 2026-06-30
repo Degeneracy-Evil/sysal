@@ -70,6 +70,7 @@ std::optional<Network> parse_network(const RawStore& raw, std::vector<std::strin
     auto net_records = raw.get_all(RawSource::SysfsNet);
     if(net_records.empty())
     {
+        warnings.push_back("parse_network: 缺少 SysfsNet 数据");
         return std::nullopt;
     }
 

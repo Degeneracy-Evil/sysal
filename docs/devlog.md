@@ -1,5 +1,24 @@
 # 开发记录
 
+### 2026-07-01 F2c: 4 个 parser 空数据时添加 warning
+
+- **变更类型**: src / fix
+- **涉及文件**: src/parser/network.cpp, src/parser/pci.cpp, src/parser/storage.cpp, src/parser/accelerator.cpp, docs/devlog.md
+- **变更内容**: network/pci/storage/accelerator 4 个 parser 在源数据为空时静默返回 nullopt，现添加 warning 消息（`"parse_network: 缺少 SysfsNet 数据"` 等），与 cpu/memory/platform parser 保持一致
+- **原因**: 4 个 parser 与 cpu/memory/platform 行为不一致，缺少 warning 不利于调试
+- **验证**: `utils/check.sh` 全部 4 项通过
+
+### 2026-07-01 F2: 修复 parse_uint/parse_hex 部分消费 + collect() 全失败抛异常
+
+- **变更类型**: src / fix
+- **涉及文件**: src/parser/parse_utils.cpp, tests/test_parse_utils.cpp, src/pipeline/pipeline.cpp, tests/test_collect.cpp, docs/devlog.md
+- **变更内容**:
+  1. `parse_uint` / `parse_hex` 新增 `ptr != trimmed.data() + trimmed.size()` 检查：`from_chars` 部分消费时返回 `nullopt`，拒绝 `"123abc"` / `"ffxyz"` 等输入
+  2. `run_replay` 在 `record_collector_status` 之后检查全部请求采集器失败时抛出 `SysalError(ErrorKind::CollectionFailed, ...)`
+  3. 新增测试：parse_uint/parse_hex 部分消费拒绝、空 RawStore 调用 collect_from_raw 抛 SysalError
+- **原因**: `from_chars` 不要求消费全部输入，原实现静默接受部分消费导致错误值；设计文档要求全部采集器失败时抛 SysalError 但原实现未实现
+- **验证**: `utils/check.sh` 全部通过（clang-format + clang-tidy + build + tests）
+
 ### 2026-07-01 F1a: 修复 read_cpufreq 忽略 package_id
 
 - **变更类型**: src / fix

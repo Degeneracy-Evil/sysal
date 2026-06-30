@@ -19,6 +19,7 @@
 #include "resolver/resolve.hpp"
 
 #include "sysal/core/collect.hpp"
+#include "sysal/core/error.hpp"
 #include "sysal/core/system.hpp"
 #include "sysal/model/raw_store.hpp"
 #include "sysal/test/replay.hpp"
@@ -131,6 +132,14 @@ System run_replay(const RawStore& raw, Collect flags, std::vector<std::string>& 
     std::vector<std::string> succeeded_collectors;
     std::vector<std::string> failed_collectors;
     record_collector_status(result, succeeded_collectors, failed_collectors);
+
+    // 全部请求的采集器失败时抛出异常
+    if(succeeded_collectors.empty() && !failed_collectors.empty())
+    {
+        throw SysalError(ErrorKind::CollectionFailed, "all requested collectors failed: " +
+                                                          std::to_string(failed_collectors.size()) +
+                                                          " collectors");
+    }
 
     // Resolver：合并、冲突解决、可见性计算
     auto info = resolve(std::move(result), warnings);

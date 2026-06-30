@@ -1,4 +1,7 @@
+#include "sysal/core/error.hpp"
 #include "sysal/core/system.hpp"
+#include "sysal/model/raw_store.hpp"
+#include "sysal/test/replay.hpp"
 
 #include <cassert>
 #include <string>
@@ -48,6 +51,23 @@ int main()
 
         // 采集耗时非负
         assert(sys.meta.collect_duration.count() >= 0.0);
+    }
+
+    // ---- 测试 4: 全部采集器失败时抛出 SysalError ----
+    {
+        RawStore empty_raw;
+        bool threw = false;
+        try
+        {
+            auto sys = sysal::test::collect_from_raw(empty_raw, Collect::Cpu);
+            (void)sys;
+        }
+        catch(const SysalError& e)
+        {
+            assert(e.kind() == ErrorKind::CollectionFailed);
+            threw = true;
+        }
+        assert(threw);
     }
 
     return 0;

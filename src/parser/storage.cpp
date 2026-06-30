@@ -67,7 +67,7 @@ std::optional<Storage> parse_storage(const RawStore& raw, std::vector<std::strin
     auto block_records = raw.get_all(RawSource::SysfsBlock);
     if(block_records.empty())
     {
-        // 无 sysfs block 数据，表示未检测到存储设备
+        warnings.push_back("parse_storage: 缺少 SysfsBlock 数据");
         return std::nullopt;
     }
 

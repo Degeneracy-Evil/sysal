@@ -46,11 +46,21 @@ int main()
     assert(!parse_uint("abc").has_value());
     assert(!parse_uint("").has_value());
 
+    // parse_uint 拒绝部分消费
+    assert(!parse_uint("123abc").has_value());
+    assert(!parse_uint("12 34").has_value());
+    assert(!parse_uint("0x10").has_value());
+
     // parse_hex
     assert(parse_hex("0a").has_value() && *parse_hex("0a") == 10);
     assert(parse_hex("ff").has_value() && *parse_hex("ff") == 255);
     assert(parse_hex("41").has_value() && *parse_hex("41") == 65);
     assert(!parse_hex("xyz").has_value());
+
+    // parse_hex 拒绝部分消费
+    assert(!parse_hex("ffxyz").has_value());
+    assert(!parse_hex("fg").has_value());
+    assert(!parse_hex("10ab cd").has_value());
 
     // parse_pci_address (十六进制，修复 B-1 bug)
     auto addr1 = parse_pci_address("0000:41:00.0");

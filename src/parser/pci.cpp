@@ -63,6 +63,7 @@ std::optional<Pci> parse_pci(const RawStore& raw, std::vector<std::string>& warn
     auto pci_records = raw.get_all(RawSource::SysfsPci);
     if(pci_records.empty())
     {
+        warnings.push_back("parse_pci: 缺少 SysfsPci 数据");
         return std::nullopt;
     }
 

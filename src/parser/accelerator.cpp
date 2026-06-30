@@ -160,7 +160,7 @@ std::optional<Accelerators> parse_accelerator(const RawStore& raw,
     auto nvidia_records = raw.get_all(RawSource::NvidiaSmi);
     if(nvidia_records.empty())
     {
-        // 无 nvidia-smi 数据，表示未检测到加速器
+        warnings.push_back("parse_accelerator: 缺少 nvidia-smi 数据");
         return std::nullopt;
     }
 
