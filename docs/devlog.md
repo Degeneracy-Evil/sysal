@@ -1,5 +1,26 @@
 # 开发记录
 
+### 2026-06-30 Phase 7: Accelerator、Storage 域解析器
+
+- **变更类型**: src / build
+- **涉及文件**: src/parser/accelerator.hpp, src/parser/accelerator.cpp, src/parser/storage.hpp, src/parser/storage.cpp, tests/test_parse_accelerator.cpp, tests/test_parse_storage.cpp, xmake.lua, docs/devlog.md
+- **变更内容**:
+  1. `accelerator.hpp` + `accelerator.cpp`：实现 `parse_accelerator(RawStore&, warnings)` → `std::optional<Accelerators>`。解析 NvidiaSmi CSV 输出（index/name/pci.bus_id/memory.total）→ AcceleratorDevice 列表，支持 MiB/GiB/KiB 单位转换，SysfsPci numa_node 查找（D-4 修正）
+  2. `storage.hpp` + `storage.cpp`：实现 `parse_storage(RawStore&, warnings)` → `std::optional<Storage>`。解析 SysfsBlock 记录（按设备名分组，size×512→容量），设备名前缀推断 StorageKind（nvme→Nvme, sd→Sata），B-2 修正：PCI 地址暂缺并发出警告
+  3. `test_parse_accelerator.cpp`：4 个测试（2 GPU 解析、NUMA 查找、空数据 nullopt、GiB 单位）
+  4. `test_parse_storage.cpp`：4 个测试（nvme+sda 解析、空数据 nullopt、Other 类型推断、B-2 警告）
+  5. `xmake.lua`：新增 test_parse_accelerator、test_parse_storage 两个测试目标
+- **原因**: Phase 7 域解析器实现，accelerator 和 storage 两个子域
+- **验证**: `utils/check.sh` 全部通过（clang-format + clang-tidy + build + tests）
+
+### 2026-06-30 Phase 7: PCI、Network 域解析器
+
+- **变更类型**: src / build
+- **涉及文件**: src/parser/pci.hpp, src/parser/pci.cpp, src/parser/network.hpp, src/parser/network.cpp, tests/test_parse_pci.cpp, tests/test_parse_network.cpp, xmake.lua
+- **变更内容**: 新增 PCI 和 Network 域解析器，从 RawStore 中解析 Pci/Network 结构体；PCI 解析器从 SysfsPci 记录提取地址、厂商、设备名、类别、NUMA 节点；Network 解析器从 SysfsNet 记录提取接口名、MAC、链路状态、速率；新增对应测试；xmake.lua 添加 test_parse_pci 和 test_parse_network 目标
+- **原因**: Phase 7 域解析器扩展，覆盖 PCI 和 Network 子系统
+- **验证**: `utils/check.sh` 全量通过（clang-format + clang-tidy + build + tests）
+
 ### 2026-06-30 Phase 7: Platform、CPU、Memory 域解析器
 
 - **变更类型**: src / build
