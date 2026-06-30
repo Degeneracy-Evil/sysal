@@ -1,5 +1,15 @@
 # 开发记录
 
+### 2026-07-01 新增代码质量评审方法与首份评审报告
+
+- **变更类型**: docs
+- **涉及文件**: docs/code_quality_review_method.md, docs/quality_reports/v001_initial_rewrite.md
+- **变更内容**:
+  1. 新增 `docs/code_quality_review_method.md`：定义可复用的多维度代码质量评审方法（9 个维度、权重分配、Oracle agent 分批执行流程、prompt 模板、汇总报告格式）
+  2. 新增 `docs/quality_reports/v001_initial_rewrite.md`：v0.0.1 重写后的首份质量评审报告（加权总分 8/10，9 维度详评，11 个关键问题按 P0/P1/P2 排序）
+- **原因**: 建立可复用的代码质量评价体系，便于后续开发周期重复执行；记录首次评审基线供后续对比
+- **验证**: 方法文档与报告文档分离存放；评审由 5 个 Oracle agent 分 3 批并行执行
+
 ### 2026-06-30 Phase 10: 测试基础设施与重写收尾
 
 - **变更类型**: src / build / docs
