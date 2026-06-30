@@ -2,9 +2,9 @@
 #include "reader/linux/procfs.hpp"
 #include "reader/linux/sysfs.hpp"
 
-#include <sysal/core/collect.hpp>
-#include <sysal/model/raw_store.hpp>
-#include <sysal/types/enums.hpp>
+#include "sysal/core/collect.hpp"
+#include "sysal/model/raw_store.hpp"
+#include "sysal/types/enums.hpp"
 
 #include <cassert>
 #include <iostream>

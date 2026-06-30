@@ -1,3 +1,7 @@
+/// @file memory.cpp
+/// @brief 内存解析器实现
+/// @details 从 /proc/meminfo 和 sysfs NUMA meminfo 解析内存总量和 NUMA 内存分布。
+
 #include "memory.hpp"
 
 #include "parse_utils.hpp"

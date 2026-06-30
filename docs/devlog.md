@@ -1,5 +1,17 @@
 # 开发记录
 
+### 2026-07-01 F3: 一致性修复（/// @file 头、include 风格、testbench 断言、NDEBUG 防护）
+
+- **变更类型**: src / tests / build / chore
+- **涉及文件**: src/parser/cpu.cpp, src/parser/execution.cpp, src/parser/platform.cpp, src/parser/accelerator.cpp, src/parser/memory.cpp, src/serialization/serialize.cpp, tests/test_types.cpp, tests/test_model.cpp, tests/test_raw_store_io.cpp, tests/test_reader.cpp, tests/test_replay.cpp, tests/testbench.cpp, xmake.lua, docs/devlog.md
+- **变更内容**:
+  1. F3a: 5 个 parser .cpp 文件添加 `/// @file` + `/// @brief` + `/// @details` Doxygen 头（cpu/execution/platform/accelerator/memory）
+  2. F3b: 7 个文件中的 `#include <sysal/...>` 统一改为 `#include "sysal/..."`（serialize.cpp + 6 个测试文件）
+  3. F3c: testbench.cpp 添加 `#include <cassert>` 和 9 个基本断言（collect 后 7 个 + refresh 后 2 个），使其既是 demo 也是有效测试
+  4. F3e: xmake.lua 的 `test_target` helper 添加 `add_cxxflags("-UNDEBUG", {force = true})`，防止测试被 `-DNDEBUG` 编译时 `assert()` 被禁用
+- **原因**: 代码一致性和测试质量问题——部分 .cpp 缺少 Doxygen 头、include 风格不统一、testbench 无断言、assert 可能被禁用
+- **验证**: `utils/check.sh` 全部 4 项通过（clang-format + clang-tidy + build + tests）
+
 ### 2026-07-01 F2c: 4 个 parser 空数据时添加 warning
 
 - **变更类型**: src / fix

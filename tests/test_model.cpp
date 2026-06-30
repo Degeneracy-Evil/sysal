@@ -1,7 +1,7 @@
-#include <sysal/model/accelerator.hpp>
-#include <sysal/model/cpu.hpp>
-#include <sysal/model/pci.hpp>
-#include <sysal/model/raw_store.hpp>
+#include "sysal/model/accelerator.hpp"
+#include "sysal/model/cpu.hpp"
+#include "sysal/model/pci.hpp"
+#include "sysal/model/raw_store.hpp"
 
 #include <cassert>
 #include <chrono>

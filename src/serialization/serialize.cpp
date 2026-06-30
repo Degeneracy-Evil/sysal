@@ -6,11 +6,11 @@
 
 #include "serialization/json.hpp"
 
-#include <sysal/core/error.hpp>
-#include <sysal/model/raw_store.hpp>
-#include <sysal/serialization/serialization.hpp>
-#include <sysal/test/replay.hpp>
-#include <sysal/types/enums.hpp>
+#include "sysal/core/error.hpp"
+#include "sysal/model/raw_store.hpp"
+#include "sysal/serialization/serialization.hpp"
+#include "sysal/test/replay.hpp"
+#include "sysal/types/enums.hpp"
 
 #include <cstdint>
 #include <fstream>

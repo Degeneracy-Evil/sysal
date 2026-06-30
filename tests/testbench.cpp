@@ -3,9 +3,10 @@
 /// @details 采集当前机器全部系统信息，以格式化文本输出各子域数据，
 ///          并演示 JSON 序列化与 refresh 功能。
 
-#include <sysal/core/sysal.hpp>
-#include <sysal/serialization/serialization.hpp>
+#include "sysal/core/sysal.hpp"
+#include "sysal/serialization/serialization.hpp"
 
+#include <cassert>
 #include <iomanip>
 #include <iostream>
 
@@ -108,6 +109,15 @@ int main()
     std::cout << "=== sysal testbench ===\n\n";
 
     auto sys = sysal::System::collect();
+
+    // 基本断言：确保采集到有效数据
+    assert(!sys.info.cpu.logical_cpus.empty());
+    assert(!sys.info.cpu.packages.empty());
+    assert(sys.info.memory.total_memory.value > 0);
+    assert(!sys.info.platform.os.name.empty());
+    assert(!sys.meta.succeeded_collectors.empty());
+    assert(sys.meta.sysal_version == "0.0.1");
+    assert(sys.meta.collect_duration.count() >= 0.0);
 
     // Platform
     std::cout << "Platform:\n";
@@ -303,6 +313,8 @@ int main()
     // Refresh
     std::cout << "\n--- Refresh ---\n";
     sys.refresh();
+    assert(!sys.info.cpu.logical_cpus.empty());
+    assert(sys.info.memory.total_memory.value > 0);
     std::cout << "After refresh: " << sys.info.cpu.logical_cpus.size() << " CPUs, "
               << format_memory(sys.info.memory.total_memory.value) << " memory\n";
 

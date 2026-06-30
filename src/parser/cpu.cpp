@@ -1,3 +1,7 @@
+/// @file cpu.cpp
+/// @brief CPU 解析器实现
+/// @details 从 /proc/cpuinfo 和 sysfs cpufreq 数据中解析 CPU 拓扑、频率和 NUMA 映射。
+
 #include "cpu.hpp"
 
 #include "parse_utils.hpp"

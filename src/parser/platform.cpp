@@ -1,3 +1,7 @@
+/// @file platform.cpp
+/// @brief 平台信息解析器实现
+/// @details 从 /proc 和 sysfs 解析主机名、OS、内核、架构、固件和虚拟化信息。
+
 #include "platform.hpp"
 
 #include "parse_utils.hpp"

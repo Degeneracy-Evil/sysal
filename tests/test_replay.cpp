@@ -3,8 +3,8 @@
 /// @details 从 fixture 文件加载 RawStore，执行 Parser→Resolver 回放管线，
 ///          验证域不变量。首次运行时自动生成 fixture。
 
-#include <sysal/core/system.hpp>
-#include <sysal/test/replay.hpp>
+#include "sysal/core/system.hpp"
+#include "sysal/test/replay.hpp"
 
 #include <cassert>
 #include <filesystem>

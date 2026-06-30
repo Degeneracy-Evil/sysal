@@ -1,3 +1,7 @@
+/// @file accelerator.cpp
+/// @brief 加速器解析器实现
+/// @details 从 nvidia-smi 命令输出和 sysfs PCI 数据中解析 GPU 等加速器信息。
+
 #include "accelerator.hpp"
 
 #include "parse_utils.hpp"

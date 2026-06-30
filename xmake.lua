@@ -18,6 +18,8 @@ local function test_target(name, source)
         add_files(source)
         add_deps("sysal")
         add_includedirs("src")
+        -- 测试必须启用 assert：显式取消 NDEBUG
+        add_cxxflags("-UNDEBUG", {force = true})
 end
 
 ---------------------------------------- 主库

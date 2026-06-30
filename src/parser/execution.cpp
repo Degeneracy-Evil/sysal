@@ -1,3 +1,7 @@
+/// @file execution.cpp
+/// @brief 执行上下文解析器实现
+/// @details 从 /proc/self 系列文件解析进程环境、权限、cgroup 和容器信息。
+
 #include "execution.hpp"
 
 #include "parse_utils.hpp"
