@@ -1,5 +1,38 @@
 # 开发记录
 
+### 2026-06-30 Phase 10: 测试基础设施与重写收尾
+
+- **变更类型**: src / build / docs
+- **涉及文件**: tests/test_replay.cpp, tests/testbench.cpp, tests/fixtures/, xmake.lua, docs/issues.md, docs/devlog.md
+- **变更内容**:
+  1. `tests/test_replay.cpp`：raw replay 测试。首次运行时自动采集当前机器原始数据并保存到 `tests/fixtures/dev_machine.json`；后续运行加载 fixture 执行 Parser→Resolver 回放管线，验证域不变量（CPU 非空、内存 > 0、平台信息非空、网络/PCI 非空、执行上下文有效、元数据完整），并与实时采集对比关键指标（CPU 数量、内存总量）
+  2. `tests/testbench.cpp`：全量 API 演示。采集当前机器全部系统信息，以格式化文本输出各子域（Platform/CPU/Memory/Accelerator/Network/PCI/Storage/Software/Execution），演示 JSON 序列化（pretty print）与 refresh 功能。PCI 地址使用十六进制零填充格式（`%04x:%02x:%02x.%x`），速率输出 Mbps，内存输出 GiB/MiB
+  3. `tests/fixtures/`：fixture 目录，存放 raw replay 测试的原始数据快照
+  4. `xmake.lua`：新增 `test_replay` 和 `testbench` 两个测试目标
+  5. `docs/issues.md`：更新全部 18 个已知问题的状态——14 个已通过重写修复、2 个部分修复（B-2 NVMe symlink 链、D-8 软件栈大面积空白）、2 个已移除（D-3 TopologyInfo、D-5 PciRelation）。移除旧类型名引用（TopologyInfo、Diagnostics、PlatformInfo）
+  6. `docs/devlog.md`：本条目
+- **原因**: Phase 10 重写收尾——创建最终测试基础设施，更新文档反映重写成果
+- **验证**: `xmake -r` 构建成功，`xmake run test_replay` 全部通过，`xmake run testbench` 输出正常，`utils/check.sh` 全部通过
+
+### 2026-06-30 重写总结（Phase 1–10）
+
+sysal v0.0.1 重写完成。10 个阶段的核心变更：
+
+| Phase | 内容 | 关键产出 |
+|-------|------|----------|
+| 1 | 设计文档重写 | 19 个设计文档，反映新架构 |
+| 2 | 数据模型 | 11 个 model 头文件，System/SystemInfo/Collect |
+| 3 | 类型系统 | StrongId/NamedString/ScalarUnit 模板，消除重复 |
+| 4 | JSON 引擎 | 纯 JSON 解析/发射，无 sysal 耦合 |
+| 5 | RawStore 序列化 | save/load_raw_store，测试基础设施 |
+| 6 | Linux Reader | procfs + sysfs 采集器，C-1 修复 |
+| 7 | 9 个域 Parser | platform/cpu/memory/accelerator/storage/pci/network/software/execution |
+| 8 | Resolver + Pipeline + System API | collect/refresh/collect_from_raw，可见性计算 |
+| 9 | System JSON 序列化 | to_json/from_json，版本兼容 |
+| 10 | 测试基础设施 | test_replay + testbench + fixture + 文档更新 |
+
+修复的已知问题：A-1/A-2/A-3、B-1/B-3、C-1/C-2/C-3/C-4、D-1/D-2/D-4/D-6/D-7、E-1/E-2/E-3、F-1/F-2（共 16 个）。部分修复：B-2、D-8。已移除：D-3、D-5。
+
 ### 2026-06-30 Phase 9: System JSON 序列化（to_json / from_json）
 
 - **变更类型**: src / build
