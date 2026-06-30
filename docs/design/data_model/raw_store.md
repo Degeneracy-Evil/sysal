@@ -5,18 +5,34 @@
 ```cpp
 enum class RawSource
 {
-    // Linux（v0.0.1）
+    // Linux procfs（v0.0.1）
     ProcCpuInfo,
     ProcMemInfo,
+    ProcVersion,
+    ProcSelfCgroup,
+    ProcSelfStatus,
+    ProcOneCgroup,
+    // Linux sysfs（v0.0.1）
     SysfsCpu,
+    SysfsNuma,
     SysfsNet,
     SysfsPci,
+    SysfsBlock,
+    SysfsDmi,
+    // Linux 文件 / 命令（v0.0.1）
+    EtcOsRelease,
+    RootDockerenv,
+    Uname,
     Lspci,
-    HwinfoOutput,
-    Nvml,
     NvidiaSmi,
-    Ibverbs,
+    Nvcc,
     Lsblk,
+    // 环境变量（v0.0.1）
+    Environment,
+    // 外部库后端（未来支持）
+    Nvml,
+    Ibverbs,
+    HwinfoOutput,
     // Windows / macOS — 未来支持
 };
 
@@ -52,6 +68,6 @@ struct RawStore
 一个 `RawSource` 可能对应多条记录（例如 `SysfsCpu` 下有许多 sysfs 文件）。
 `path_or_command` 作为次级键，用于细粒度访问。
 
-`RawStore` 在 `SystemSnapshot` 中是可选的。通过在构造 `System` 时
+`RawStore` 在 `System` 中是可选的。通过在 `System::collect()` 时
 将 `Collect::Raw` 加入请求的 `Collect` 位掩码来启用采集；未设置该标志时
-`SystemSnapshot::raw` 为 `std::nullopt`。
+`System::raw` 为 `std::nullopt`。

@@ -1,131 +1,71 @@
 # 概览
 
-## 项目定位
+## sysal 是什么
 
-**sysal** 是一个用于采集和表示服务器系统信息的 C++ 库。
+sysal 是一个 C++ 系统信息抽象库。它采集服务器的硬件与软件信息，归一化为强类型数据结构，
+通过简洁的 API 交给调用方使用。
 
-sysal 默认**不是**独立可执行程序。
-sysal **不是**基准测试框架。
-sysal **不是**算子调度器。
-sysal **不是**性能预测系统。
+sysal 只回答一个问题：**这台机器上有什么，当前进程能看到什么。**
 
-它的职责是：
+它不回答：哪个设备最好、哪个算子该选、系统性能如何。那些是上层项目（opal、opbl）的职责。
 
-```txt
-采集真实的系统信息。
-将其归一化为类型化数据结构。
-通过简单的 API 返回给调用方。
+## 设计哲学
+
+**原始证据优先，类型化模型其次，决策永不。**
+
+所有信息先以原始形态进入 `RawStore`（/proc 文件内容、sysfs 属性、命令输出等），
+再由 Parser 解析为结构化类型，最后由 Resolver 组装为 `System` 对象。
+原始数据始终可追溯，便于调试与测试。
+
+这条原则带来的好处：
+
+- **可调试**：解析结果有误时，可直接检查原始证据
+- **可测试**：无需真实硬件，用保存的原始数据即可回放测试
+- **后端无关**：更换数据来源（procfs → hwloc → NVML）不影响公共 API
+- **跨平台友好**：新增平台只需新增 Reader，类型化模型不变
+
+## 内部管线
+
 ```
-
-sysal 应当返回**事实**，而非**决策**。
-
-例如，sysal 可以返回：
-
-```txt
-GPU0 关联到 NUMA node 0（设备级 numa_node 字段）。
-NIC mlx5_0 关联到 PCI 地址 0000:ca:00.0。
-CUDA 驱动版本可用。
-当前进程只能看到 GPU0 和 GPU1。
-```
-
-sysal 不应返回：
-
-```txt
-GPU0 是 GEMM 的最佳设备。
-NIC mlx5_0 应被选用于通信。
-本系统性能良好。
-```
-
-这些决策属于更高层的项目，例如 opal 或 opbl。
-
-## 核心设计原则
-
-sysal 遵循以下内部管线：
-
-```txt
 Reader → RawStore → Parser → ParseResult → Resolver → System
 ```
 
-核心原则是：
+| 阶段 | 职责 |
+|------|------|
+| Reader | 从 /proc、/sys、命令输出等来源采集原始数据，存入 `RawStore` |
+| Parser | 从 `RawStore` 中按域解析出结构化事实（`ParseResult`），各域独立，无跨域引用 |
+| Resolver | 合并各域事实，解决来源冲突，计算进程可见性，组装最终的 `System` 对象 |
 
-```txt
-原始证据优先。
-类型化模型其次。
-决策永不。
-```
-
-所有采集到的信息应首先进入 raw 层。
-类型化的系统模型应从原始证据中派生。
-
-此设计可改善：
-
-* 可调试性
-* 可测试性
-* 可复现性
-* 原始数据访问
-* 后端可扩展性
-* 未来平台支持
-
-## 与其他项目的关系
-
-```txt
-sysal:  本系统拥有什么？当前进程能看到什么？
-opal:   应当选择哪个算子？
-opbl:   算子运行得多快？
-```
-
-sysal 与 opal 和 opbl 保持独立。
-sysal 可能被 opal 使用，但不包含任何 opal 特定的调度逻辑。
-
-## 架构总结
-
-```txt
-sysal::System::collect(flags)
-    ↓
-Reader 采集原始证据
-    ↓
-RawStore 记录原始数据
-    ↓
-Parser 提取 ParseResult（按域划分，无交叉引用）
-    ↓
-Resolver 合并事实、解决冲突、构建可见性
-    ↓
-System 对象返回给调用方
-```
-
-核心设计原则：
-
-```txt
-类型化的系统信息库。
-基于原始证据。
-后端无关。
-对 LSP 友好。
-不做调度决策。
-```
-
-## API 调用示例
+## 公共 API
 
 ```cpp
-// 采集全部信息
+// 采集——一次调用，返回不可变对象
 sysal::System sys = sysal::System::collect();
 
-// 访问各子系统的类型化模型
+// 访问——直接成员，无需方法调用
 const auto& cpu  = sys.info.cpu;
 const auto& mem  = sys.info.memory;
 const auto& gpus = sys.info.accelerators;
 
-// 仅采集基本子集
-sysal::System basic = sysal::System::collect(sysal::Collect::basic);
-
-// 细粒度控制：按位或组合
-using namespace sysal;
+// 按需采集——位掩码组合
 sysal::System partial = sysal::System::collect(
-    Collect::Platform | Collect::Cpu | Collect::Raw
+    sysal::Collect::Cpu | sysal::Collect::Accelerator | sysal::Collect::Raw
 );
 
-// 刷新已有对象
+// 刷新——重新采集，替换内部状态
 sys.refresh();
 ```
 
-失败时抛出 `SysalError`，不使用非抛出式 API。
-不需要全局 `init()`，后端初始化在 `collect()` 内部自动完成。
+- 不需要全局 `init()`，后端初始化在 `collect()` 内部自动完成
+- 失败时抛出 `SysalError`，部分失败记录到 `sys.warnings`
+- `System` 构造后不可变，多线程 const 访问安全
+
+## 与其他项目的关系
+
+| 项目 | 回答的问题 |
+|------|-----------|
+| **sysal** | 这台机器有什么？当前进程能看到什么？ |
+| **opal** | 应该选哪个算子？ |
+| **opbl** | 这个算子跑得多快？ |
+
+sysal 与 opal、opbl 保持独立。sysal 可能被 opal 使用，但不包含任何调度逻辑。

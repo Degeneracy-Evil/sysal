@@ -76,15 +76,15 @@ namespace sysal
 // 系统信息本体：各子系统的类型化模型
 struct SystemInfo
 {
-    PlatformInfo         platform;
-    CpuSubsystem         cpu;
-    MemorySubsystem      memory;
-    AcceleratorSubsystem accelerators;
-    NetworkSubsystem     network;
-    StorageSubsystem     storage;
-    PciSubsystem         pci;
-    SoftwareStackInfo    software;
-    ExecutionContextInfo execution;
+    Platform          platform;
+    Cpu               cpu;
+    Memory            memory;
+    Accelerators      accelerators;
+    Network           network;
+    Storage           storage;
+    Pci               pci;
+    SoftwareStack     software;
+    ExecutionContext  execution;
 };
 
 class System

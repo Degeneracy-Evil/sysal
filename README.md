@@ -1,292 +1,137 @@
 # sysal
 
-sysal is a C++ system information abstraction library for servers.
+sysal 是一个 C++ 系统信息抽象库，用于服务器。
 
-It is designed to collect, normalize, and expose system information through a clean typed API. sysal focuses on returning real system facts, including hardware resources, software stack, runtime environment, network devices, PCI topology, accelerator information, and raw evidence when needed.
+它采集服务器的硬件与软件信息，归一化为强类型数据结构，通过简洁的 API 交给调用方使用。sysal 只返回**事实**，不做**决策**。
 
-sysal is a **library**, not a standalone system inspection tool.
+## 项目定位
 
-## Project Goal
+sysal 回答一个问题：**这台机器上有什么，当前进程能看到什么。**
 
-sysal aims to provide a stable and extensible system information layer for upper-level projects.
+它不回答：哪个设备最好、哪个算子该选、系统性能如何。那些是上层项目（opal、opbl）的职责。
 
-It answers questions such as:
+sysal 是一个**库**，不是独立的系统巡检工具。
 
-* What CPU, memory, GPU, NIC, storage, and PCI resources does this server have?
-* What resources are visible to the current process?
-* What software stack is available, such as CUDA, ROCm, MPI, UCX, or BLAS libraries?
-* How are devices connected through NUMA and PCI topology?
-* What raw system evidence was used to build the final typed model?
+## 非目标
 
-sysal only returns facts. It does not make scheduling, benchmarking, or performance decisions.
+sysal 不是：
 
-## Non-Goals
+- 算子调度器
+- 基准测试框架
+- 性能评分系统
+- 守护进程
+- 监控系统
+- Web 服务
+- hwloc 的替代品
 
-sysal is not:
+外部库（`NVML`、`ibverbs` 等）可作为后端使用，但 sysal 保持自己的公共数据模型，后端类型不泄漏到 API 中。
 
-* an operator scheduler
-* a benchmark framework
-* a performance scoring system
-* a daemon
-* a monitoring system
-* a web service
-* a replacement for hwloc or other system libraries
+## 核心概念
 
-External libraries such as `hwloc`, `NVML`, or `ibverbs` may be used as backends, but sysal keeps its own public data model.
+sysal 遵循以下内部管线：
 
-## Core Concept
-
-sysal follows this internal pipeline:
-
-```txt
-Read / Probe
-    ↓
-RawStore
-    ↓
-Parser / Adapter
-    ↓
-Normalized Facts
-    ↓
-Resolver / Topology Builder
-    ↓
-SystemSnapshot
+```
+Reader → RawStore → Parser → ParseResult → Resolver → System
 ```
 
-The design principle is:
+设计原则：**原始证据优先，类型化模型其次，决策永不。**
 
-```txt
-Raw evidence first.
-Typed model second.
-Decision never.
-```
+所有信息先以原始形态进入 `RawStore`，再由 Parser 解析为结构化类型，最后由 Resolver 组装为 `System` 对象。
 
-## Main API Style
-
-The public API should remain small and clear.
-
-Example:
+## 公共 API
 
 ```cpp
-auto snapshot = sysal::collect_or_throw(
-    sysal::CollectSpec::for_operator_dispatch()
-        .with_raw()
+// 采集——一次调用，返回不可变对象
+sysal::System sys = sysal::System::collect();
+
+// 访问——直接成员，无需方法调用
+const auto& cpu  = sys.info.cpu;
+const auto& mem  = sys.info.memory;
+const auto& gpus = sys.info.accelerators;
+
+// 按需采集——位掩码组合
+sysal::System partial = sysal::System::collect(
+    sysal::Collect::Cpu | sysal::Collect::Accelerator | sysal::Collect::Raw
 );
 
-const auto& resources = snapshot.resources;
-
-const auto& cpu = resources.cpu;
-const auto& memory = resources.memory;
-const auto& accelerators = resources.accelerators;
-const auto& network = resources.network;
+// 刷新——重新采集，替换内部状态
+sys.refresh();
 ```
 
-Non-throwing style:
+- 不需要全局 `init()`，后端初始化在 `collect()` 内部自动完成
+- 失败时抛出 `SysalError`，部分失败记录到 `sys.warnings`
+- `System` 构造后不可变，多线程 const 访问安全
+- 适用于 MPI 多进程场景：每个进程独立创建自己的 `System` 对象
 
-```cpp
-auto result = sysal::collect(
-    sysal::CollectSpec::for_operator_dispatch()
-        .with_raw()
-);
+## 数据模型
 
-if (!result) {
-    return report_error(result.error());
-}
+`System` 对象持有以下公开成员：
 
-const auto& snapshot = *result;
-const auto& resources = snapshot.resources;
-```
+| 成员 | 类型 | 说明 |
+|------|------|------|
+| `info` | `SystemInfo` | 系统信息本体（扁平结构） |
+| `meta` | `SnapshotMeta` | 采集元数据（时间、版本、耗时） |
+| `warnings` | `std::vector<std::string>` | 采集过程中的警告 |
+| `raw` | `std::optional<RawStore>` | 可选的原始证据 |
 
-## Main Data Model
+`SystemInfo` 扁平包含各子系统：
 
-The central object is `SystemSnapshot`.
+- `Platform`：主机、OS、内核、架构、固件、虚拟化
+- `Cpu`：packages、cores、逻辑 CPU、ISA 扩展
+- `Memory`：总量、NUMA 内存分布
+- `Accelerators`：GPU、NPU、FPGA 设备
+- `Network`：网卡、链路状态、IP、PCI 地址
+- `Storage`：块设备、容量、类型
+- `Pci`：PCI 设备清单
+- `SoftwareStack`：驱动、运行时、编译器、CUDA、ROCm、MPI、RDMA
+- `ExecutionContext`：进程环境、cgroup、cpuset、容器、可见性索引
 
-```cpp
-struct SystemSnapshot {
-    SnapshotMeta meta;
-    PlatformInfo platform;
-    ResourceInfo resources;
-    SoftwareStackInfo software;
-    ExecutionContextInfo execution;
-    Diagnostics diagnostics;
-    std::optional<RawStore> raw;
-};
-```
+## 开发环境
 
-Main sections:
+| 工具 | 最低版本 | 说明 |
+|------|----------|------|
+| clang | 17 | C++23 编译器 |
+| xmake | 2.8 | 构建系统 |
+| lld | — | 链接器 |
+| libc++ | — | C++ 标准库（随 clang 发布） |
+| clang-format | — | 代码格式化（随 clang 发布） |
+| clang-tidy | — | 静态分析（随 clang 发布） |
 
-* `PlatformInfo`: host, OS, kernel, architecture, firmware, virtualization
-* `ResourceInfo`: CPU, memory, accelerators, network, storage, PCI, topology
-* `SoftwareStackInfo`: drivers, runtimes, compilers, libraries, CUDA, ROCm, MPI, RDMA stack
-* `ExecutionContextInfo`: process environment, cgroup, cpuset, permissions, container visibility
-* `TopologyInfo`: NUMA, PCI, device locality, GPU/NIC relationships
-* `RawStore`: optional raw records from `/proc`, `/sys`, `hwloc`, `lspci`, `nvidia-smi`, `ibverbs`, etc.
-* `Diagnostics`: warnings and errors during collection, parsing, and resolving
-
-## Design Principles
-
-### Strong Typed Model
-
-sysal avoids using generic string maps for structured information.
-
-Prefer:
-
-```cpp
-struct MemorySize {
-    std::uint64_t bytes;
-};
-
-struct Frequency {
-    std::uint64_t hz;
-};
-
-struct PciAddress {
-    std::uint16_t domain;
-    std::uint8_t bus;
-    std::uint8_t device;
-    std::uint8_t function;
-};
-```
-
-Instead of:
-
-```cpp
-std::unordered_map<std::string, std::string> info;
-```
-
-This improves type safety, LSP completion, maintainability, and API discoverability.
-
-### Raw Evidence Support
-
-sysal keeps a clear distinction between:
-
-```txt
-Raw evidence
-    and
-Normalized typed model
-```
-
-Raw data is useful for debugging, testing, and verifying parser behavior.
-The final public model should remain typed and structured.
-
-### Backend Independence
-
-sysal may use existing system libraries internally.
-
-Recommended backend direction:
-
-* topology: `hwloc`
-* NVIDIA GPU: `NVML`
-* RDMA: `ibverbs` and sysfs
-* generic Linux hardware information: `/proc`, `/sys`, PCI, command output
-* optional hardware inventory fallback: `hwinfo`
-
-Backend-specific types should not leak into the public API.
-
-## Development Environment
-
-Current target development environment:
-
-* OS: Ubuntu Server 24.04
-* Language: C++23
-* Build system: xmake
-* Code formatting: clang-format
-* Static analysis: clang-tidy
-
-### Prerequisites
-
-| Tool | Min Version | Description |
-|------|-------------|-------------|
-| clang | 17 | C++23 compiler |
-| xmake | 2.8 | Build system |
-| lld | — | Linker |
-| libc++ | — | C++ standard library (bundled with clang) |
-| clang-format | — | Code formatter (bundled with clang) |
-| clang-tidy | — | Static analysis (bundled with clang) |
-| perl | — | check.sh whitespace fix |
-
-## Build
+## 构建
 
 ```bash
-xmake
+xmake          # 构建
+xmake -r       # 重新构建
 ```
 
-`compile_commands.json` is auto-generated to `build/` on build (for clang-tidy / clangd), no manual step needed.
+`compile_commands.json` 在构建后自动生成到 `build/`（供 clang-tidy / clangd 使用）。
+
+## 测试
+
+```bash
+xmake run test_replay    # raw replay 测试
+xmake run testbench      # 全量 API 演示
+```
 
 ## CI
 
-On push to `main` or PR, GitHub Actions automatically runs `utils/check.sh` full checks.
+push 到 `main` 或 PR 时，GitHub Actions 自动运行 `utils/check.sh` 全量检查（clang-format + clang-tidy + build + tests）。
 
-## Run Tests
+## v0.0.1 范围
 
-```bash
-xmake test
-```
+**实现**：公共 API（`System::collect` / `refresh` / `Collect` 位掩码）、全部数据模型、Linux 支持（procfs / sysfs / PCI）、NVML 可选后端、raw replay 测试。
 
-## Format Code
+**不实现**：性能评分、基准测试、算子选择、调度策略、守护进程、数据库存储、Web API、完整跨平台、拓扑信息（已有 hwloc）。
 
-```bash
-xmake format
-```
+## 与其他项目的关系
 
-Or directly:
+| 项目 | 回答的问题 |
+|------|-----------|
+| **sysal** | 这台机器有什么？当前进程能看到什么？ |
+| **opal** | 应该选哪个算子？ |
+| **opbl** | 这个算子跑得多快？ |
 
-```bash
-clang-format -i <files>
-```
-
-## Static Analysis
-
-```bash
-xmake check
-```
-
-Or directly with clang-tidy, depending on project configuration.
-
-## Initial Version Scope
-
-sysal v0.0.1 focuses on building a clean foundation.
-
-Planned scope:
-
-* public API: `collect(spec) -> SystemSnapshot`
-* typed model for platform, resources, software stack, execution context, topology, raw records, and diagnostics
-* Linux support through `/proc`, `/sys`, and PCI information
-* basic CPU and memory collection
-* basic network interface collection
-* basic NVIDIA GPU collection when NVML is available
-* optional hwloc-based topology collection
-* raw record storage for debugging
-* diagnostics for partial failures and fallback behavior
-
-Out of scope for v0.0.1:
-
-* performance prediction
-* benchmark execution
-* operator selection
-* scheduling policy
-* daemon mode
-* database storage
-* web API
-* full cross-platform support
-* complex plugin system
-
-## Relationship With Other Projects
-
-sysal is intended to serve as a system information provider.
-
-```txt
-sysal:
-    What does this system have?
-    What can the current process see?
-
-opal:
-    Which operator should be selected?
-
-opbl:
-    How fast does an operator run?
-```
-
-sysal should remain independent from opal and opbl.
+sysal 与 opal、opbl 保持独立。
 
 ## License
 

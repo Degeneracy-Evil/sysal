@@ -1,14 +1,11 @@
-# Warnings（警告信息）
+# Warnings
 
 记录采集过程中出现的问题。这些问题不一定导致整次采集失败，
-因此以 `SystemSnapshot` 中的 `std::vector<std::string> warnings` 形式保留。
+因此以 `System` 中的 `std::vector<std::string> warnings` 形式保留。
 
 ```cpp
-struct SystemSnapshot
-{
-    // ...其余字段省略...
-    std::vector<std::string> warnings;  // 采集过程中的警告信息
-};
+// System 的公开成员
+std::vector<std::string> warnings;  // 采集过程中的警告信息
 ```
 
 ## 设计说明
@@ -18,7 +15,7 @@ struct SystemSnapshot
 因此 sysal 不使用复杂的诊断结构体，而是用简单的字符串列表记录原因，
 既便于实现，也便于上层直接展示或记录日志。
 
-当采集本身彻底失败（而非部分失败）时，`System` 的构造会抛出 `SysalError`，
+当采集本身彻底失败（而非部分失败）时，`System::collect()` 会抛出 `SysalError`，
 不会进入 `warnings`。
 
 ## 示例

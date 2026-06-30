@@ -1,5 +1,32 @@
 # 开发记录
 
+### 2026-06-30 修复设计文档遗漏（pipeline + raw_store）
+
+- **变更类型**: docs
+- **涉及文件**: docs/design/architecture/pipeline.md, docs/design/data_model/raw_store.md
+- **变更内容**:
+  1. pipeline.md：parser 目录列表补上遗漏的 `platform.hpp / platform.cpp`（ParseResult 有 9 个 optional 字段含 platform，但目录列表只列了 8 个 parser）
+  2. raw_store.md：`RawSource` 枚举从 11 个值扩展到 23 个，按来源分组（procfs / sysfs / 文件命令 / 环境变量 / 未来后端），补上 C-1 修复（parser 不直接调用 syscall）和数据空白修复（D-1/D-2/D-4/D-6/D-7）所需的全部来源
+- **原因**: 重写计划审计阶段发现 pipeline.md 的 parser 目录遗漏 platform parser；raw_store.md 的 RawSource 枚举缺少实现所需的来源值（ProcSelfStatus/ProcSelfCgroup/ProcOneCgroup 用于 execution parser 的 C-1 修复，SysfsNuma 用于 CPU NUMA 归属和内存 NUMA 分布，SysfsDmi 用于固件信息，EtcOsRelease/Uname 用于 platform parser，Environment 用于环境变量采集，RootDockerenv 用于容器检测，Nvcc 用于 CUDA 版本检测，SysfsBlock 用于存储设备）
+- **验证**: 文档审查，确认 pipeline.md parser 目录列表与 ParseResult 的 9 个字段一一对应；raw_store.md 的 RawSource 枚举覆盖全部 parser 所需的来源
+
+### 2026-06-30 从 resource_info.md 拆分 6 个子系统设计文档
+
+- **变更类型**: docs
+- **涉及文件**: docs/design/data_model/cpu.md, docs/design/data_model/memory.md, docs/design/data_model/accelerator.md, docs/design/data_model/network.md, docs/design/data_model/pci.md, docs/design/data_model/storage.md
+- **变更内容**:
+  1. 将原 resource_info.md 设计文档按子系统拆分为 6 个独立文件，每个文件聚焦一个子系统
+  2. 按新命名规则重命名聚合类型：`CpuSubsystem` → `Cpu`、`MemorySubsystem` → `Memory`、`AcceleratorSubsystem` → `Accelerators`、`NetworkSubsystem` → `Network`、`StorageSubsystem` → `Storage`、`PciSubsystem` → `Pci`、`NumaMemoryInfo` → `NumaMemory`
+  3. cpu.md：包含 StrongId 类型定义（CpuPackageId/CpuCoreId/LogicalCpuId）、CpuPackage/CpuCore/LogicalCpu/Cpu 结构体及便利查询方法；说明 `LogicalCpu::package_id` 反范式化与 `numa_node` 直接从 sysfs 读取
+  4. memory.md：Memory 与 NumaMemory 结构体
+  5. accelerator.md：AcceleratorKind 枚举、AcceleratorDevice 与 Accelerators 结构体；说明 `devices` 是数据真源、便利方法为非持有型过滤、`nearest_numa_node` 直接从 sysfs 读取
+  6. network.md：NetworkInterface 与 Network 结构体
+  7. pci.md：PciDevice 与 Pci 结构体；说明 Pci 是设备清单、`numa_node` 直接从 sysfs 读取
+  8. storage.md：StorageDevice 与 Storage 结构体；说明 v0.0.1 仅提供基本设备清单
+  9. 不包含 `ResourceInfo` 聚合类型（已移除，SystemInfo 直接包含各子系统）
+- **原因**: 拆分单一大文档为聚焦的子系统文档，便于维护；统一去除 `Info`/`Subsystem` 后缀，简化类型命名
+- **验证**: 文档审查，确认无 `ResourceInfo`/`CpuSubsystem`/`MemorySubsystem`/`AcceleratorSubsystem`/`NetworkSubsystem`/`StorageSubsystem`/`PciSubsystem`/`NumaMemoryInfo` 等带后缀类型名残留；代码块类型名与 ids.hpp/enums.hpp/resource_info.hpp 一致
+
 ### 2026-06-30 重写 7 个数据模型设计文档以反映新架构
 
 - **变更类型**: docs

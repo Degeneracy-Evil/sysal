@@ -18,15 +18,15 @@ namespace sysal::detail
 
 struct ParseResult
 {
-    std::optional<PlatformInfo>          platform;
-    std::optional<CpuSubsystem>          cpu;
-    std::optional<MemorySubsystem>       memory;
-    std::optional<PciSubsystem>          pci;
-    std::optional<NetworkSubsystem>      network;
-    std::optional<AcceleratorSubsystem>  accelerators;
-    std::optional<StorageSubsystem>      storage;
-    std::optional<SoftwareStackInfo>     software;
-    std::optional<ExecutionContextInfo>  execution;
+    std::optional<Platform>          platform;
+    std::optional<Cpu>               cpu;
+    std::optional<Memory>            memory;
+    std::optional<Pci>               pci;
+    std::optional<Network>           network;
+    std::optional<Accelerators>      accelerators;
+    std::optional<Storage>           storage;
+    std::optional<SoftwareStack>     software;
+    std::optional<ExecutionContext>  execution;
 };
 
 }  // namespace sysal::detail
@@ -41,23 +41,33 @@ struct ParseResult
 ```txt
 sysal/
 ├── include/sysal/
-│   ├── sysal.hpp
-│   ├── system.hpp               # System 类 + SystemInfo
-│   ├── collect.hpp              # Collect 位掩码枚举
-│   ├── snapshot_meta.hpp
-│   ├── platform_info.hpp
-│   ├── resource_info.hpp
-│   ├── software_stack_info.hpp
-│   ├── execution_context_info.hpp
-│   ├── raw_store.hpp
-│   ├── error.hpp
-│   ├── enums.hpp
-│   ├── ids.hpp
-│   ├── units.hpp
-│   ├── value_types.hpp
-│   ├── strong_id.hpp
-│   ├── serialization.hpp        # 可选
-│   └── test/replay.hpp          # 测试工具
+│   ├── core/                        # 库核心
+│   │   ├── sysal.hpp                # 总入口
+│   │   ├── system.hpp               # System 类 + SystemInfo
+│   │   ├── collect.hpp              # Collect 位掩码枚举
+│   │   └── error.hpp                # SysalError
+│   ├── model/                       # 数据模型
+│   │   ├── snapshot_meta.hpp
+│   │   ├── platform.hpp
+│   │   ├── cpu.hpp
+│   │   ├── memory.hpp
+│   │   ├── accelerator.hpp
+│   │   ├── network.hpp
+│   │   ├── storage.hpp
+│   │   ├── pci.hpp
+│   │   ├── software.hpp
+│   │   ├── execution.hpp
+│   │   └── raw_store.hpp
+│   ├── types/                       # 基础类型
+│   │   ├── enums.hpp
+│   │   ├── ids.hpp
+│   │   ├── units.hpp
+│   │   ├── value_types.hpp
+│   │   └── strong_id.hpp
+│   ├── serialization/
+│   │   └── serialization.hpp        # 可选
+│   └── test/
+│       └── replay.hpp               # 测试工具
 │
 └── src/
     ├── api/                     # 公共 API 实现
@@ -65,7 +75,7 @@ sysal/
     │
     ├── model/                   # 数据模型实现
     │   ├── raw_store.cpp        # RawStore 方法
-    │   └── resource_info.cpp    # ResourceInfo 便利查询方法
+    │   └── resource.cpp            # 便利查询方法
     │
     ├── reader/linux/            # 平台相关 Reader
     │   ├── procfs.hpp / procfs.cpp
@@ -75,6 +85,7 @@ sysal/
     ├── parser/                  # 原始数据 → 结构化事实
     │   ├── parse_utils.hpp
     │   ├── parse_result.hpp     # ParseResult 定义
+    │   ├── platform.hpp / platform.cpp
     │   ├── cpu.hpp / cpu.cpp
     │   ├── memory.hpp / memory.cpp
     │   ├── pci.hpp / pci.cpp
@@ -99,8 +110,13 @@ sysal/
 
 | 目录 | 职责 |
 |---|---|
-| `api/` | `System::collect()` / `refresh()` 实现，公共入口 |
-| `model/` | `RawStore`、`ResourceInfo` 等数据模型的方法实现 |
+| `include/sysal/core/` | 库入口、`System` 类、`Collect` 枚举、错误类型 |
+| `include/sysal/model/` | 各子系统的数据模型定义 |
+| `include/sysal/types/` | 基础类型（枚举、强类型 ID、单位、值包装） |
+| `include/sysal/serialization/` | 可选的 JSON 序列化头 |
+| `include/sysal/test/` | 测试工具 |
+| `src/api/` | `System::collect()` / `refresh()` 实现 |
+| `src/model/` | `RawStore` 等数据模型的方法实现 |
 | `reader/linux/` | 平台相关的原始数据采集（procfs / sysfs） |
 | `parser/` | 从 `RawStore` 解析出 `ParseResult`（按域独立） |
 | `resolver/` | 从 `ParseResult` 组装 `System`（可见性、冲突解决） |

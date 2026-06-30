@@ -11,11 +11,16 @@ docs/design/
 ├── overview.md                   ← 项目定位与核心原则
 ├── public_api.md                 ← 公共 API 设计
 ├── data_model/                   ← 数据模型（System 各组成部分）
-│   ├── system_snapshot.md
-│   ├── platform_info.md
-│   ├── resource_info.md
-│   ├── software_stack_info.md
-│   ├── execution_context.md
+│   ├── system.md
+│   ├── platform.md
+│   ├── cpu.md
+│   ├── memory.md
+│   ├── accelerator.md
+│   ├── network.md
+│   ├── storage.md
+│   ├── pci.md
+│   ├── software.md
+│   ├── execution.md
 │   ├── raw_store.md
 │   └── warnings.md
 ├── architecture/                 ← 内部架构
@@ -49,11 +54,16 @@ docs/design/
 
 | 文件 | 职能 |
 |---|---|
-| [data_model/system_snapshot.md](data_model/system_snapshot.md) | `System` 类、`SystemInfo` 结构、`SnapshotMeta` 元数据 |
-| [data_model/platform_info.md](data_model/platform_info.md) | `PlatformInfo`：host / OS / kernel / arch / firmware / virt |
-| [data_model/resource_info.md](data_model/resource_info.md) | `ResourceInfo`：CPU / Memory / Accelerator / Network / PCI / Storage |
-| [data_model/software_stack_info.md](data_model/software_stack_info.md) | `SoftwareStackInfo`：drivers / runtimes / CUDA / ROCm / MPI / RDMA |
-| [data_model/execution_context.md](data_model/execution_context.md) | `ExecutionContextInfo`：进程环境 / cgroup / cpuset / 可见性索引 |
+| [data_model/system.md](data_model/system.md) | `System` 类、`SystemInfo` 结构、`SnapshotMeta` 元数据 |
+| [data_model/platform.md](data_model/platform.md) | `Platform`：host / OS / kernel / arch / firmware / virt |
+| [data_model/cpu.md](data_model/cpu.md) | `Cpu`：packages / cores / logical CPUs / ISA extensions |
+| [data_model/memory.md](data_model/memory.md) | `Memory`：total / available / NUMA 内存分布 |
+| [data_model/accelerator.md](data_model/accelerator.md) | `Accelerators`：GPU / NPU / FPGA 设备 |
+| [data_model/network.md](data_model/network.md) | `Network`：网卡列表 / 链路状态 / IP / PCI 地址 |
+| [data_model/storage.md](data_model/storage.md) | `Storage`：块设备清单 / 容量 / 类型 |
+| [data_model/pci.md](data_model/pci.md) | `Pci`：PCI 设备清单 / vendor / class / NUMA |
+| [data_model/software.md](data_model/software.md) | `SoftwareStack`：drivers / runtimes / CUDA / ROCm / MPI / RDMA |
+| [data_model/execution.md](data_model/execution.md) | `ExecutionContext`：进程环境 / cgroup / cpuset / 可见性索引 |
 | [data_model/raw_store.md](data_model/raw_store.md) | `RawStore` / `RawRecord`：原始证据存储、多记录支持 |
 | [data_model/warnings.md](data_model/warnings.md) | 采集过程中的警告信息（`std::vector<std::string>`） |
 
@@ -91,8 +101,8 @@ docs/design/
 
 1. [overview.md](overview.md) — 理解项目定位和核心原则
 2. [public_api.md](public_api.md) — 理解公共 API 形态
-3. [data_model/system_snapshot.md](data_model/system_snapshot.md) — 理解顶层数据模型
-4. [data_model/resource_info.md](data_model/resource_info.md) — 理解资源模型（最重要）
+3. [data_model/system.md](data_model/system.md) — 理解顶层数据模型
+4. [data_model/cpu.md](data_model/cpu.md) — 理解 CPU 模型（最重要）
 5. [architecture/pipeline.md](architecture/pipeline.md) — 理解内部管线和模块结构
 6. [rules/strong_typing.md](rules/strong_typing.md) — 理解类型系统
 7. [roadmap.md](roadmap.md) — 理解 v0.0.1 范围
