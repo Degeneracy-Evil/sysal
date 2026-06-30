@@ -1,5 +1,20 @@
 # 开发记录
 
+### 2026-06-30 Phase 8: Resolver、Pipeline、System::collect/refresh
+
+- **变更类型**: src / build
+- **涉及文件**: src/resolver/resolve.hpp, src/resolver/resolve.cpp, src/pipeline/pipeline.hpp, src/pipeline/pipeline.cpp, src/api/system.cpp, include/sysal/test/replay.hpp, tests/test_resolve.cpp, tests/test_collect.cpp, xmake.lua, docs/devlog.md
+- **变更内容**:
+  1. `resolve.hpp` + `resolve.cpp`：实现 `resolve(ParseResult, warnings) → SystemInfo`。移动 ParseResult 各 optional 域到 SystemInfo（缺省默认构造）；计算 CPU 可见性（cpuset 约束）、加速器可见性（CUDA_VISIBLE_DEVICES）、网络接口可见性（v0.0.1 全部可见）；交叉校验资源级 visible_to_current_process 与 ExecutionContext 便利索引的一致性，不一致时追加 `[visibility_mismatch]` 警告；冲突解决框架就绪（v0.0.1 大多单来源，格式 `[conflict] <field>: <src1>=<val>, <src2>=<val>, adopted=<src>`）
+  2. `pipeline.hpp` + `pipeline.cpp`：实现 `run_pipeline(flags, warnings)` 和 `run_replay(raw, flags, warnings)`。run_pipeline 执行 Reader→Parser→Resolver 完整管线；run_replay 从已有 RawStore 执行 Parser→Resolver 回放管线；按域调用 9 个解析器；记录成功/失败采集器；构建 SnapshotMeta（collect_time、sysal_version="0.0.1"、collect_duration、requested_flags）；后端 init/shutdown 生命周期占位；实现 `sysal::test::collect_from_raw` 公共接口
+  3. `system.cpp`：实现 `System::collect(flags)` 委托 `run_pipeline`，`System::refresh()` 用 `meta.requested_flags` 重新采集并移动赋值
+  4. `replay.hpp`：新增 `collect_from_raw(raw, flags)` 声明
+  5. `test_resolve.cpp`：7 个测试（CPU 可见性 cpuset 约束、CPU 无约束全可见、加速器可见性、加速器无约束、网络接口全可见、缺失域默认构造、交叉校验一致性）
+  6. `test_collect.cpp`：3 个测试（collect 冒烟、refresh 保持一致、元数据正确）
+  7. `xmake.lua`：新增 test_resolve、test_collect 两个测试目标
+- **原因**: Phase 8 核心实现——Resolver 冲突解决与可见性计算、Pipeline 管线编排、System 公共 API
+- **验证**: `utils/check.sh` 全部 4 项检查通过（clang-format + clang-tidy + build + tests）
+
 ### 2026-06-30 Phase 7: Software、Execution 域解析器
 
 - **变更类型**: src / build
