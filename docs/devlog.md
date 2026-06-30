@@ -1,5 +1,17 @@
 # 开发记录
 
+### 2026-06-30 Phase 9: System JSON 序列化（to_json / from_json）
+
+- **变更类型**: src / build
+- **涉及文件**: include/sysal/serialization/serialization.hpp, src/serialization/serialize.cpp, tests/test_serialization.cpp, xmake.lua, docs/devlog.md
+- **变更内容**:
+  1. `serialization.hpp`：新增 SerializationOptions 结构体（pretty_print、include_raw、include_meta）、to_json / from_json 自由函数声明
+  2. `serialize.cpp`：在已有 RawStore 序列化基础上扩展 System↔JSON 实现。to_json 序列化 info（9 个子域）、meta（可选）、warnings、raw（可选）；from_json 解析全部字段并做版本兼容性检查（0.0.x）。为每个子结构体实现独立的 to/from 辅助函数，处理强类型（StrongId::value()、NamedString::value、ScalarUnit::value、PciAddress 对象、enum static_cast）、可选字段（firmware、virtualization、cuda、rocm、level_zero、mpi、rdma、container 等）
+  3. `test_serialization.cpp`：7 个测试（round-trip 往返、include_raw=false 无 raw 键、include_raw=true 有 raw 键、include_meta=false 无 meta 键、include_meta=true 有 meta 键、版本不兼容抛 SysalError、兼容版本正常解析）
+  4. `xmake.lua`：新增 test_serialization 测试目标
+- **原因**: Phase 9 实现——System JSON 序列化与反序列化，支持 raw replay 测试管线
+- **验证**: xmake -r 成功，xmake run test_serialization 14 项全部通过
+
 ### 2026-06-30 Phase 8: Resolver、Pipeline、System::collect/refresh
 
 - **变更类型**: src / build
