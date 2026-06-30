@@ -1,3 +1,7 @@
+/// @file sysal.hpp
+/// @brief sysal 公共 API 总入口
+/// @details 一站式聚合头文件，包含 sysal 全部公共头文件，便于使用方一次性引入。
+
 #pragma once
 
 #include "sysal/collect.hpp"
