@@ -206,6 +206,72 @@ int main()
         assert(cpu.packages[0].max_frequency->value == 3300000ULL * 1000);
     }
 
+    // ---- 测试 7: 多封装 cpufreq 频率信息（各封装独立频率） ----
+    {
+        RawStore raw;
+        raw.records.push_back(make_record(RawSource::ProcCpuInfo, "/proc/cpuinfo",
+                                          "processor\t: 0\n"
+                                          "physical id\t: 0\n"
+                                          "core id\t\t: 0\n"
+                                          "flags\t\t: sse4_2\n"
+                                          "\n"
+                                          "processor\t: 1\n"
+                                          "physical id\t: 0\n"
+                                          "core id\t\t: 1\n"
+                                          "flags\t\t: sse4_2\n"
+                                          "\n"
+                                          "processor\t: 2\n"
+                                          "physical id\t: 1\n"
+                                          "core id\t\t: 0\n"
+                                          "flags\t\t: sse4_2\n"
+                                          "\n"
+                                          "processor\t: 3\n"
+                                          "physical id\t: 1\n"
+                                          "core id\t\t: 1\n"
+                                          "flags\t\t: sse4_2\n"));
+        // Package 0: CPU 0 and 1
+        raw.records.push_back(
+            make_record(RawSource::SysfsCpu, "cpu/cpu0/cpufreq/base_frequency", "2400000\n"));
+        raw.records.push_back(
+            make_record(RawSource::SysfsCpu, "cpu/cpu0/cpufreq/scaling_max_freq", "3500000\n"));
+        raw.records.push_back(
+            make_record(RawSource::SysfsCpu, "cpu/cpu1/cpufreq/base_frequency", "2400000\n"));
+        raw.records.push_back(
+            make_record(RawSource::SysfsCpu, "cpu/cpu1/cpufreq/scaling_max_freq", "3500000\n"));
+        // Package 1: CPU 2 and 3 — different frequencies
+        raw.records.push_back(
+            make_record(RawSource::SysfsCpu, "cpu/cpu2/cpufreq/base_frequency", "1800000\n"));
+        raw.records.push_back(
+            make_record(RawSource::SysfsCpu, "cpu/cpu2/cpufreq/scaling_max_freq", "2900000\n"));
+        raw.records.push_back(
+            make_record(RawSource::SysfsCpu, "cpu/cpu3/cpufreq/base_frequency", "1800000\n"));
+        raw.records.push_back(
+            make_record(RawSource::SysfsCpu, "cpu/cpu3/cpufreq/scaling_max_freq", "2900000\n"));
+
+        std::vector<std::string> warnings;
+        auto result = parse_cpu(raw, warnings);
+        assert(result.has_value());
+
+        const auto& cpu = *result;
+        assert(cpu.packages.size() == 2);
+
+        // Package 0: 2400000 kHz → 2400000000 Hz
+        assert(cpu.packages[0].base_frequency.has_value());
+        assert(cpu.packages[0].base_frequency->value == 2400000ULL * 1000);
+        assert(cpu.packages[0].max_frequency.has_value());
+        assert(cpu.packages[0].max_frequency->value == 3500000ULL * 1000);
+
+        // Package 1: 1800000 kHz → 1800000000 Hz (DIFFERENT from package 0)
+        assert(cpu.packages[1].base_frequency.has_value());
+        assert(cpu.packages[1].base_frequency->value == 1800000ULL * 1000);
+        assert(cpu.packages[1].max_frequency.has_value());
+        assert(cpu.packages[1].max_frequency->value == 2900000ULL * 1000);
+
+        // Verify they are actually different
+        assert(cpu.packages[0].base_frequency->value != cpu.packages[1].base_frequency->value);
+        assert(cpu.packages[0].max_frequency->value != cpu.packages[1].max_frequency->value);
+    }
+
     // ---- 测试 6: 缺少 /proc/cpuinfo 数据 ----
     {
         RawStore raw;

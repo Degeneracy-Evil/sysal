@@ -1,5 +1,31 @@
 # 开发记录
 
+### 2026-07-01 F1a: 修复 read_cpufreq 忽略 package_id
+
+- **变更类型**: src / fix
+- **涉及文件**: src/parser/cpu.cpp, tests/test_parse_cpu.cpp, docs/devlog.md
+- **变更内容**:
+  1. 新增 `extract_cpu_number_from_path` 辅助函数：从 sysfs 路径（如 `cpu/cpu0/cpufreq/base_frequency`）中提取 CPU 编号
+  2. `read_cpufreq` 签名修改：移除 `[[maybe_unused]]`，新增 `package_cpu_ids` 参数（该封装包含的逻辑 CPU 编号集合）
+  3. `read_cpufreq` 逻辑修复：遍历 sysfs 记录时提取 CPU 编号，仅处理属于该封装的 CPU 记录。原实现对所有封装都取第一个 `base_frequency` 和 `scaling_max_freq`，导致多 socket 系统所有封装获得 cpu0 的频率
+  4. 调用点修改：从 `entries` 收集每个封装的逻辑 CPU 编号集合，传入 `read_cpufreq`
+  5. 新增测试 7：2 封装各 2 CPU，频率不同（package 0: 2400/3500 MHz，package 1: 1800/2900 MHz），断言各封装频率正确且互不相同
+- **原因**: 多 socket 系统中所有封装获得相同频率（cpu0 的），违反设计意图
+- **验证**: `utils/check.sh` 全部 4 项通过；`xmake run test_parse_cpu` 7 个测试全部通过
+
+### 2026-07-01 F1b+F1c: 修复交叉校验同义反复 + 实现冲突解决框架
+
+- **变更类型**: src / fix
+- **涉及文件**: src/resolver/resolve.cpp, tests/test_resolve.cpp, docs/devlog.md
+- **变更内容**:
+  1. `cross_check_cpu_visibility` 重写：原实现比较 `visible_to_current_process` 与 `visible_logical_cpu_ids`（同义反复，compute 已从后者设置前者，永远一致）。新实现检测两类问题：(a) 幻影 ID——`visible_logical_cpu_ids` 引用模型中不存在的 CPU，格式 `[visibility_mismatch] cpu_N: in_visible_logical_cpu_ids but cpu does not exist in model`；(b) 约束提示——cpuset 限制可见 CPU 数量，格式 `[constraint] cpu visibility restricted: N total, M visible`
+  2. `cross_check_accelerator_visibility` 同理重写：检测加速器幻影 ID 和环境变量约束提示
+  3. 新增 `TrustLevel` 枚举（Backend=0 > Sysfs=1 > Procfs=2 > Command=3 > Inferred=4）和 `resolve_conflict` 辅助函数：当两来源值不同时，高信任（低数值）来源胜出，追加 `[conflict]` 格式警告；值相同时无冲突。v0.0.1 无多来源字段故未调用，框架已就绪
+  4. `resolve()` 中冲突解决占位注释更新为框架就绪说明
+  5. 测试 7 重写为幻影 ID 检测（CPU 99 不存在于模型）；新增测试 8（cpuset 约束提示 4 total 2 visible）；新增测试 9（加速器幻影 ID 检测）
+- **原因**: F1b——原交叉校验是同义反复，无法发现真实问题（幻影 ID）；F1c——冲突解决仅有注释占位，需实现可测试的 helper
+- **验证**: `utils/check.sh` 全部 4 项通过（clang-format + clang-tidy + build + tests）；`xmake run test_resolve` 9 个测试全部通过
+
 ### 2026-07-01 新增代码质量评审方法与首份评审报告
 
 - **变更类型**: docs

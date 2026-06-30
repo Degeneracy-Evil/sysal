@@ -6,6 +6,7 @@
 #include "resolver/resolve.hpp"
 
 #include <algorithm>
+#include <cstdint>
 #include <unordered_set>
 
 namespace sysal::detail
@@ -80,10 +81,10 @@ void compute_network_visibility(Network& net)
     }
 }
 
-/// @brief 交叉校验 CPU 可见性一致性
-/// @details 比较各 LogicalCpu 的 visible_to_current_process 与
-///          ExecutionContext.visible_logical_cpu_ids 便利索引。
-///          不一致时追加警告。
+/// @brief 交叉校验 CPU 可见性
+/// @details 检测两类问题：
+///          1. 幻影 ID：visible_logical_cpu_ids 引用了模型中不存在的 CPU
+///          2. 约束提示：cpuset 限制了可见 CPU 数量（信息性，非错误）
 void cross_check_cpu_visibility(const Cpu& cpu, const ExecutionContext& exec,
                                 std::vector<std::string>& warnings)
 {
@@ -92,26 +93,37 @@ void cross_check_cpu_visibility(const Cpu& cpu, const ExecutionContext& exec,
         return;
     }
 
-    std::unordered_set<std::uint32_t> index_set;
-    for(const auto& id : exec.visible_logical_cpu_ids)
-    {
-        index_set.insert(id.value());
-    }
-
+    // 构建模型中存在的 CPU ID 集合
+    std::unordered_set<std::uint32_t> model_ids;
     for(const auto& lc : cpu.logical_cpus)
     {
-        bool in_index = index_set.count(lc.id.value()) != 0;
-        if(lc.visible_to_current_process != in_index)
+        model_ids.insert(lc.id.value());
+    }
+
+    // 检测幻影 ID：索引引用了模型中不存在的 CPU
+    for(const auto& id : exec.visible_logical_cpu_ids)
+    {
+        if(model_ids.count(id.value()) == 0)
         {
-            warnings.push_back("[visibility_mismatch] cpu_" + std::to_string(lc.id.value()) +
-                               ": visible_to_current_process=" +
-                               (lc.visible_to_current_process ? "true" : "false") +
-                               ", in_visible_logical_cpu_ids=" + (in_index ? "true" : "false"));
+            warnings.push_back("[visibility_mismatch] cpu_" + std::to_string(id.value()) +
+                               ": in_visible_logical_cpu_ids but cpu does not exist in model");
         }
+    }
+
+    // 约束提示：cpuset 限制了可见 CPU 数量
+    if(!exec.visible_logical_cpu_ids.empty() &&
+       exec.visible_logical_cpu_ids.size() < cpu.logical_cpus.size())
+    {
+        warnings.push_back(
+            "[constraint] cpu visibility restricted: " + std::to_string(cpu.logical_cpus.size()) +
+            " total, " + std::to_string(exec.visible_logical_cpu_ids.size()) + " visible");
     }
 }
 
-/// @brief 交叉校验加速器可见性一致性
+/// @brief 交叉校验加速器可见性
+/// @details 检测两类问题：
+///          1. 幻影 ID：visible_accelerator_ids 引用了模型中不存在的加速器
+///          2. 约束提示：可见加速器数量受环境变量限制（信息性，非错误）
 void cross_check_accelerator_visibility(const Accelerators& acc, const ExecutionContext& exec,
                                         std::vector<std::string>& warnings)
 {
@@ -120,22 +132,31 @@ void cross_check_accelerator_visibility(const Accelerators& acc, const Execution
         return;
     }
 
-    std::unordered_set<std::uint32_t> index_set;
-    for(const auto& id : exec.visible_accelerator_ids)
-    {
-        index_set.insert(id.value());
-    }
-
+    // 构建模型中存在的加速器 ID 集合
+    std::unordered_set<std::uint32_t> model_ids;
     for(const auto& dev : acc.devices)
     {
-        bool in_index = index_set.count(dev.id.value()) != 0;
-        if(dev.visible_to_current_process != in_index)
+        model_ids.insert(dev.id.value());
+    }
+
+    // 检测幻影 ID：索引引用了模型中不存在的加速器
+    for(const auto& id : exec.visible_accelerator_ids)
+    {
+        if(model_ids.count(id.value()) == 0)
         {
-            warnings.push_back("[visibility_mismatch] accelerator_" +
-                               std::to_string(dev.id.value()) + ": visible_to_current_process=" +
-                               (dev.visible_to_current_process ? "true" : "false") +
-                               ", in_visible_accelerator_ids=" + (in_index ? "true" : "false"));
+            warnings.push_back(
+                "[visibility_mismatch] accelerator_" + std::to_string(id.value()) +
+                ": in_visible_accelerator_ids but accelerator does not exist in model");
         }
+    }
+
+    // 约束提示：环境变量限制了可见加速器数量
+    if(!exec.visible_accelerator_ids.empty() &&
+       exec.visible_accelerator_ids.size() < acc.devices.size())
+    {
+        warnings.push_back("[constraint] accelerator visibility restricted: " +
+                           std::to_string(acc.devices.size()) + " total, " +
+                           std::to_string(exec.visible_accelerator_ids.size()) + " visible");
     }
 }
 
@@ -148,6 +169,55 @@ void cross_check_network_visibility(const Network& /*net*/, const ExecutionConte
     // v0.0.1: 网络命名空间检测推迟，visible_network_interface_names 为空，
     // 所有接口均标记可见，无需交叉校验。
 }
+
+/// @brief 来源信任等级（数值越低越可信）
+enum class TrustLevel : std::uint8_t
+{
+    Backend = 0, ///< 专用后端（NVML、ibverbs）
+    Sysfs = 1,   ///< sysfs
+    Procfs = 2,  ///< procfs
+    Command = 3, ///< 命令输出（lspci、nvidia-smi）
+    Inferred = 4 ///< 推断/默认值
+};
+
+// resolve_conflict 是 v0.0.1 冲突解决框架的一部分，
+// 当前版本无多来源字段故未调用，未来版本将使用。
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunused-function"
+
+/// @brief 解决两来源冲突
+/// @details 当两来源值不同时，高信任（低数值）来源胜出，
+///          追加 [conflict] 格式警告。值相同时无冲突。
+/// @param field 字段名
+/// @param src1_name 来源1名称
+/// @param src1_val 来源1的值字符串
+/// @param src1_trust 来源1信任等级
+/// @param src2_name 来源2名称
+/// @param src2_val 来源2的值字符串
+/// @param src2_trust 来源2信任等级
+/// @param warnings 警告列表
+/// @return 胜出来源的值字符串
+std::string resolve_conflict(const std::string& field, const std::string& src1_name,
+                             const std::string& src1_val, TrustLevel src1_trust,
+                             const std::string& src2_name, const std::string& src2_val,
+                             TrustLevel src2_trust, std::vector<std::string>& warnings)
+{
+    if(src1_val == src2_val)
+    {
+        return src1_val;
+    }
+
+    bool adopt_src1 = src1_trust <= src2_trust;
+    const std::string& adopted = adopt_src1 ? src1_name : src2_name;
+    const std::string& adopted_val = adopt_src1 ? src1_val : src2_val;
+
+    warnings.push_back("[conflict] " + field + ": " + src1_name + "=" + src1_val + ", " +
+                       src2_name + "=" + src2_val + ", adopted=" + adopted);
+
+    return adopted_val;
+}
+
+#pragma clang diagnostic pop
 
 } // namespace
 
@@ -172,18 +242,15 @@ SystemInfo resolve(ParseResult result, std::vector<std::string>& warnings)
     compute_accelerator_visibility(info.accelerators, info.execution);
     compute_network_visibility(info.network);
 
-    // 交叉校验：资源级 visible_to_current_process 为事实来源，
-    // 便利索引为派生。不一致时记录警告。
+    // 交叉校验：检测幻影 ID 和约束提示
     cross_check_cpu_visibility(info.cpu, info.execution, warnings);
     cross_check_accelerator_visibility(info.accelerators, info.execution, warnings);
     cross_check_network_visibility(info.network, info.execution, warnings);
 
-    // 冲突解决框架（v0.0.1）：
-    // 来源信任优先级：专用后端 > sysfs > procfs > 命令输出 > 推断/默认值
+    // 冲突解决框架
     // v0.0.1 中大多数字段只有一个来源，冲突罕见。
-    // 若两个来源提供不同值，选择高信任来源并追加警告：
-    //   [conflict] <field>: <src1>=<val>, <src2>=<val>, adopted=<src>
-    // 当前阶段无需具体冲突检测逻辑，框架已就绪。
+    // resolve_conflict helper 已就绪，未来当多来源数据可用时调用。
+    // 来源信任优先级：专用后端 > sysfs > procfs > 命令输出 > 推断/默认值
 
     return info;
 }

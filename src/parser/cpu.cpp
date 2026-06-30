@@ -3,9 +3,11 @@
 #include "parse_utils.hpp"
 
 #include <algorithm>
+#include <cctype>
 #include <map>
 #include <set>
 #include <string_view>
+#include <unordered_set>
 
 namespace sysal::detail
 {
@@ -165,14 +167,44 @@ std::vector<IsaExtension> parse_isa_extensions(const std::string& flags)
     return extensions;
 }
 
+/// @brief 从路径中提取 CPU 编号
+/// @param path sysfs 路径，如 "cpu/cpu0/cpufreq/base_frequency"
+/// @return CPU 编号，若模式未找到则返回 nullopt
+std::optional<std::uint32_t> extract_cpu_number_from_path(std::string_view path)
+{
+    auto pos = path.find("cpu/cpu");
+    if(pos == std::string_view::npos)
+    {
+        return std::nullopt;
+    }
+    auto digits_start = pos + 7; // "cpu/cpu" 长度
+    auto digits_end = digits_start;
+    while(digits_end < path.size() && std::isdigit(static_cast<unsigned char>(path[digits_end])))
+    {
+        ++digits_end;
+    }
+    if(digits_end == digits_start)
+    {
+        return std::nullopt;
+    }
+    auto v = parse_uint(path.substr(digits_start, digits_end - digits_start));
+    if(!v.has_value())
+    {
+        return std::nullopt;
+    }
+    return static_cast<std::uint32_t>(*v);
+}
+
 /// @brief 从 sysfs cpufreq 记录中读取频率信息
 /// @param raw 原始证据存储
 /// @param package_id 封装 ID
+/// @param package_cpu_ids 属于该封装的逻辑 CPU 编号集合
 /// @param warnings 警告列表
 /// @return pair<base_frequency, max_frequency>
 std::pair<std::optional<Frequency>, std::optional<Frequency>>
-read_cpufreq(const RawStore& raw, [[maybe_unused]] std::uint32_t package_id,
-             [[maybe_unused]] std::vector<std::string>& warnings)
+read_cpufreq(const RawStore& raw, std::uint32_t package_id,
+             const std::unordered_set<std::uint32_t>& package_cpu_ids,
+             std::vector<std::string>& warnings)
 {
     std::optional<Frequency> base_freq;
     std::optional<Frequency> max_freq;
@@ -181,6 +213,14 @@ read_cpufreq(const RawStore& raw, [[maybe_unused]] std::uint32_t package_id,
     for(const auto* rec : cpu_records)
     {
         const auto& path = rec->path_or_command;
+
+        // 提取路径中的 CPU 编号，仅处理属于该封装的 CPU
+        auto cpu_num = extract_cpu_number_from_path(path);
+        if(!cpu_num.has_value() || package_cpu_ids.count(*cpu_num) == 0)
+        {
+            continue;
+        }
+
         // 查找 base_frequency: cpu/cpuN/cpufreq/base_frequency
         if(path.find("base_frequency") != std::string::npos && !base_freq.has_value())
         {
@@ -201,6 +241,10 @@ read_cpufreq(const RawStore& raw, [[maybe_unused]] std::uint32_t package_id,
             }
         }
     }
+
+    // 消除未使用参数警告（package_id / warnings 保留供未来使用）
+    (void)package_id;
+    (void)warnings;
 
     return {base_freq, max_freq};
 }
@@ -426,10 +470,10 @@ std::optional<Cpu> parse_cpu(const RawStore& raw, std::vector<std::string>& warn
         cpu.isa_extensions = parse_isa_extensions(entries[0].flags);
     }
 
-    // 读取 cpufreq 频率信息（每个封装从第一个 CPU 读取）
+    // 读取 cpufreq 频率信息（每个封装从属于该封装的 CPU 读取）
     for(auto& pkg : cpu.packages)
     {
-        // 找到属于该封装的第一个逻辑 CPU 的原始 physical_id
+        // 找到属于该封装的原始 physical_id
         std::uint32_t raw_pkg_id = 0;
         for(const auto& [raw_id, mapped_id] : package_id_map)
         {
@@ -439,7 +483,16 @@ std::optional<Cpu> parse_cpu(const RawStore& raw, std::vector<std::string>& warn
                 break;
             }
         }
-        auto [base_freq, max_freq] = read_cpufreq(raw, raw_pkg_id, warnings);
+        // 收集属于该封装的逻辑 CPU 编号
+        std::unordered_set<std::uint32_t> package_cpu_ids;
+        for(const auto& e : entries)
+        {
+            if(e.physical_id == raw_pkg_id)
+            {
+                package_cpu_ids.insert(e.processor);
+            }
+        }
+        auto [base_freq, max_freq] = read_cpufreq(raw, raw_pkg_id, package_cpu_ids, warnings);
         pkg.base_frequency = base_freq;
         pkg.max_frequency = max_freq;
     }
