@@ -59,10 +59,16 @@ struct IpAddressTag
 {
 };
 
+/// @brief PCI 设备类别标签
+struct PciClassTag
+{
+};
+
 using Vendor = NamedString<VendorTag>;               ///< 厂商名称
 using DeviceName = NamedString<DeviceNameTag>;       ///< 设备名称
 using InterfaceName = NamedString<InterfaceNameTag>; ///< 网络接口名称
 using MacAddress = NamedString<MacAddressTag>;       ///< MAC 地址
 using IpAddress = NamedString<IpAddressTag>;         ///< IP 地址
+using PciClass = NamedString<PciClassTag>;           ///< PCI 设备类别
 
 } // namespace sysal

@@ -11,7 +11,8 @@ Checks: >
   readability-use-anyofallof,
   -bugprone-easily-swappable-parameters,
   -bugprone-narrowing-conversions,
-  -bugprone-unchecked-optional-access,
+  -bugprone-exception-escape,
+  -clang-analyzer-optin.core.EnumCastOutOfRange,
   -performance-avoid-endl,
   -performance-enum-size
 

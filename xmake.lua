@@ -56,4 +56,5 @@ target("sysal")
     end)
 
 ---------------------------------------- 测试目标
--- 随各阶段逐步添加 test_target 调用
+
+test_target("test_types", "tests/test_types.cpp")

@@ -5,7 +5,7 @@
 
 #pragma once
 
-#include "sysal/strong_id.hpp"
+#include "sysal/types/strong_id.hpp"
 
 #include <cstdint>
 
