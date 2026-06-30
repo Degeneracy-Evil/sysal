@@ -1,3 +1,7 @@
+/// @file network_parser.cpp
+/// @brief 网络子系统解析器实现
+/// @details 从 sysfs 网络接口目录解析接口属性，并通过 getifaddrs 收集 IP 地址。
+
 #include "network_parser.hpp"
 #include "parse_utils.hpp"
 #include "parsed_facts.hpp"
@@ -21,6 +25,9 @@ namespace sysal::detail
 namespace
 {
 
+/// @brief 通过 getifaddrs 收集所有网络接口的 IP 地址
+/// @return 接口名到 IP 地址列表的映射；getifaddrs 失败时返回空映射。
+///         仅收集 IPv4 与 IPv6 地址，跳过无地址或其它协议族的条目。
 std::unordered_map<std::string, std::vector<IpAddress>> collect_all_addresses()
 {
     std::unordered_map<std::string, std::vector<IpAddress>> result;
@@ -39,6 +46,7 @@ std::unordered_map<std::string, std::vector<IpAddress>> collect_all_addresses()
         }
 
         const auto family = ifa->ifa_addr->sa_family;
+        // 仅处理 IPv4 与 IPv6 地址
         if(family != AF_INET && family != AF_INET6)
         {
             continue;
@@ -82,6 +90,7 @@ std::optional<NetworkSubsystem> parse_network(const RawStore& raw, Diagnostics& 
         return std::nullopt;
     }
 
+    // 一次性收集所有接口的 IP 地址，避免重复调用 getifaddrs
     auto address_map = collect_all_addresses();
 
     NetworkSubsystem facts;
@@ -92,6 +101,7 @@ std::optional<NetworkSubsystem> parse_network(const RawStore& raw, Diagnostics& 
 
         const auto base = "/sys/class/net/" + iface + "/";
 
+        // 解析接口链路状态（operstate）
         auto operstate_it = path_map.find(base + "operstate");
         if(operstate_it != path_map.end())
         {
@@ -110,12 +120,14 @@ std::optional<NetworkSubsystem> parse_network(const RawStore& raw, Diagnostics& 
             }
         }
 
+        // 解析接口 MAC 地址
         auto address_it = path_map.find(base + "address");
         if(address_it != path_map.end())
         {
             net_iface.mac = MacAddress{trim(address_it->second)};
         }
 
+        // 解析接口速率，sysfs 中单位为 Mbps，转换为 Hz 表达的带宽
         auto speed_it = path_map.find(base + "speed");
         if(speed_it != path_map.end())
         {
@@ -126,6 +138,7 @@ std::optional<NetworkSubsystem> parse_network(const RawStore& raw, Diagnostics& 
             }
         }
 
+        // 解析接口关联的 PCI 设备地址（软链接目标）
         auto device_it = path_map.find(base + "device");
         if(device_it != path_map.end())
         {
@@ -136,6 +149,7 @@ std::optional<NetworkSubsystem> parse_network(const RawStore& raw, Diagnostics& 
             }
         }
 
+        // 关联通过 getifaddrs 收集到的 IP 地址列表
         auto addr_it = address_map.find(iface);
         if(addr_it != address_map.end())
         {

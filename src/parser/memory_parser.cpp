@@ -1,3 +1,8 @@
+/// @file memory_parser.cpp
+/// @brief 内存子系统解析器实现
+/// @details 从 /proc/meminfo 解析系统总内存与可用内存，并从 sysfs NUMA 节点目录
+///          解析各 NUMA 节点的内存信息。
+
 #include "memory_parser.hpp"
 #include "parse_utils.hpp"
 #include "parsed_facts.hpp"
@@ -20,6 +25,10 @@ namespace sysal::detail
 namespace
 {
 
+/// @brief 解析单个 NUMA 节点的 meminfo 内容
+/// @param content sysfs 中 nodeN/meminfo 的原始文本
+/// @param node_id NUMA 节点编号
+/// @return 解析成功返回 NumaMemoryInfo；缺少 MemTotal 返回 std::nullopt
 std::optional<NumaMemoryInfo> parse_numa_meminfo(const std::string& content, std::uint32_t node_id)
 {
     std::optional<MemorySize> total;
@@ -29,6 +38,7 @@ std::optional<NumaMemoryInfo> parse_numa_meminfo(const std::string& content, std
     for(const auto& line : lines)
     {
         auto [key, value] = split_kv(line);
+        // NUMA meminfo 的 key 带有 "Node N " 前缀，用 ends_with 匹配
         if(key.ends_with("MemTotal"))
         {
             auto bytes = extract_kb(value);
@@ -47,6 +57,7 @@ std::optional<NumaMemoryInfo> parse_numa_meminfo(const std::string& content, std
         }
     }
 
+    // MemTotal 是必需字段，缺失视为解析失败
     if(!total)
     {
         return std::nullopt;
@@ -59,6 +70,10 @@ std::optional<NumaMemoryInfo> parse_numa_meminfo(const std::string& content, std
     return info;
 }
 
+/// @brief 解析所有 NUMA 节点的内存信息
+/// @param raw 原始数据存储
+/// @param diag 诊断信息收集器
+/// @return 各 NUMA 节点的内存信息列表；无 NUMA 节点时返回空列表
 std::vector<NumaMemoryInfo> parse_numa_memory(const RawStore& raw, Diagnostics& diag)
 {
     auto path_map = build_path_map(raw, RawSource::SysfsNuma);
@@ -82,6 +97,7 @@ std::vector<NumaMemoryInfo> parse_numa_memory(const RawStore& raw, Diagnostics& 
         auto meminfo_it = path_map.find(base);
         if(meminfo_it == path_map.end())
         {
+            // 该节点缺少 meminfo 文件，跳过
             continue;
         }
 
@@ -137,6 +153,7 @@ std::optional<MemorySubsystem> parse_memory(const RawStore& raw, Diagnostics& di
         }
     }
 
+    // MemTotal 是必需字段，缺失视为解析失败
     if(!found_total)
     {
         add_warning(diag, "MemTotal not found in /proc/meminfo", RawSource::ProcMemInfo);
