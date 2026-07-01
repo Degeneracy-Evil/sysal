@@ -87,7 +87,11 @@ local unit_tests = {
 }
 
 for _, name in ipairs(unit_tests) do
-    test_target(name, "tests/" .. name .. ".cpp")
+    if name == "test_replay" then
+        test_target(name, "tests/integration/" .. name .. ".cpp")
+    else
+        test_target(name, "tests/unit/" .. name .. ".cpp")
+    end
 end
 
 -- testbench 链接动态库，仅访问公共头

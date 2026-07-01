@@ -11,6 +11,7 @@
 #include <cassert>
 #include <chrono>
 #include <cstdint>
+#include <cstdio>
 #include <iomanip>
 #include <iostream>
 #include <string>
@@ -31,11 +32,17 @@ std::string format_memory(std::uint64_t bytes)
     const auto kib = 1024ULL;
     if(bytes >= gib)
     {
-        return std::to_string(bytes / gib) + " GiB";
+        double val = static_cast<double>(bytes) / static_cast<double>(gib);
+        char buf[32];
+        std::snprintf(buf, sizeof(buf), "%.2f GiB", val);
+        return buf;
     }
     if(bytes >= mib)
     {
-        return std::to_string(bytes / mib) + " MiB";
+        double val = static_cast<double>(bytes) / static_cast<double>(mib);
+        char buf[32];
+        std::snprintf(buf, sizeof(buf), "%.2f MiB", val);
+        return buf;
     }
     if(bytes >= kib)
     {
@@ -51,11 +58,17 @@ std::string format_frequency(std::uint64_t hz)
 {
     if(hz >= 1'000'000'000)
     {
-        return std::to_string(hz / 1'000'000'000) + " GHz";
+        double ghz = static_cast<double>(hz) / 1'000'000'000.0;
+        char buf[32];
+        std::snprintf(buf, sizeof(buf), "%.2f GHz", ghz);
+        return buf;
     }
     if(hz >= 1'000'000)
     {
-        return std::to_string(hz / 1'000'000) + " MHz";
+        double mhz = static_cast<double>(hz) / 1'000'000.0;
+        char buf[32];
+        std::snprintf(buf, sizeof(buf), "%.2f MHz", mhz);
+        return buf;
     }
     if(hz >= 1'000)
     {

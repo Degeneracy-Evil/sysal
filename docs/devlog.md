@@ -1,5 +1,20 @@
 # 开发记录
 
+### 2026-07-01 R6 testbench 输出修复 + tests/ 目录重组
+
+- **变更类型**: src / fix / tests / chore
+- **涉及文件**: src/parser/platform.cpp, src/reader/linux/sysfs.cpp, tests/testbench.cpp, tests/unit/test_parse_platform.cpp, xmake.lua, docs/devlog.md, tests/{unit,integration}/* (git mv)
+- **变更内容**:
+  1. `platform.cpp` `parse_proc_version()`：将基于 `" SMP"` 的版本/时间戳切分改为基于星期几名称（Mon/Tue/Wed/Thu/Fri/Sat/Sun）定位时间戳起点，正确处理 `#111-Ubuntu SMP PREEMPT_DYNAMIC Sat Apr 11 ...` 这类含 PREEMPT_DYNAMIC 的现代内核版本字符串；新增 `#include <array>`
+  2. `testbench.cpp` `format_frequency()`：GHz/MHz 改为 `%.2f` 浮点格式（如 "2.20 GHz"），原整数除法丢失小数
+  3. `testbench.cpp` `format_memory()`：GiB/MiB 改为 `%.2f` 浮点格式（如 "80.00 GiB"），原整数除法丢失小数；新增 `#include <cstdio>`
+  4. UEFI 检测：`sysfs.cpp` `read_dmi_sysfs()` 末尾检查 `/sys/firmware/efi` 存在性并写入 SysfsDmi 记录；`platform.cpp` `parse_dmi()` 记录循环中匹配 `/sys/firmware/efi` 路径置 `firmware.uefi = true`，移除原硬编码 `false`
+  5. `test_parse_platform.cpp` 测试 1 内核版本断言从 `#101-Ubuntu` 更新为 `#101-Ubuntu SMP`（匹配新解析逻辑）
+  6. tests/ 目录重组：17 个单元测试 .cpp 经 `git mv` 移入 `tests/unit/`，`test_replay.cpp` 移入 `tests/integration/`，`testbench.cpp` 与 `fixtures/` 保留原位；`xmake.lua` 测试源路径同步更新
+  7. `test_serialization.cpp` test_compatible_version 内联 JSON 的 sysal_version 从 "0.0.1" 更新为 "0.0.2"（版本号 bump 后遗漏）
+- **原因**: testbench 输出存在 4 个 bug（内核版本截断、频率/显存整数除法丢精度、UEFI 永远 false）；tests/ 扁平结构随测试增多需按 unit/integration 分层
+- **验证**: `xmake -r` build ok；`test_parse_platform` 通过；`testbench` 退出码 0，输出 "Kernel version: #111-Ubuntu SMP PREEMPT_DYNAMIC"、"Base freq: 2.20 GHz"、"Memory: 80.00 GiB"、"UEFI: yes"；全部测试通过（含 test_serialization sysal_version 断言已同步更新为 0.0.2）
+
 ### 2026-07-01 R5b ISA 扩展枚举扩展 + 版本号升级至 0.0.2
 
 - **变更类型**: src / tests / chore

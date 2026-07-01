@@ -270,6 +270,12 @@ void read_dmi_sysfs(RawStore& raw)
     read_sysfs_file(raw, RawSource::SysfsDmi, (dmi_base / "product_name").string());
     read_sysfs_file(raw, RawSource::SysfsDmi, (dmi_base / "product_serial").string());
     read_sysfs_file(raw, RawSource::SysfsDmi, (dmi_base / "sys_vendor").string());
+
+    // UEFI 检测：/sys/firmware/efi 在 UEFI 系统上存在
+    if(fs::exists("/sys/firmware/efi"))
+    {
+        add_record(raw, RawSource::SysfsDmi, "/sys/firmware/efi", "1", CollectStatus::Success);
+    }
 }
 
 } // namespace

@@ -7,6 +7,7 @@
 #include "parse_utils.hpp"
 
 #include <algorithm>
+#include <array>
 #include <string_view>
 
 namespace sysal::detail
@@ -93,29 +94,37 @@ Kernel parse_proc_version(std::string_view payload, std::vector<std::string>& wa
         warnings.push_back("parse_platform: /proc/version 格式异常，无法提取内核发行号");
     }
 
-    // 提取编译时间：查找 "#<数字>" SMP 后面的时间戳
-    // 格式示例: ... #101-Ubuntu SMP Mon Nov 13 18:02:07 UTC 2023
+    // 提取编译时间与构建版本：查找 "#<数字>" 后第一个星期几名称作为时间戳起点
+    // 格式示例: ... #111-Ubuntu SMP PREEMPT_DYNAMIC Sat Apr 11 23:16:02 UTC 2026
     auto hash_pos = trimmed.rfind('#');
     if(hash_pos != std::string_view::npos)
     {
         auto after_hash = trimmed.substr(hash_pos);
-        auto smp_pos = after_hash.find("SMP ");
-        if(smp_pos != std::string_view::npos)
-        {
-            auto time_start = smp_pos + 4; // "SMP " 长度
-            auto time_part = after_hash.substr(time_start);
-            kernel.compiled_at = trim(std::string(time_part));
-        }
-    }
 
-    // kernel.version: 从 # 开始的构建版本字符串（如 "#101-Ubuntu"）
-    if(hash_pos != std::string_view::npos)
-    {
-        auto after_hash = trimmed.substr(hash_pos);
-        auto smp_pos = after_hash.find(" SMP");
-        if(smp_pos != std::string_view::npos)
+        // 时间戳总是以星期几开头（Mon/Tue/Wed/Thu/Fri/Sat/Sun）
+        static const std::array<std::string_view, 7> days = {
+            "Mon ", "Tue ", "Wed ", "Thu ", "Fri ", "Sat ", "Sun "
+        };
+
+        auto ts_pos = std::string_view::npos;
+        for(auto day : days)
         {
-            kernel.version = std::string(after_hash.substr(0, smp_pos));
+            auto p = after_hash.find(day);
+            if(p != std::string_view::npos && (ts_pos == std::string_view::npos || p < ts_pos))
+            {
+                ts_pos = p;
+            }
+        }
+
+        if(ts_pos != std::string_view::npos)
+        {
+            auto version_end = ts_pos;
+            if(version_end > 0 && after_hash[version_end - 1] == ' ')
+            {
+                version_end--;
+            }
+            kernel.version = std::string(after_hash.substr(0, version_end));
+            kernel.compiled_at = std::string(after_hash.substr(ts_pos));
         }
         else
         {
@@ -196,13 +205,15 @@ void parse_dmi(const RawStore& raw, Platform& platform,
         {
             platform.host.serial = trim(payload);
         }
+        else if(path.find("/sys/firmware/efi") != std::string::npos)
+        {
+            firmware.uefi = true;
+            has_firmware = true;
+        }
     }
 
     if(has_firmware)
     {
-        // 检测 UEFI：如果存在 /sys/firmware/efi 则为 UEFI
-        // 此信息不在 DMI 中，此处默认 false，由调用方补充
-        firmware.uefi = false;
         platform.firmware = firmware;
     }
 }
