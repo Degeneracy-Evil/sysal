@@ -63,7 +63,7 @@ int main()
 
         // Kernel
         assert(p.kernel.release == "5.15.0-91-generic");
-        assert(p.kernel.version == "#101-Ubuntu SMP Mon Nov 13 18:02:07 UTC 2023");
+        assert(p.kernel.version == "5.15.0");
         assert(p.kernel.compiled_at == "Mon Nov 13 18:02:07 UTC 2023");
         assert(p.kernel.architecture == "x86_64");
 

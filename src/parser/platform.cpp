@@ -94,17 +94,22 @@ Kernel parse_proc_version(std::string_view payload, std::vector<std::string>& wa
         warnings.push_back("parse_platform: /proc/version 格式异常，无法提取内核发行号");
     }
 
-    // 提取编译时间与构建版本：查找 "#<数字>" 后第一个星期几名称作为时间戳起点
-    // 格式示例: ... #111-Ubuntu SMP PREEMPT_DYNAMIC Sat Apr 11 23:16:02 UTC 2026
+    // version: 从 release 截取上游版本号（"-" 之前的部分，如 "6.8.0"）
+    if(!kernel.release.empty())
+    {
+        auto dash = kernel.release.find('-');
+        kernel.version = (dash != std::string::npos)
+                             ? kernel.release.substr(0, dash)
+                             : kernel.release;
+    }
+
+    // compiled_at: 从 # 后提取编译时间戳（以星期几开头）
     auto hash_pos = trimmed.rfind('#');
     if(hash_pos != std::string_view::npos)
     {
         auto after_hash = trimmed.substr(hash_pos);
-
-        // 时间戳总是以星期几开头（Mon/Tue/Wed/Thu/Fri/Sat/Sun）
         static const std::array<std::string_view, 7> days = {
-            "Mon ", "Tue ", "Wed ", "Thu ", "Fri ", "Sat ", "Sun "
-        };
+            "Mon ", "Tue ", "Wed ", "Thu ", "Fri ", "Sat ", "Sun "};
 
         auto ts_pos = std::string_view::npos;
         for(auto day : days)
@@ -115,20 +120,10 @@ Kernel parse_proc_version(std::string_view payload, std::vector<std::string>& wa
                 ts_pos = p;
             }
         }
-
         if(ts_pos != std::string_view::npos)
         {
-            kernel.version = std::string(after_hash);
             kernel.compiled_at = std::string(after_hash.substr(ts_pos));
         }
-        else
-        {
-            kernel.version = std::string(after_hash);
-        }
-    }
-    else
-    {
-        kernel.version = kernel.release;
     }
     return kernel;
 }
