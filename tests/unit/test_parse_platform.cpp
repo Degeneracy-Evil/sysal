@@ -3,7 +3,7 @@
 #include "sysal/model/raw_store.hpp"
 #include "sysal/types/enums.hpp"
 
-#include <cassert>
+#include "test_macros.hpp"
 #include <chrono>
 #include <string>
 #include <vector>
@@ -51,40 +51,40 @@ int main()
 
         std::vector<std::string> warnings;
         auto result = parse_platform(raw, warnings);
-        assert(result.has_value());
+        CHECK(result.has_value());
 
         const auto& p = *result;
 
         // Os
-        assert(p.os.name == "Ubuntu");
-        assert(p.os.version == "22.04");
-        assert(p.os.distribution == "ubuntu");
-        assert(p.os.codename == "jammy");
+        CHECK(p.os.name == "Ubuntu");
+        CHECK(p.os.version == "22.04");
+        CHECK(p.os.distribution == "ubuntu");
+        CHECK(p.os.codename == "jammy");
 
         // Kernel
-        assert(p.kernel.release == "5.15.0-91-generic");
-        assert(p.kernel.version == "5.15.0");
-        assert(p.kernel.compiled_at == "Mon Nov 13 18:02:07 UTC 2023");
-        assert(p.kernel.architecture == "x86_64");
+        CHECK(p.kernel.release == "5.15.0-91-generic");
+        CHECK(p.kernel.version == "5.15.0");
+        CHECK(p.kernel.compiled_at == "Mon Nov 13 18:02:07 UTC 2023");
+        CHECK(p.kernel.architecture == "x86_64");
 
         // Architecture
-        assert(p.architecture.name == "x86_64");
-        assert(p.architecture.bits == 64);
-        assert(p.architecture.byte_order == "little");
+        CHECK(p.architecture.name == "x86_64");
+        CHECK(p.architecture.bits == 64);
+        CHECK(p.architecture.byte_order == "little");
 
         // Host (DMI)
-        assert(p.host.product_name == "PowerEdge R750");
-        assert(p.host.vendor.value == "Dell Inc.");
-        assert(p.host.serial == "ABCD1234");
+        CHECK(p.host.product_name == "PowerEdge R750");
+        CHECK(p.host.vendor.value == "Dell Inc.");
+        CHECK(p.host.serial == "ABCD1234");
 
         // Firmware
-        assert(p.firmware.has_value());
-        assert(p.firmware->bios_vendor == "American Megatrends Inc.");
-        assert(p.firmware->bios_version == "1.0.0");
-        assert(p.firmware->bios_date == "01/01/2023");
+        CHECK(p.firmware.has_value());
+        CHECK(p.firmware->bios_vendor.value == "American Megatrends Inc.");
+        CHECK(p.firmware->bios_version == "1.0.0");
+        CHECK(p.firmware->bios_date == "01/01/2023");
 
         // Virtualization: 无数据，应为 nullopt
-        assert(!p.virtualization.has_value());
+        CHECK(!p.virtualization.has_value());
     }
 
     // ---- 测试 2: 容器环境不再产生 Virtualization（容器信息由 ExecutionContext 承载） ----
@@ -101,9 +101,9 @@ int main()
 
         std::vector<std::string> warnings;
         auto result = parse_platform(raw, warnings);
-        assert(result.has_value());
+        CHECK(result.has_value());
         // detect_virtualization 仅检测硬件虚拟化，容器不再产生 Virtualization
-        assert(!result->virtualization.has_value());
+        CHECK(!result->virtualization.has_value());
     }
 
     // ---- 测试 3: 虚拟化检测（KVM） ----
@@ -119,10 +119,10 @@ int main()
 
         std::vector<std::string> warnings;
         auto result = parse_platform(raw, warnings);
-        assert(result.has_value());
-        assert(result->virtualization.has_value());
-        assert(result->virtualization->kind == VirtualizationKind::Kvm);
-        assert(result->virtualization->hypervisor == "KVM");
+        CHECK(result.has_value());
+        CHECK(result->virtualization.has_value());
+        CHECK(result->virtualization->kind == VirtualizationKind::Kvm);
+        CHECK(result->virtualization->hypervisor == "KVM");
     }
 
     // ---- 测试 4: aarch64 架构 ----
@@ -136,9 +136,9 @@ int main()
 
         std::vector<std::string> warnings;
         auto result = parse_platform(raw, warnings);
-        assert(result.has_value());
-        assert(result->architecture.name == "aarch64");
-        assert(result->architecture.bits == 64);
+        CHECK(result.has_value());
+        CHECK(result->architecture.name == "aarch64");
+        CHECK(result->architecture.bits == 64);
     }
 
     // ---- 测试 5: riscv64 架构 ----
@@ -152,9 +152,9 @@ int main()
 
         std::vector<std::string> warnings;
         auto result = parse_platform(raw, warnings);
-        assert(result.has_value());
-        assert(result->architecture.name == "riscv64");
-        assert(result->architecture.bits == 64);
+        CHECK(result.has_value());
+        CHECK(result->architecture.name == "riscv64");
+        CHECK(result->architecture.bits == 64);
     }
 
     // ---- 测试 6: 缺少数据时产生警告 ----
@@ -165,10 +165,10 @@ int main()
         std::vector<std::string> warnings;
         auto result = parse_platform(raw, warnings);
         // 即使缺少数据，仍返回默认 Platform
-        assert(result.has_value());
+        CHECK(result.has_value());
         // 应有警告
-        assert(!warnings.empty());
+        CHECK(!warnings.empty());
     }
 
-    return 0;
+    TEST_SUMMARY();
 }

@@ -1,3 +1,7 @@
+/// @file parse_utils.cpp
+/// @brief 解析工具函数实现
+/// @details 提供字符串分割、trim、数值解析等通用工具。
+
 #include "parse_utils.hpp"
 
 #include <algorithm>

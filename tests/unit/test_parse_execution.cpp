@@ -3,7 +3,7 @@
 #include "sysal/model/raw_store.hpp"
 #include "sysal/types/enums.hpp"
 
-#include <cassert>
+#include "test_macros.hpp"
 #include <chrono>
 #include <string>
 #include <vector>
@@ -41,59 +41,59 @@ int main()
 
         std::vector<std::string> warnings;
         auto result = parse_execution(raw, warnings);
-        assert(result.has_value());
+        CHECK(result.has_value());
 
         const auto& ctx = *result;
 
         // 进程
-        assert(ctx.process.pid == 1234);
-        assert(ctx.process.ppid == 1);
-        assert(ctx.process.uid == 0);
-        assert(ctx.process.gid == 0);
-        assert(ctx.process.comm == "testapp");
+        CHECK(ctx.process.pid == 1234);
+        CHECK(ctx.process.ppid == 1);
+        CHECK(ctx.process.uid == 0);
+        CHECK(ctx.process.gid == 0);
+        CHECK(ctx.process.comm == "testapp");
 
         // cgroup
-        assert(ctx.cgroup.version == CgroupVersion::V2);
-        assert(ctx.cgroup.path == "/user.slice");
+        CHECK(ctx.cgroup.version == CgroupVersion::V2);
+        CHECK(ctx.cgroup.path == "/user.slice");
 
         // cpuset
-        assert(ctx.cpuset.cpus == "0-3,5");
-        assert(ctx.cpuset.mems == "0-1");
-        assert(ctx.cpuset.cpus_effective == "0-3,5");
-        assert(ctx.cpuset.mems_effective == "0-1");
+        CHECK(ctx.cpuset.cpus == "0-3,5");
+        CHECK(ctx.cpuset.mems == "0-1");
+        CHECK(ctx.cpuset.cpus_effective == "0-3,5");
+        CHECK(ctx.cpuset.mems_effective == "0-1");
 
         // 可见逻辑 CPU
-        assert(ctx.visible_logical_cpu_ids.size() == 5);
-        assert(ctx.visible_logical_cpu_ids[0] == LogicalCpuId{0});
-        assert(ctx.visible_logical_cpu_ids[1] == LogicalCpuId{1});
-        assert(ctx.visible_logical_cpu_ids[2] == LogicalCpuId{2});
-        assert(ctx.visible_logical_cpu_ids[3] == LogicalCpuId{3});
-        assert(ctx.visible_logical_cpu_ids[4] == LogicalCpuId{5});
+        CHECK(ctx.visible_logical_cpu_ids.size() == 5);
+        CHECK(ctx.visible_logical_cpu_ids[0] == LogicalCpuId{0});
+        CHECK(ctx.visible_logical_cpu_ids[1] == LogicalCpuId{1});
+        CHECK(ctx.visible_logical_cpu_ids[2] == LogicalCpuId{2});
+        CHECK(ctx.visible_logical_cpu_ids[3] == LogicalCpuId{3});
+        CHECK(ctx.visible_logical_cpu_ids[4] == LogicalCpuId{5});
 
         // 权限
-        assert(ctx.permission.euid == 0);
-        assert(ctx.permission.egid == 0);
-        assert(ctx.permission.is_root == true);
-        assert(ctx.permission.capabilities.size() == 8);
-        assert(ctx.permission.capabilities[0] == "CAP_CHOWN");
-        assert(ctx.permission.capabilities[1] == "CAP_DAC_OVERRIDE");
-        assert(ctx.permission.capabilities[2] == "CAP_FOWNER");
-        assert(ctx.permission.capabilities[7] == "CAP_SETPCAP");
+        CHECK(ctx.permission.euid == 0);
+        CHECK(ctx.permission.egid == 0);
+        CHECK(ctx.permission.is_root == true);
+        CHECK(ctx.permission.capabilities.size() == 8);
+        CHECK(ctx.permission.capabilities[0] == "CAP_CHOWN");
+        CHECK(ctx.permission.capabilities[1] == "CAP_DAC_OVERRIDE");
+        CHECK(ctx.permission.capabilities[2] == "CAP_FOWNER");
+        CHECK(ctx.permission.capabilities[7] == "CAP_SETPCAP");
 
         // 容器
-        assert(ctx.container.has_value());
-        assert(ctx.container->kind == ContainerKind::Docker);
+        CHECK(ctx.container.has_value());
+        CHECK(ctx.container->kind == ContainerKind::Docker);
 
         // 环境变量
-        assert(ctx.environment.entries.size() == 3);
+        CHECK(ctx.environment.entries.size() == 3);
 
         // 可见加速器
-        assert(ctx.visible_accelerator_ids.size() == 2);
-        assert(ctx.visible_accelerator_ids[0] == AcceleratorId{0});
-        assert(ctx.visible_accelerator_ids[1] == AcceleratorId{1});
+        CHECK(ctx.visible_accelerator_ids.size() == 2);
+        CHECK(ctx.visible_accelerator_ids[0] == AcceleratorId{0});
+        CHECK(ctx.visible_accelerator_ids[1] == AcceleratorId{1});
 
         // 可见网络接口（v0.0.1 为空）
-        assert(ctx.visible_network_interface_names.empty());
+        CHECK(ctx.visible_network_interface_names.empty());
     }
 
     // ---- 测试 2: 非特权用户 ----
@@ -110,16 +110,16 @@ int main()
 
         std::vector<std::string> warnings;
         auto result = parse_execution(raw, warnings);
-        assert(result.has_value());
+        CHECK(result.has_value());
 
         const auto& ctx = *result;
-        assert(ctx.process.pid == 5678);
-        assert(ctx.process.uid == 1000);
-        assert(ctx.permission.euid == 1000);
-        assert(ctx.permission.egid == 1000);
-        assert(ctx.permission.is_root == false);
-        assert(!ctx.container.has_value());
-        assert(ctx.visible_logical_cpu_ids.size() == 192);
+        CHECK(ctx.process.pid == 5678);
+        CHECK(ctx.process.uid == 1000);
+        CHECK(ctx.permission.euid == 1000);
+        CHECK(ctx.permission.egid == 1000);
+        CHECK(ctx.permission.is_root == false);
+        CHECK(!ctx.container.has_value());
+        CHECK(ctx.visible_logical_cpu_ids.size() == 192);
     }
 
     // ---- 测试 3: cgroup v1 ----
@@ -134,10 +134,10 @@ int main()
 
         std::vector<std::string> warnings;
         auto result = parse_execution(raw, warnings);
-        assert(result.has_value());
-        assert(result->cgroup.version == CgroupVersion::V1);
-        assert(result->cgroup.path == "/user.slice");
-        assert(result->cgroup.controllers.size() == 2);
+        CHECK(result.has_value());
+        CHECK(result->cgroup.version == CgroupVersion::V1);
+        CHECK(result->cgroup.path == "/user.slice");
+        CHECK(result->cgroup.controllers.size() == 2);
     }
 
     // ---- 测试 4: Kubernetes 容器检测 ----
@@ -154,9 +154,9 @@ int main()
 
         std::vector<std::string> warnings;
         auto result = parse_execution(raw, warnings);
-        assert(result.has_value());
-        assert(result->container.has_value());
-        assert(result->container->kind == ContainerKind::Kubernetes);
+        CHECK(result.has_value());
+        CHECK(result->container.has_value());
+        CHECK(result->container->kind == ContainerKind::Kubernetes);
     }
 
     // ---- 测试 5: 无数据 → nullopt ----
@@ -164,7 +164,7 @@ int main()
         RawStore raw;
         std::vector<std::string> warnings;
         auto result = parse_execution(raw, warnings);
-        assert(!result.has_value());
+        CHECK(!result.has_value());
     }
 
     // ---- 测试 6: Podman 容器检测（环境变量） ----
@@ -178,10 +178,10 @@ int main()
 
         std::vector<std::string> warnings;
         auto result = parse_execution(raw, warnings);
-        assert(result.has_value());
-        assert(result->container.has_value());
-        assert(result->container->kind == ContainerKind::Podman);
+        CHECK(result.has_value());
+        CHECK(result->container.has_value());
+        CHECK(result->container->kind == ContainerKind::Podman);
     }
 
-    return 0;
+    TEST_SUMMARY();
 }

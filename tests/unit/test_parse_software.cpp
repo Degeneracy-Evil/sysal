@@ -3,7 +3,7 @@
 #include "sysal/model/raw_store.hpp"
 #include "sysal/types/enums.hpp"
 
-#include <cassert>
+#include "test_macros.hpp"
 #include <chrono>
 #include <string>
 #include <vector>
@@ -33,35 +33,35 @@ int main()
 
         std::vector<std::string> warnings;
         auto result = parse_software(raw, warnings);
-        assert(result.has_value());
+        CHECK(result.has_value());
 
         const auto& s = *result;
 
         // 驱动
-        assert(s.drivers.size() == 1);
-        assert(s.drivers[0].name == "nvidia");
-        assert(s.drivers[0].version == "535.129.03");
-        assert(s.drivers[0].loaded == true);
-        assert(s.drivers[0].id == DriverId{0});
+        CHECK(s.drivers.size() == 1);
+        CHECK(s.drivers[0].name == "nvidia");
+        CHECK(s.drivers[0].version == "535.129.03");
+        CHECK(s.drivers[0].loaded == true);
+        CHECK(s.drivers[0].id == DriverId{0});
 
         // 运行时
-        assert(s.runtimes.size() == 1);
-        assert(s.runtimes[0].name == "cuda");
-        assert(s.runtimes[0].version == "12.4");
-        assert(s.runtimes[0].env_var == "CUDA_HOME");
+        CHECK(s.runtimes.size() == 1);
+        CHECK(s.runtimes[0].name == "cuda");
+        CHECK(s.runtimes[0].version == "12.4");
+        CHECK(s.runtimes[0].env_var == "CUDA_HOME");
 
         // CUDA 栈
-        assert(s.cuda.has_value());
-        assert(s.cuda->version == "12.4");
-        assert(s.cuda->driver_version == "535.129.03");
+        CHECK(s.cuda.has_value());
+        CHECK(s.cuda->version == "12.4");
+        CHECK(s.cuda->driver_version == "535.129.03");
 
         // v0.0.1 不实现的部分
-        assert(s.compilers.empty());
-        assert(s.libraries.empty());
-        assert(!s.rocm.has_value());
-        assert(!s.level_zero.has_value());
-        assert(!s.mpi.has_value());
-        assert(!s.rdma.has_value());
+        CHECK(s.compilers.empty());
+        CHECK(s.libraries.empty());
+        CHECK(!s.rocm.has_value());
+        CHECK(!s.level_zero.has_value());
+        CHECK(!s.mpi.has_value());
+        CHECK(!s.rdma.has_value());
     }
 
     // ---- 测试 2: 仅 NVIDIA 驱动（无 CUDA） ----
@@ -73,13 +73,13 @@ int main()
 
         std::vector<std::string> warnings;
         auto result = parse_software(raw, warnings);
-        assert(result.has_value());
-        assert(result->drivers.size() == 1);
-        assert(result->drivers[0].version == "470.42");
-        assert(result->runtimes.empty());
-        assert(result->cuda.has_value());
-        assert(result->cuda->version.empty());
-        assert(result->cuda->driver_version == "470.42");
+        CHECK(result.has_value());
+        CHECK(result->drivers.size() == 1);
+        CHECK(result->drivers[0].version == "470.42");
+        CHECK(result->runtimes.empty());
+        CHECK(result->cuda.has_value());
+        CHECK(result->cuda->version.empty());
+        CHECK(result->cuda->driver_version == "470.42");
     }
 
     // ---- 测试 3: 仅 CUDA（无 NVIDIA 驱动） ----
@@ -90,13 +90,13 @@ int main()
 
         std::vector<std::string> warnings;
         auto result = parse_software(raw, warnings);
-        assert(result.has_value());
-        assert(result->drivers.empty());
-        assert(result->runtimes.size() == 1);
-        assert(result->runtimes[0].version == "11.8");
-        assert(result->cuda.has_value());
-        assert(result->cuda->version == "11.8");
-        assert(result->cuda->driver_version.empty());
+        CHECK(result.has_value());
+        CHECK(result->drivers.empty());
+        CHECK(result->runtimes.size() == 1);
+        CHECK(result->runtimes[0].version == "11.8");
+        CHECK(result->cuda.has_value());
+        CHECK(result->cuda->version == "11.8");
+        CHECK(result->cuda->driver_version.empty());
     }
 
     // ---- 测试 4: 无数据 → nullopt ----
@@ -104,7 +104,7 @@ int main()
         RawStore raw;
         std::vector<std::string> warnings;
         auto result = parse_software(raw, warnings);
-        assert(!result.has_value());
+        CHECK(!result.has_value());
     }
 
     // ---- 测试 5: nvidia-smi 格式异常 → 警告 ----
@@ -114,9 +114,9 @@ int main()
 
         std::vector<std::string> warnings;
         auto result = parse_software(raw, warnings);
-        assert(!result.has_value());
-        assert(!warnings.empty());
+        CHECK(!result.has_value());
+        CHECK(!warnings.empty());
     }
 
-    return 0;
+    TEST_SUMMARY();
 }

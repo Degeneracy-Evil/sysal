@@ -211,6 +211,11 @@ read_cpufreq(const RawStore& raw, std::uint32_t package_id,
     auto cpu_records = raw.get_all(RawSource::SysfsCpu);
     for(const auto* rec : cpu_records)
     {
+        if(rec->status != CollectStatus::Success)
+        {
+            continue;
+        }
+
         const auto& path = rec->path_or_command;
 
         // 提取路径中的 CPU 编号，仅处理属于该封装的 CPU
@@ -260,6 +265,11 @@ build_numa_mapping(const RawStore& raw, [[maybe_unused]] std::vector<std::string
     auto numa_records = raw.get_all(RawSource::SysfsNuma);
     for(const auto* rec : numa_records)
     {
+        if(rec->status != CollectStatus::Success)
+        {
+            continue;
+        }
+
         const auto& path = rec->path_or_command;
         // 查找 cpulist: node/nodeN/cpulist
         if(path.find("cpulist") == std::string::npos)
@@ -288,6 +298,7 @@ build_numa_mapping(const RawStore& raw, [[maybe_unused]] std::vector<std::string
         }
 
         // 解析 cpulist: 格式如 "0-3,8-11" 或 "0,1,2,3"
+        constexpr std::size_t MAX_CPUS = 1024;
         const auto& cpulist = rec->payload;
         auto parts = split(cpulist, ',');
         for(const auto& part : parts)
@@ -301,10 +312,16 @@ build_numa_mapping(const RawStore& raw, [[maybe_unused]] std::vector<std::string
                 auto end = parse_uint(trimmed.substr(dash_pos + 1));
                 if(start.has_value() && end.has_value())
                 {
-                    for(auto cpu = *start; cpu <= *end; ++cpu)
+                    for(auto cpu = *start;
+                        cpu <= *end && cpu_to_numa.size() < MAX_CPUS;
+                        ++cpu)
                     {
                         cpu_to_numa[static_cast<std::uint32_t>(cpu)] =
                             static_cast<std::uint32_t>(*node_id);
+                    }
+                    if(cpu_to_numa.size() >= MAX_CPUS && *end > cpu_to_numa.rbegin()->first)
+                    {
+                        break;
                     }
                 }
             }
@@ -314,6 +331,10 @@ build_numa_mapping(const RawStore& raw, [[maybe_unused]] std::vector<std::string
                 auto cpu = parse_uint(trimmed);
                 if(cpu.has_value())
                 {
+                    if(cpu_to_numa.size() >= MAX_CPUS)
+                    {
+                        break;
+                    }
                     cpu_to_numa[static_cast<std::uint32_t>(*cpu)] =
                         static_cast<std::uint32_t>(*node_id);
                 }
@@ -351,13 +372,22 @@ std::optional<Cpu> parse_cpu(const RawStore& raw, std::vector<std::string>& warn
 {
     // 解析 /proc/cpuinfo
     auto cpuinfo_records = raw.get_all(RawSource::ProcCpuInfo);
-    if(cpuinfo_records.empty())
+    const RawRecord* cpuinfo_rec = nullptr;
+    for(const auto* rec : cpuinfo_records)
+    {
+        if(rec->status == CollectStatus::Success)
+        {
+            cpuinfo_rec = rec;
+            break;
+        }
+    }
+    if(cpuinfo_rec == nullptr)
     {
         warnings.push_back("parse_cpu: 缺少 /proc/cpuinfo 数据");
         return std::nullopt;
     }
 
-    auto entries = parse_cpuinfo(cpuinfo_records[0]->payload, warnings);
+    auto entries = parse_cpuinfo(cpuinfo_rec->payload, warnings);
     if(entries.empty())
     {
         warnings.push_back("parse_cpu: /proc/cpuinfo 无有效条目");
@@ -418,10 +448,26 @@ std::optional<Cpu> parse_cpu(const RawStore& raw, std::vector<std::string>& warn
     // 构建 LogicalCpu 列表
     for(const auto& e : entries)
     {
+        auto core_it = core_key_map.find({e.physical_id, e.core_id});
+        if(core_it == core_key_map.end())
+        {
+            warnings.push_back("parse_cpu: 逻辑 CPU " + std::to_string(e.processor) +
+                               " 的 (physical_id=" + std::to_string(e.physical_id) +
+                               ", core_id=" + std::to_string(e.core_id) + ") 未找到匹配核");
+            continue;
+        }
+        auto pkg_it = package_id_map.find(e.physical_id);
+        if(pkg_it == package_id_map.end())
+        {
+            warnings.push_back("parse_cpu: 逻辑 CPU " + std::to_string(e.processor) +
+                               " 的 physical_id=" + std::to_string(e.physical_id) +
+                               " 未找到匹配封装");
+            continue;
+        }
         LogicalCpu lc;
         lc.id = LogicalCpuId{e.processor};
-        lc.core_id = core_key_map.at({e.physical_id, e.core_id});
-        lc.package_id = package_id_map.at(e.physical_id);
+        lc.core_id = core_it->second;
+        lc.package_id = pkg_it->second;
         lc.visible_to_current_process = true;
         cpu.logical_cpus.push_back(lc);
     }

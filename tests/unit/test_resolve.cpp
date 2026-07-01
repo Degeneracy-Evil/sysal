@@ -4,7 +4,7 @@
 #include "sysal/model/execution.hpp"
 #include "sysal/types/ids.hpp"
 
-#include <cassert>
+#include "test_macros.hpp"
 #include <string>
 #include <vector>
 
@@ -39,10 +39,10 @@ int main()
         auto info = resolve(std::move(result), warnings);
 
         // CPU 0 和 1 可见，2 和 3 不可见
-        assert(info.cpu.logical_cpus[0].visible_to_current_process == true);
-        assert(info.cpu.logical_cpus[1].visible_to_current_process == true);
-        assert(info.cpu.logical_cpus[2].visible_to_current_process == false);
-        assert(info.cpu.logical_cpus[3].visible_to_current_process == false);
+        CHECK(info.cpu.logical_cpus[0].visible_to_current_process == true);
+        CHECK(info.cpu.logical_cpus[1].visible_to_current_process == true);
+        CHECK(info.cpu.logical_cpus[2].visible_to_current_process == false);
+        CHECK(info.cpu.logical_cpus[3].visible_to_current_process == false);
 
         // 无可见性交叉校验警告（一致）
         bool has_visibility_mismatch = false;
@@ -53,7 +53,7 @@ int main()
                 has_visibility_mismatch = true;
             }
         }
-        assert(!has_visibility_mismatch);
+        CHECK(!has_visibility_mismatch);
     }
 
     // ---- 测试 2: CPU 可见性——无 cpuset 约束（全部可见） ----
@@ -81,7 +81,7 @@ int main()
 
         for(const auto& lc : info.cpu.logical_cpus)
         {
-            assert(lc.visible_to_current_process == true);
+            CHECK(lc.visible_to_current_process == true);
         }
     }
 
@@ -107,10 +107,10 @@ int main()
         std::vector<std::string> warnings;
         auto info = resolve(std::move(result), warnings);
 
-        assert(info.accelerators.devices[0].visible_to_current_process == true);
-        assert(info.accelerators.devices[1].visible_to_current_process == false);
-        assert(info.accelerators.devices[2].visible_to_current_process == true);
-        assert(info.accelerators.devices[3].visible_to_current_process == false);
+        CHECK(info.accelerators.devices[0].visible_to_current_process == true);
+        CHECK(info.accelerators.devices[1].visible_to_current_process == false);
+        CHECK(info.accelerators.devices[2].visible_to_current_process == true);
+        CHECK(info.accelerators.devices[3].visible_to_current_process == false);
     }
 
     // ---- 测试 4: 加速器可见性——无约束（全部可见） ----
@@ -136,7 +136,7 @@ int main()
 
         for(const auto& dev : info.accelerators.devices)
         {
-            assert(dev.visible_to_current_process == true);
+            CHECK(dev.visible_to_current_process == true);
         }
     }
 
@@ -162,7 +162,7 @@ int main()
 
         for(const auto& iface : info.network.interfaces)
         {
-            assert(iface.visible_to_current_process == true);
+            CHECK(iface.visible_to_current_process == true);
         }
     }
 
@@ -175,9 +175,9 @@ int main()
         auto info = resolve(std::move(result), warnings);
 
         // 默认构造的 Cpu 应有空的 logical_cpus
-        assert(info.cpu.logical_cpus.empty());
-        assert(info.accelerators.devices.empty());
-        assert(info.network.interfaces.empty());
+        CHECK(info.cpu.logical_cpus.empty());
+        CHECK(info.accelerators.devices.empty());
+        CHECK(info.network.interfaces.empty());
     }
 
     // ---- 测试 7: 可见性交叉校验——幻影 ID 检测 ----
@@ -206,10 +206,10 @@ int main()
         auto info = resolve(std::move(result), warnings);
 
         // CPU 0-3 可见（在索引中且存在）
-        assert(info.cpu.logical_cpus[0].visible_to_current_process == true);
-        assert(info.cpu.logical_cpus[1].visible_to_current_process == true);
-        assert(info.cpu.logical_cpus[2].visible_to_current_process == true);
-        assert(info.cpu.logical_cpus[3].visible_to_current_process == true);
+        CHECK(info.cpu.logical_cpus[0].visible_to_current_process == true);
+        CHECK(info.cpu.logical_cpus[1].visible_to_current_process == true);
+        CHECK(info.cpu.logical_cpus[2].visible_to_current_process == true);
+        CHECK(info.cpu.logical_cpus[3].visible_to_current_process == true);
 
         // 应检测到幻影 ID cpu_99
         bool has_phantom_warning = false;
@@ -226,9 +226,9 @@ int main()
                 has_constraint_warning = true;
             }
         }
-        assert(has_phantom_warning);
+        CHECK(has_phantom_warning);
         // 5 visible (including phantom) vs 4 total — 5 > 4 so no constraint
-        assert(!has_constraint_warning);
+        CHECK(!has_constraint_warning);
     }
 
     // ---- 测试 8: cpuset 约束提示 ----
@@ -255,10 +255,10 @@ int main()
         std::vector<std::string> warnings;
         auto info = resolve(std::move(result), warnings);
 
-        assert(info.cpu.logical_cpus[0].visible_to_current_process == true);
-        assert(info.cpu.logical_cpus[1].visible_to_current_process == true);
-        assert(info.cpu.logical_cpus[2].visible_to_current_process == false);
-        assert(info.cpu.logical_cpus[3].visible_to_current_process == false);
+        CHECK(info.cpu.logical_cpus[0].visible_to_current_process == true);
+        CHECK(info.cpu.logical_cpus[1].visible_to_current_process == true);
+        CHECK(info.cpu.logical_cpus[2].visible_to_current_process == false);
+        CHECK(info.cpu.logical_cpus[3].visible_to_current_process == false);
 
         bool has_constraint = false;
         for(const auto& w : warnings)
@@ -269,7 +269,7 @@ int main()
                 has_constraint = true;
             }
         }
-        assert(has_constraint);
+        CHECK(has_constraint);
     }
 
     // ---- 测试 9: 加速器幻影 ID 检测 ----
@@ -304,8 +304,8 @@ int main()
                 has_phantom = true;
             }
         }
-        assert(has_phantom);
+        CHECK(has_phantom);
     }
 
-    return 0;
+    TEST_SUMMARY();
 }

@@ -60,6 +60,23 @@ using json = nlohmann::json;
     return result;
 }
 
+/// @brief 校验枚举值是否在合法范围内
+/// @param val 从 JSON 读取的整数值
+/// @param max_val 枚举最大合法值
+/// @param field_name 字段名（用于错误信息）
+/// @return 校验通过的枚举值
+/// @throws SysalError 若值越界
+template<typename Enum>
+Enum validate_enum(std::uint32_t val, Enum max_val, std::string_view field_name)
+{
+    if(val > static_cast<std::uint32_t>(max_val))
+    {
+        throw SysalError(ErrorKind::DeserializationError,
+                         "枚举值越界: " + std::string(field_name) + " = " + std::to_string(val));
+    }
+    return static_cast<Enum>(val);
+}
+
 // ───────────────────────────── PciAddress ─────────────────────────────
 
 [[nodiscard]] json pci_address_to_json(const PciAddress& addr)
@@ -210,7 +227,7 @@ using json = nlohmann::json;
 [[nodiscard]] json firmware_to_json(const Firmware& f)
 {
     return json{
-        {"bios_vendor", f.bios_vendor},
+        {"bios_vendor", f.bios_vendor.value},
         {"bios_version", f.bios_version},
         {"bios_date", f.bios_date},
         {"uefi", f.uefi},
@@ -220,7 +237,7 @@ using json = nlohmann::json;
 [[nodiscard]] Firmware firmware_from_json(const json& j)
 {
     Firmware f;
-    j.at("bios_vendor").get_to(f.bios_vendor);
+    j.at("bios_vendor").get_to(f.bios_vendor.value);
     j.at("bios_version").get_to(f.bios_version);
     j.at("bios_date").get_to(f.bios_date);
     f.uefi = j.at("uefi").get<bool>();
@@ -238,7 +255,7 @@ using json = nlohmann::json;
 [[nodiscard]] Virtualization virt_from_json(const json& j)
 {
     Virtualization v;
-    v.kind = static_cast<VirtualizationKind>(j.at("kind").get<std::uint32_t>());
+    v.kind = validate_enum(j.at("kind").get<std::uint32_t>(), VirtualizationKind::Other, "kind");
     j.at("hypervisor").get_to(v.hypervisor);
     return v;
 }
@@ -438,7 +455,7 @@ using json = nlohmann::json;
 [[nodiscard]] Cpu cpu_from_json(const json& j)
 {
     Cpu c;
-    c.arch = static_cast<Arch>(j.at("arch").get<std::uint32_t>());
+    c.arch = validate_enum(j.at("arch").get<std::uint32_t>(), Arch::Other, "arch");
     for(const auto& elem : j.at("packages"))
     {
         c.packages.push_back(cpu_package_from_json(elem));
@@ -457,7 +474,8 @@ using json = nlohmann::json;
     }
     for(const auto& elem : j.at("isa_extensions"))
     {
-        c.isa_extensions.push_back(static_cast<IsaExtension>(elem.get<std::uint32_t>()));
+        c.isa_extensions.push_back(
+            validate_enum(elem.get<std::uint32_t>(), IsaExtension::Pclmulqdq, "isa_extensions"));
     }
     return c;
 }
@@ -557,7 +575,7 @@ using json = nlohmann::json;
 {
     AcceleratorDevice d;
     d.id = AcceleratorId(j.at("id").get<std::uint32_t>());
-    d.kind = static_cast<AcceleratorKind>(j.at("kind").get<std::uint32_t>());
+    d.kind = validate_enum(j.at("kind").get<std::uint32_t>(), AcceleratorKind::Other, "kind");
     j.at("vendor").get_to(d.vendor.value);
     j.at("name").get_to(d.name.value);
     if(j.contains("pci_address"))
@@ -632,7 +650,7 @@ using json = nlohmann::json;
     NetworkInterface ni;
     j.at("name").get_to(ni.name.value);
     j.at("mac").get_to(ni.mac.value);
-    ni.state = static_cast<InterfaceState>(j.at("state").get<std::uint32_t>());
+    ni.state = validate_enum(j.at("state").get<std::uint32_t>(), InterfaceState::Unknown, "state");
     if(j.contains("speed"))
     {
         ni.speed = Bandwidth{j.at("speed").get<std::uint64_t>()};
@@ -707,7 +725,7 @@ using json = nlohmann::json;
     {
         sd.pci_address = pci_address_from_json(j.at("pci_address"));
     }
-    sd.kind = static_cast<StorageKind>(j.at("kind").get<std::uint32_t>());
+    sd.kind = validate_enum(j.at("kind").get<std::uint32_t>(), StorageKind::Other, "kind");
     return sd;
 }
 
@@ -1116,7 +1134,8 @@ using json = nlohmann::json;
 [[nodiscard]] Cgroup cgroup_from_json(const json& j)
 {
     Cgroup c;
-    c.version = static_cast<CgroupVersion>(j.at("version").get<std::uint32_t>());
+    c.version =
+        validate_enum(j.at("version").get<std::uint32_t>(), CgroupVersion::V2, "version");
     j.at("path").get_to(c.path);
     if(j.contains("controllers"))
     {
@@ -1186,7 +1205,7 @@ using json = nlohmann::json;
 [[nodiscard]] Container container_from_json(const json& j)
 {
     Container c;
-    c.kind = static_cast<ContainerKind>(j.at("kind").get<std::uint32_t>());
+    c.kind = validate_enum(j.at("kind").get<std::uint32_t>(), ContainerKind::Other, "kind");
     j.at("id").get_to(c.id);
     j.at("runtime").get_to(c.runtime);
     return c;

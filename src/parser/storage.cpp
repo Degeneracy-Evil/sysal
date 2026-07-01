@@ -1,3 +1,7 @@
+/// @file storage.cpp
+/// @brief 存储解析器实现
+/// @details 从 sysfs 块设备数据解析存储设备信息。
+
 #include "storage.hpp"
 
 #include "parse_utils.hpp"
@@ -90,6 +94,11 @@ std::optional<Storage> parse_storage(const RawStore& raw, std::vector<std::strin
     std::map<std::string, std::map<std::string, std::string>> device_attrs;
     for(const auto* rec : block_records)
     {
+        if(rec->status != CollectStatus::Success)
+        {
+            continue;
+        }
+
         auto dev_name = extract_device_name(rec->path_or_command);
         if(dev_name.empty())
         {

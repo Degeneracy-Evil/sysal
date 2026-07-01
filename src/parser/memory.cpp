@@ -125,13 +125,22 @@ std::optional<Memory> parse_memory(const RawStore& raw, std::vector<std::string>
 
     // 解析 /proc/meminfo
     auto meminfo_records = raw.get_all(RawSource::ProcMemInfo);
-    if(meminfo_records.empty())
+    const RawRecord* meminfo_rec = nullptr;
+    for(const auto* rec : meminfo_records)
+    {
+        if(rec->status == CollectStatus::Success)
+        {
+            meminfo_rec = rec;
+            break;
+        }
+    }
+    if(meminfo_rec == nullptr)
     {
         warnings.push_back("parse_memory: 缺少 /proc/meminfo 数据");
         return std::nullopt;
     }
 
-    auto [total, available] = parse_meminfo(meminfo_records[0]->payload, warnings);
+    auto [total, available] = parse_meminfo(meminfo_rec->payload, warnings);
     if(total.value == 0)
     {
         warnings.push_back("parse_memory: MemTotal 为 0 或未找到");
@@ -144,6 +153,11 @@ std::optional<Memory> parse_memory(const RawStore& raw, std::vector<std::string>
     auto numa_records = raw.get_all(RawSource::SysfsNuma);
     for(const auto* rec : numa_records)
     {
+        if(rec->status != CollectStatus::Success)
+        {
+            continue;
+        }
+
         const auto& path = rec->path_or_command;
         // 查找 meminfo: node/nodeN/meminfo
         if(path.find("meminfo") == std::string::npos)

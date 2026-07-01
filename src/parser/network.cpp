@@ -1,3 +1,7 @@
+/// @file network.cpp
+/// @brief 网络解析器实现
+/// @details 从 sysfs 网络接口数据解析网络设备信息。
+
 #include "network.hpp"
 
 #include "parse_utils.hpp"
@@ -78,6 +82,11 @@ std::optional<Network> parse_network(const RawStore& raw, std::vector<std::strin
     std::map<std::string, std::vector<const RawRecord*>> groups;
     for(const auto* rec : net_records)
     {
+        if(rec->status != CollectStatus::Success)
+        {
+            continue;
+        }
+
         auto ifname = extract_interface_name_from_path(rec->path_or_command);
         if(ifname.empty())
         {

@@ -170,55 +170,6 @@ void cross_check_network_visibility(const Network& /*net*/, const ExecutionConte
     // 所有接口均标记可见，无需交叉校验。
 }
 
-/// @brief 来源信任等级（数值越低越可信）
-enum class TrustLevel : std::uint8_t
-{
-    Backend = 0, ///< 专用后端（NVML、ibverbs）
-    Sysfs = 1,   ///< sysfs
-    Procfs = 2,  ///< procfs
-    Command = 3, ///< 命令输出（lspci、nvidia-smi）
-    Inferred = 4 ///< 推断/默认值
-};
-
-// resolve_conflict 是 v0.0.1 冲突解决框架的一部分，
-// 当前版本无多来源字段故未调用，未来版本将使用。
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wunused-function"
-
-/// @brief 解决两来源冲突
-/// @details 当两来源值不同时，高信任（低数值）来源胜出，
-///          追加 [conflict] 格式警告。值相同时无冲突。
-/// @param field 字段名
-/// @param src1_name 来源1名称
-/// @param src1_val 来源1的值字符串
-/// @param src1_trust 来源1信任等级
-/// @param src2_name 来源2名称
-/// @param src2_val 来源2的值字符串
-/// @param src2_trust 来源2信任等级
-/// @param warnings 警告列表
-/// @return 胜出来源的值字符串
-std::string resolve_conflict(const std::string& field, const std::string& src1_name,
-                             const std::string& src1_val, TrustLevel src1_trust,
-                             const std::string& src2_name, const std::string& src2_val,
-                             TrustLevel src2_trust, std::vector<std::string>& warnings)
-{
-    if(src1_val == src2_val)
-    {
-        return src1_val;
-    }
-
-    bool adopt_src1 = src1_trust <= src2_trust;
-    const std::string& adopted = adopt_src1 ? src1_name : src2_name;
-    const std::string& adopted_val = adopt_src1 ? src1_val : src2_val;
-
-    warnings.push_back("[conflict] " + field + ": " + src1_name + "=" + src1_val + ", " +
-                       src2_name + "=" + src2_val + ", adopted=" + adopted);
-
-    return adopted_val;
-}
-
-#pragma clang diagnostic pop
-
 } // namespace
 
 SystemInfo resolve(ParseResult result, std::vector<std::string>& warnings)
@@ -246,11 +197,6 @@ SystemInfo resolve(ParseResult result, std::vector<std::string>& warnings)
     cross_check_cpu_visibility(info.cpu, info.execution, warnings);
     cross_check_accelerator_visibility(info.accelerators, info.execution, warnings);
     cross_check_network_visibility(info.network, info.execution, warnings);
-
-    // 冲突解决框架
-    // v0.0.1 中大多数字段只有一个来源，冲突罕见。
-    // resolve_conflict helper 已就绪，未来当多来源数据可用时调用。
-    // 来源信任优先级：专用后端 > sysfs > procfs > 命令输出 > 推断/默认值
 
     return info;
 }

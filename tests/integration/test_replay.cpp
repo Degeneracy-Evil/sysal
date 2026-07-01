@@ -6,7 +6,8 @@
 #include "sysal/core/system.hpp"
 #include "sysal/test/replay.hpp"
 
-#include <cassert>
+#include "test_macros.hpp"
+
 #include <filesystem>
 #include <iostream>
 
@@ -15,21 +16,6 @@ namespace
 
 /// @brief fixture 文件路径
 const std::string fixture_path = "tests/fixtures/dev_machine.json";
-
-/// @brief 断言宏，带消息输出
-#define CHECK(cond, msg)                                                                           \
-    do                                                                                             \
-    {                                                                                              \
-        if(!(cond))                                                                                \
-        {                                                                                          \
-            std::cerr << "FAIL: " << (msg) << "\n";                                                \
-            return 1;                                                                              \
-        }                                                                                          \
-        else                                                                                       \
-        {                                                                                          \
-            std::cout << "  PASS: " << (msg) << "\n";                                              \
-        }                                                                                          \
-    } while(0)
 
 /// @brief 生成 fixture 文件
 /// @details 采集当前机器的原始数据并保存到 fixture 路径。
@@ -67,70 +53,50 @@ int main()
     // 2. 加载 fixture
     std::cout << "\nStep 2: Loading fixture...\n";
     auto raw = sysal::test::load_raw_store(fixture_path);
-    CHECK(!raw.records.empty(),
-          "fixture has records (count=" + std::to_string(raw.records.size()) + ")");
+    CHECK(!raw.records.empty());
 
     // 3. 回放采集
     std::cout << "\nStep 3: Replaying from raw store...\n";
     auto sys = sysal::test::collect_from_raw(raw);
-    CHECK(true, "collect_from_raw succeeded");
+    CHECK(true);
 
     // 4. 验证域不变量
     std::cout << "\nStep 4: Verifying domain invariants...\n";
 
     // CPU
-    CHECK(!sys.info.cpu.logical_cpus.empty(),
-          "cpu.logical_cpus not empty (size=" + std::to_string(sys.info.cpu.logical_cpus.size()) +
-              ")");
-    CHECK(!sys.info.cpu.packages.empty(),
-          "cpu.packages not empty (size=" + std::to_string(sys.info.cpu.packages.size()) + ")");
+    CHECK(!sys.info.cpu.logical_cpus.empty());
+    CHECK(!sys.info.cpu.packages.empty());
 
     // Memory
-    CHECK(sys.info.memory.total_memory.value > 0,
-          "memory.total_memory > 0 (" + std::to_string(sys.info.memory.total_memory.value) +
-              " bytes)");
+    CHECK(sys.info.memory.total_memory.value > 0);
 
     // Platform
-    CHECK(!sys.info.platform.os.name.empty(),
-          "platform.os.name not empty ('" + sys.info.platform.os.name + "')");
-    CHECK(!sys.info.platform.kernel.release.empty(),
-          "platform.kernel.release not empty ('" + sys.info.platform.kernel.release + "')");
-    CHECK(!sys.info.platform.architecture.name.empty(),
-          "platform.architecture.name not empty ('" + sys.info.platform.architecture.name + "')");
+    CHECK(!sys.info.platform.os.name.empty());
+    CHECK(!sys.info.platform.kernel.release.empty());
+    CHECK(!sys.info.platform.architecture.name.empty());
 
     // Network
-    CHECK(!sys.info.network.interfaces.empty(),
-          "network.interfaces not empty (size=" +
-              std::to_string(sys.info.network.interfaces.size()) + ")");
+    CHECK(!sys.info.network.interfaces.empty());
 
     // PCI
-    CHECK(!sys.info.pci.devices.empty(),
-          "pci.devices not empty (size=" + std::to_string(sys.info.pci.devices.size()) + ")");
+    CHECK(!sys.info.pci.devices.empty());
 
     // Execution
-    CHECK(sys.info.execution.process.pid > 0,
-          "execution.process.pid > 0 (" + std::to_string(sys.info.execution.process.pid) + ")");
+    CHECK(sys.info.execution.process.pid > 0);
 
     // Meta
-    CHECK(!sys.meta.succeeded_collectors.empty(),
-          "meta.succeeded_collectors not empty (size=" +
-              std::to_string(sys.meta.succeeded_collectors.size()) + ")");
-    CHECK(!sys.meta.sysal_version.empty(),
-          "meta.sysal_version not empty ('" + sys.meta.sysal_version + "')");
+    CHECK(!sys.meta.succeeded_collectors.empty());
+    CHECK(!sys.meta.sysal_version.empty());
 
     // Warnings（可能为空，仅验证类型有效）
-    CHECK(true, "warnings vector valid (size=" + std::to_string(sys.warnings.size()) + ")");
+    CHECK(true);
 
     // 5. 与实时采集对比关键指标
     std::cout << "\nStep 5: Comparing replay vs live collection...\n";
     auto live = sysal::System::collect();
-    CHECK(sys.info.cpu.logical_cpus.size() == live.info.cpu.logical_cpus.size(),
-          "replay CPU count matches live (" + std::to_string(sys.info.cpu.logical_cpus.size()) +
-              " vs " + std::to_string(live.info.cpu.logical_cpus.size()) + ")");
-    CHECK(sys.info.memory.total_memory.value == live.info.memory.total_memory.value,
-          "replay memory matches live (" + std::to_string(sys.info.memory.total_memory.value) +
-              " vs " + std::to_string(live.info.memory.total_memory.value) + ")");
+    CHECK(sys.info.cpu.logical_cpus.size() == live.info.cpu.logical_cpus.size());
+    CHECK(sys.info.memory.total_memory.value == live.info.memory.total_memory.value);
 
     std::cout << "\n=== test_replay: ALL PASSED ===\n";
-    return 0;
+    TEST_SUMMARY();
 }

@@ -99,7 +99,6 @@ sysal/
     │   └── resolve.hpp / resolve.cpp
     │
     ├── serialization/           # JSON 序列化
-    │   ├── json.hpp              # 手写 JSON 引擎
     │   └── serialize.cpp         # System ↔ JSON
     │
     └── pipeline/                # 流程编排

@@ -6,7 +6,7 @@
 #include "sysal/types/units.hpp"
 #include "sysal/types/value_types.hpp"
 
-#include <cassert>
+#include "test_macros.hpp"
 #include <cstdint>
 
 int main()
@@ -18,45 +18,45 @@ int main()
     static_assert(!sysal::has(sysal::basic, sysal::Collect::Accelerator));
 
     auto flags = sysal::Collect::Cpu | sysal::Collect::Memory | sysal::Collect::Raw;
-    assert(sysal::has(flags, sysal::Collect::Cpu));
-    assert(sysal::has(flags, sysal::Collect::Memory));
-    assert(sysal::has(flags, sysal::Collect::Raw));
-    assert(!sysal::has(flags, sysal::Collect::Network));
+    CHECK(sysal::has(flags, sysal::Collect::Cpu));
+    CHECK(sysal::has(flags, sysal::Collect::Memory));
+    CHECK(sysal::has(flags, sysal::Collect::Raw));
+    CHECK(!sysal::has(flags, sysal::Collect::Network));
 
     // Arch 枚举
     auto arch = sysal::Arch::X86_64;
-    assert(arch == sysal::Arch::X86_64);
+    CHECK(arch == sysal::Arch::X86_64);
 
     // StrongId
     sysal::CpuPackageId pkg{0};
     sysal::CpuCoreId core{1};
     sysal::LogicalCpuId cpu{2};
-    assert(pkg.value() == 0);
-    assert(core.value() == 1);
-    assert(cpu.value() == 2);
-    assert(pkg == sysal::CpuPackageId{0});
+    CHECK(pkg.value() == 0);
+    CHECK(core.value() == 1);
+    CHECK(cpu.value() == 2);
+    CHECK(pkg == sysal::CpuPackageId{0});
 
     // ScalarUnit
     sysal::MemorySize mem{1024};
     sysal::Frequency freq{2400000000};
-    assert(mem.value == 1024);
-    assert(freq.value == 2400000000);
+    CHECK(mem.value == 1024);
+    CHECK(freq.value == 2400000000);
 
     // NamedString
     sysal::Vendor vendor{"GenuineIntel"};
     sysal::DeviceName name{"Intel(R) Xeon(R) Gold 5320"};
     sysal::PciClass cls{"030000"};
-    assert(vendor.value == "GenuineIntel");
-    assert(cls.value == "030000");
+    CHECK(vendor.value == "GenuineIntel");
+    CHECK(cls.value == "030000");
 
     // PciAddress
     sysal::PciAddress addr{0, 65, 0, 0};
-    assert(addr.domain == 0);
-    assert(addr.bus == 65);
+    CHECK(addr.domain == 0);
+    CHECK(addr.bus == 65);
 
     // SysalError
     sysal::SysalError err(sysal::ErrorKind::CollectionFailed, "test error");
-    assert(err.kind() == sysal::ErrorKind::CollectionFailed);
+    CHECK(err.kind() == sysal::ErrorKind::CollectionFailed);
 
-    return 0;
+    TEST_SUMMARY();
 }

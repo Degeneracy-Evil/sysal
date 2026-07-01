@@ -1,5 +1,33 @@
 # 开发记录
 
+### 2026-07-01 testbench 重命名为 sysal_info + 统一 CHECK 宏
+
+- **变更类型**: refactor / tests / build / docs
+- **涉及文件**: examples/sysal_info.cpp (git mv from tests/testbench.cpp), tests/test_macros.hpp (新增), tests/unit/*.cpp (16 个), tests/unit/test_serialization.cpp, tests/integration/test_replay.cpp, xmake.lua, README.md, AGENTS.md, docs/design/testing/raw_replay.md, docs/devlog.md
+- **变更内容**:
+  1. `tests/testbench.cpp` 经 `git mv` 移至 `examples/sysal_info.cpp`，文件头注释从 "testbench / 全量能力测试" 改为 "sysal_info / 全量能力演示"，输出 banner 从 "=== sysal testbench ===" 改为 "=== sysal info ==="
+  2. xmake.lua: `test_target("testbench", ...)` 替换为独立 `target("sysal_info")`（直接定义，不走 test_target 辅助函数，因 examples/ 非 tests/）；`task("testbench")` 重命名为 `task("sysal_info")`；`test_target` 辅助函数新增 `add_includedirs("tests")` 以便测试文件找到 test_macros.hpp
+  3. 新增 `tests/test_macros.hpp`：定义 `CHECK(expr)` 宏（失败时 fprintf 到 stderr 并 ++g_test_fail，成功 ++g_test_pass）和 `TEST_SUMMARY()` 宏（打印通过/失败计数并返回退出码）
+  4. test_serialization.cpp: 移除本地 g_pass/g_fail/check()/CHECK 定义，改为 `#include "test_macros.hpp"`；`++g_pass` 改为 `CHECK(true)`；末尾 `return g_fail == 0 ? 0 : 1` 改为 `TEST_SUMMARY()`
+  5. test_replay.cpp: 移除本地 2 参数 `CHECK(cond, msg)` 宏定义，改为 `#include "test_macros.hpp"`；全部 `CHECK(cond, msg)` 转为单参数 `CHECK(cond)`；末尾 `return 0` 改为 `TEST_SUMMARY()`
+  6. 16 个 assert 测试文件（test_types/test_model/test_parse_utils/test_parse_platform/test_parse_cpu/test_parse_memory/test_parse_accelerator/test_parse_storage/test_parse_pci/test_parse_network/test_parse_software/test_parse_execution/test_reader/test_resolve/test_collect/test_raw_store_io）：`#include <cassert>` 替换为 `#include "test_macros.hpp"`，全部 `assert(expr)` 替换为 `CHECK(expr)`（AST 感知替换，不影响 static_assert），末尾 `return 0;` 替换为 `TEST_SUMMARY()`
+  7. README.md: "运行 testbench" 章节改为 "运行 sysal_info"，`xmake testbench` / `xmake run testbench` 改为 `xmake sysal_info` / `xmake run sysal_info`
+  8. AGENTS.md: `xmake testbench` 改为 `xmake sysal_info`
+  9. docs/design/testing/raw_replay.md: fixture 布局中 `testbench.cpp` 引用改为 `examples/sysal_info.cpp`
+- **原因**: testbench 实为 demo 而非测试，移至 examples/ 并重命名为 sysal_info 以正名；16 个测试文件使用 assert() 在 NDEBUG 下会被编译消除（虽已 -UNDEBUG 防护），统一为 CHECK 宏提供持续计数和汇总输出，测试结果更清晰
+- **验证**: `xmake -r` 构建零 warning 零 error；全部 18 个测试通过（test_parse_cpu 72 passed / test_types 16 passed / test_serialization 14 passed / test_replay 16 passed 等）；`xmake sysal_info` 运行正常，输出 17 section 完整内容
+
+### 2026-07-01 修复 3 个代码审查问题
+
+- **变更类型**: src / fix / tests
+- **涉及文件**: include/sysal/model/platform.hpp, src/parser/platform.cpp, src/parser/cpu.cpp, src/parser/storage.cpp, src/parser/network.cpp, src/parser/accelerator.cpp, src/parser/memory.cpp, src/parser/execution.cpp, src/parser/software.cpp, src/parser/pci.cpp, src/serialization/serialize.cpp, tests/unit/test_parse_platform.cpp, tests/testbench.cpp
+- **变更内容**:
+  1. **FIX 1 (P1)**: `Firmware::bios_vendor` 类型从 `std::string` 改为 `Vendor`（NamedString），与 `Host::vendor` 保持一致；`platform.cpp` 解析处改用 `Vendor{trim(payload)}`；`serialize.cpp` 序列化/反序列化改用 `.value`；`test_parse_platform.cpp` 和 `testbench.cpp` 断言改用 `.value`
+  2. **FIX 2 (P2)**: 所有解析器在遍历原始记录时跳过 `CollectStatus != Success` 的记录。单记录场景（ProcCpuInfo、EtcOsRelease、ProcVersion、Uname、ProcHostname、ProcMemInfo、ProcSelfStatus、ProcSelfCgroup、Environment、NvidiaSmi、Nvcc）改为查找首条 Success 记录；多记录遍历场景（SysfsCpu、SysfsNuma、SysfsDmi、ProcOneCgroup、SysfsBlock、SysfsNet、SysfsPci）在循环顶部 `continue` 跳过非 Success 记录；`pci.cpp` 的 SysfsPci 分组循环新增状态检查（lspci 已有）
+  3. **FIX 3 (P2)**: `serialize.cpp` 新增 `validate_enum` 模板函数，反序列化时校验枚举值范围；替换 8 处 `static_cast<Enum>` 为 `validate_enum(...)`，覆盖 Arch、InterfaceState、StorageKind、AcceleratorKind、IsaExtension、VirtualizationKind、CgroupVersion、ContainerKind
+- **原因**: v0.0.1 审查遗留问题修复——bios_vendor 类型不一致、解析器未过滤失败记录、JSON 反序列化缺少枚举范围校验
+- **验证**: `xmake -r` 构建零 warning 零 error；全部 18 个测试通过（test_parse_platform、test_serialization、test_parse_storage 等）
+
 ### 2026-07-01 R6 testbench 输出修复 + tests/ 目录重组
 
 - **变更类型**: src / fix / tests / chore

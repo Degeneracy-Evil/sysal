@@ -127,6 +127,11 @@ std::optional<NumaNodeId> find_numa_node_for_pci(const RawStore& raw, const PciA
     auto pci_records = raw.get_all(RawSource::SysfsPci);
     for(const auto* rec : pci_records)
     {
+        if(rec->status != CollectStatus::Success)
+        {
+            continue;
+        }
+
         const auto& path = rec->path_or_command;
         // 查找包含该 PCI 地址且以 numa_node 结尾的路径
         if(path.find(addr_buf) != std::string::npos && path.find("numa_node") != std::string::npos)
@@ -169,6 +174,11 @@ std::optional<Accelerators> parse_accelerator(const RawStore& raw,
 
     for(const auto* rec : nvidia_records)
     {
+        if(rec->status != CollectStatus::Success)
+        {
+            continue;
+        }
+
         auto lines = split(rec->payload, '\n');
         for(const auto& line : lines)
         {

@@ -1,6 +1,6 @@
-/// @file testbench.cpp
-/// @brief sysal 全量能力测试
-/// @details 测试 sysal 库的所有公共 API：完整采集、按域采集、模型查询、
+/// @file sysal_info.cpp
+/// @brief sysal 全量能力演示
+/// @details 演示 sysal 库的所有公共 API：完整采集、按域采集、模型查询、
 ///          JSON 序列化往返、原始证据、刷新、可见性筛选和错误处理。
 
 #include "sysal/core/sysal.hpp"
@@ -337,7 +337,7 @@ void label(const std::string& key, const char* value) { label(key, std::string{v
 
 int main()
 {
-    std::cout << "=== sysal testbench ===\n";
+    std::cout << "=== sysal info ===\n";
 
     // ── 1. Full Collection ──────────────────────────────────────────────
     section("1. Full Collection");
@@ -393,7 +393,7 @@ int main()
     label("Byte order", sys.info.platform.architecture.byte_order);
     if(sys.info.platform.firmware.has_value())
     {
-        label("BIOS vendor", sys.info.platform.firmware->bios_vendor);
+        label("BIOS vendor", sys.info.platform.firmware->bios_vendor.value);
         label("BIOS version", sys.info.platform.firmware->bios_version);
         label("BIOS date", sys.info.platform.firmware->bios_date);
         label("UEFI", sys.info.platform.firmware->uefi ? "yes" : "no");
@@ -810,6 +810,6 @@ int main()
         }
     }
 
-    std::cout << "\n=== testbench done ===\n";
+    std::cout << "\n=== sysal info done ===\n";
     return 0;
 }

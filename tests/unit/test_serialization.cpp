@@ -6,7 +6,8 @@
 #include "sysal/serialization/serialization.hpp"
 #include "sysal/version.hpp"
 
-#include <cassert>
+#include "test_macros.hpp"
+
 #include <cstdlib>
 #include <iostream>
 #include <string>
@@ -16,24 +17,6 @@ using namespace sysal;
 
 namespace
 {
-
-int g_pass = 0;
-int g_fail = 0;
-
-void check(bool cond, const char* expr, int line)
-{
-    if(cond)
-    {
-        ++g_pass;
-    }
-    else
-    {
-        ++g_fail;
-        std::cerr << "FAIL line " << line << ": " << expr << "\n";
-    }
-}
-
-#define CHECK(expr) check((expr), #expr, __LINE__)
 
 /// @brief 检查 JSON 字符串是否包含指定键
 /// @param json JSON 文本
@@ -52,23 +35,86 @@ void test_round_trip()
 {
     std::cout << "  test_round_trip...\n";
 
-    auto sys =
-        System::collect(Collect::Cpu | Collect::Memory | Collect::Platform | Collect::Execution);
+    auto sys = System::collect(Collect::Platform | Collect::Cpu | Collect::Memory |
+                               Collect::Accelerator | Collect::Network | Collect::Storage |
+                               Collect::Pci | Collect::Execution);
 
     // 序列化
     std::string json_str = to_json(sys, {.pretty_print = true});
     CHECK(!json_str.empty());
 
     // 反序列化
-    System sys2 = from_json(json_str);
+    System round_trip = from_json(json_str);
 
     // 比较关键字段
-    CHECK(sys2.info.cpu.logical_cpus.size() == sys.info.cpu.logical_cpus.size());
-    CHECK(sys2.info.memory.total_memory.value == sys.info.memory.total_memory.value);
-    CHECK(sys2.info.platform.os.name == sys.info.platform.os.name);
-    CHECK(sys2.info.platform.os.version == sys.info.platform.os.version);
-    CHECK(sys2.info.platform.host.hostname == sys.info.platform.host.hostname);
-    CHECK(sys2.info.execution.process.pid == sys.info.execution.process.pid);
+    CHECK(round_trip.info.cpu.logical_cpus.size() == sys.info.cpu.logical_cpus.size());
+    CHECK(round_trip.info.memory.total_memory.value == sys.info.memory.total_memory.value);
+    CHECK(round_trip.info.platform.os.name == sys.info.platform.os.name);
+    CHECK(round_trip.info.platform.os.version == sys.info.platform.os.version);
+    CHECK(round_trip.info.platform.host.hostname == sys.info.platform.host.hostname);
+    CHECK(round_trip.info.execution.process.pid == sys.info.execution.process.pid);
+
+    // Accelerator
+    CHECK(round_trip.info.accelerators.devices.size() ==
+          sys.info.accelerators.devices.size());
+    if(!sys.info.accelerators.devices.empty())
+    {
+        const auto& a = sys.info.accelerators.devices[0];
+        const auto& b = round_trip.info.accelerators.devices[0];
+        CHECK(b.name.value == a.name.value);
+        CHECK(b.kind == a.kind);
+        CHECK(b.memory_size.has_value() == a.memory_size.has_value());
+        if(a.memory_size.has_value())
+        {
+            CHECK(b.memory_size->value == a.memory_size->value);
+        }
+    }
+
+    // Storage
+    CHECK(round_trip.info.storage.devices.size() == sys.info.storage.devices.size());
+    if(!sys.info.storage.devices.empty())
+    {
+        const auto& a = sys.info.storage.devices[0];
+        const auto& b = round_trip.info.storage.devices[0];
+        CHECK(b.name.value == a.name.value);
+        CHECK(b.kind == a.kind);
+        CHECK(b.capacity.has_value() == a.capacity.has_value());
+        if(a.capacity.has_value())
+        {
+            CHECK(b.capacity->value == a.capacity->value);
+        }
+    }
+
+    // PCI
+    CHECK(round_trip.info.pci.devices.size() == sys.info.pci.devices.size());
+    if(!sys.info.pci.devices.empty())
+    {
+        const auto& a = sys.info.pci.devices[0];
+        const auto& b = round_trip.info.pci.devices[0];
+        CHECK(b.address.domain == a.address.domain);
+        CHECK(b.address.bus == a.address.bus);
+        CHECK(b.vendor.value == a.vendor.value);
+    }
+
+    // Network
+    CHECK(round_trip.info.network.interfaces.size() == sys.info.network.interfaces.size());
+    if(!sys.info.network.interfaces.empty())
+    {
+        const auto& a = sys.info.network.interfaces[0];
+        const auto& b = round_trip.info.network.interfaces[0];
+        CHECK(b.name.value == a.name.value);
+        CHECK(b.state == a.state);
+    }
+
+    // Platform: kernel 与架构
+    CHECK(round_trip.info.platform.kernel.release == sys.info.platform.kernel.release);
+    CHECK(round_trip.info.platform.architecture.name == sys.info.platform.architecture.name);
+    CHECK(round_trip.info.platform.architecture.bits == sys.info.platform.architecture.bits);
+
+    // Meta
+    CHECK(round_trip.meta.collect_duration.count() >= 0.0);
+    CHECK(sys.meta.collect_duration.count() >= 0.0);
+    CHECK(round_trip.meta.requested_flags == sys.meta.requested_flags);
 }
 
 void test_no_raw_when_excluded()
@@ -97,7 +143,7 @@ void test_raw_when_included()
     else
     {
         // raw 为空时即使 include_raw=true 也不输出
-        ++g_pass;
+        CHECK(true);
     }
 }
 
@@ -210,7 +256,7 @@ void test_compatible_version()
     },
     "meta": {
         "collect_time": 0,
-        "sysal_version": "0.0.2",
+        "sysal_version": "0.0.3",
         "collect_duration": 0.0,
         "requested_flags": 0,
         "succeeded_collectors": [],
@@ -238,6 +284,5 @@ int main()
     test_version_mismatch();
     test_compatible_version();
 
-    std::cout << "  " << g_pass << " passed, " << g_fail << " failed\n";
-    return g_fail == 0 ? 0 : 1;
+    TEST_SUMMARY();
 }

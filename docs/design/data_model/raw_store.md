@@ -34,6 +34,7 @@ enum class RawSource
     Ibverbs,
     HwinfoOutput,
     // Windows / macOS — 未来支持
+    ProcHostname,   ///< /proc/sys/kernel/hostname
 };
 
 enum class CollectStatus

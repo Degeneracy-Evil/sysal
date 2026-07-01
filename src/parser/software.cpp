@@ -1,3 +1,7 @@
+/// @file software.cpp
+/// @brief 软件栈解析器实现
+/// @details 从 nvidia-smi/nvcc 命令输出解析驱动和运行时信息。
+
 #include "software.hpp"
 
 #include "parse_utils.hpp"
@@ -80,9 +84,18 @@ std::optional<SoftwareStack> parse_software(const RawStore& raw, std::vector<std
     // 提取 NVIDIA 驱动版本
     std::optional<std::string> driver_version;
     auto nvidia_records = raw.get_all(RawSource::NvidiaSmi);
-    if(!nvidia_records.empty())
+    const RawRecord* nvidia_rec = nullptr;
+    for(const auto* rec : nvidia_records)
     {
-        driver_version = extract_nvidia_driver_version(nvidia_records[0]->payload);
+        if(rec->status == CollectStatus::Success)
+        {
+            nvidia_rec = rec;
+            break;
+        }
+    }
+    if(nvidia_rec != nullptr)
+    {
+        driver_version = extract_nvidia_driver_version(nvidia_rec->payload);
         if(!driver_version.has_value())
         {
             warnings.push_back("parse_software: nvidia-smi 输出中未找到 Driver Version");
@@ -92,16 +105,32 @@ std::optional<SoftwareStack> parse_software(const RawStore& raw, std::vector<std
     // 提取 CUDA 版本
     std::optional<std::string> cuda_version;
     auto nvcc_records = raw.get_all(RawSource::Nvcc);
-    if(!nvcc_records.empty())
+    const RawRecord* nvcc_rec = nullptr;
+    for(const auto* rec : nvcc_records)
     {
-        cuda_version = extract_cuda_version(nvcc_records[0]->payload);
+        if(rec->status == CollectStatus::Success)
+        {
+            nvcc_rec = rec;
+            break;
+        }
+    }
+    if(nvcc_rec != nullptr)
+    {
+        cuda_version = extract_cuda_version(nvcc_rec->payload);
         if(!cuda_version.has_value())
         {
             warnings.push_back("parse_software: nvcc --version 输出中未找到 release 版本");
         }
     }
 
-    // 若既无 NVIDIA 驱动也无 CUDA 数据，则无软件栈可解析
+    // 若既无 nvidia-smi 也无 nvcc 数据源，则无软件栈可解析
+    if(nvidia_records.empty() && nvcc_records.empty())
+    {
+        warnings.push_back("parse_software: 无 nvidia-smi/nvcc 数据");
+        return std::nullopt;
+    }
+
+    // 数据源存在但驱动版本与 CUDA 版本均解析失败
     if(!driver_version.has_value() && !cuda_version.has_value())
     {
         return std::nullopt;

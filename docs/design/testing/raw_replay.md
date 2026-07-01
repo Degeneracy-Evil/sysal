@@ -73,7 +73,7 @@ tests/
 │   ├── container_docker.json
 │   └── numa_8node.json
 ├── test_replay.cpp               # 当前回放测试入口
-└── testbench.cpp                 # 全量 API 演示
+└── examples/sysal_info.cpp       # 全量 API 演示
 ```
 
 v0.0.1 使用单个 `test_replay.cpp` 作为回放测试入口，后续可按子域拆分。

@@ -6,7 +6,7 @@
 #include "sysal/test/replay.hpp"
 #include "sysal/types/enums.hpp"
 
-#include <cassert>
+#include "test_macros.hpp"
 #include <chrono>
 #include <cstdio>
 #include <fstream>
@@ -72,10 +72,10 @@ void test_roundtrip()
     sysal::test::save_raw_store(original, path);
     auto loaded = sysal::test::load_raw_store(path);
 
-    assert(loaded.records.size() == original.records.size());
+    CHECK(loaded.records.size() == original.records.size());
     for(std::size_t i = 0; i < original.records.size(); ++i)
     {
-        assert(record_equal(original.records[i], loaded.records[i]));
+        CHECK(record_equal(original.records[i], loaded.records[i]));
     }
 
     std::remove(path.c_str());
@@ -88,11 +88,11 @@ void test_load_nonexistent()
     try
     {
         sysal::test::load_raw_store("/tmp/sysal_nonexistent_file_12345.json");
-        assert(false && "expected SysalError");
+        CHECK(false && "expected SysalError");
     }
     catch(const sysal::SysalError& e)
     {
-        assert(e.kind() == sysal::ErrorKind::FileNotFound);
+        CHECK(e.kind() == sysal::ErrorKind::FileNotFound);
     }
 
     std::cout << "  load nonexistent: OK\n";
@@ -110,11 +110,11 @@ void test_load_invalid_json()
     try
     {
         sysal::test::load_raw_store(path);
-        assert(false && "expected SysalError");
+        CHECK(false && "expected SysalError");
     }
     catch(const sysal::SysalError& e)
     {
-        assert(e.kind() == sysal::ErrorKind::DeserializationError);
+        CHECK(e.kind() == sysal::ErrorKind::DeserializationError);
     }
 
     std::remove(path.c_str());
@@ -130,7 +130,7 @@ void test_empty_store()
     sysal::test::save_raw_store(empty, path);
     auto loaded = sysal::test::load_raw_store(path);
 
-    assert(loaded.records.empty());
+    CHECK(loaded.records.empty());
 
     std::remove(path.c_str());
     std::cout << "  empty store: OK\n";
@@ -144,5 +144,5 @@ int main()
     test_load_invalid_json();
     test_empty_store();
     std::cout << "  all passed!\n";
-    return 0;
+    TEST_SUMMARY();
 }

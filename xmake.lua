@@ -61,6 +61,7 @@ local function test_target(name, source, link_shared)
         if not link_shared then
             add_includedirs("src")
         end
+        add_includedirs("tests")
         add_cxxflags("-UNDEBUG", {force = true})
 end
 
@@ -94,18 +95,22 @@ for _, name in ipairs(unit_tests) do
     end
 end
 
--- testbench 链接动态库，仅访问公共头
-test_target("testbench", "tests/testbench.cpp", true)
+-- sysal_info 链接动态库，仅访问公共头（demo，非测试）
+target("sysal_info")
+    set_kind("binary")
+    add_files("examples/sysal_info.cpp")
+    add_deps("sysal_shared")
+    add_cxxflags("-UNDEBUG", {force = true})
 
 -- ========== task ==========
 
-task("testbench")
+task("sysal_info")
     set_category("plugin")
     on_run(function ()
-        os.execv("xmake", {"run", "testbench"})
+        os.execv("xmake", {"run", "sysal_info"})
     end)
     set_menu {
-        usage = "xmake testbench",
-        description = "Build and run testbench with terminal output",
+        usage = "xmake sysal_info",
+        description = "Build and run sysal_info demo with terminal output",
         options = {}
     }

@@ -3,7 +3,7 @@
 #include "sysal/model/raw_store.hpp"
 #include "sysal/types/enums.hpp"
 
-#include <cassert>
+#include "test_macros.hpp"
 #include <chrono>
 #include <string>
 #include <vector>
@@ -45,25 +45,25 @@ int main()
 
         std::vector<std::string> warnings;
         auto result = parse_pci(raw, warnings);
-        assert(result.has_value());
+        CHECK(result.has_value());
 
         const auto& pci = *result;
-        assert(pci.devices.size() == 2);
+        CHECK(pci.devices.size() == 2);
 
         // 设备按 map 顺序（字典序），0000:41:00.0 在前
-        assert((pci.devices[0].address == PciAddress{0x0000, 0x41, 0x00, 0x0}));
-        assert(pci.devices[0].vendor == Vendor{"0x10de"});
-        assert(pci.devices[0].device_name == DeviceName{"0x2322"});
-        assert(pci.devices[0].device_class == PciClass{"0x030000"});
-        assert(pci.devices[0].numa_node.has_value());
-        assert(pci.devices[0].numa_node == NumaNodeId{0});
+        CHECK((pci.devices[0].address == PciAddress{0x0000, 0x41, 0x00, 0x0}));
+        CHECK(pci.devices[0].vendor == Vendor{"0x10de"});
+        CHECK(pci.devices[0].device_name == DeviceName{"0x2322"});
+        CHECK(pci.devices[0].device_class == PciClass{"0x030000"});
+        CHECK(pci.devices[0].numa_node.has_value());
+        CHECK(pci.devices[0].numa_node == NumaNodeId{0});
 
-        assert((pci.devices[1].address == PciAddress{0x0000, 0x65, 0x00, 0x0}));
-        assert(pci.devices[1].vendor == Vendor{"0x15b3"});
-        assert(pci.devices[1].device_name == DeviceName{"0x158b"});
-        assert(pci.devices[1].device_class == PciClass{"0x020000"});
-        assert(pci.devices[1].numa_node.has_value());
-        assert(pci.devices[1].numa_node == NumaNodeId{1});
+        CHECK((pci.devices[1].address == PciAddress{0x0000, 0x65, 0x00, 0x0}));
+        CHECK(pci.devices[1].vendor == Vendor{"0x15b3"});
+        CHECK(pci.devices[1].device_name == DeviceName{"0x158b"});
+        CHECK(pci.devices[1].device_class == PciClass{"0x020000"});
+        CHECK(pci.devices[1].numa_node.has_value());
+        CHECK(pci.devices[1].numa_node == NumaNodeId{1});
     }
 
     // ---- 测试 2: numa_node 为 -1 → nullopt ----
@@ -80,9 +80,9 @@ int main()
 
         std::vector<std::string> warnings;
         auto result = parse_pci(raw, warnings);
-        assert(result.has_value());
-        assert(result->devices.size() == 1);
-        assert(!result->devices[0].numa_node.has_value());
+        CHECK(result.has_value());
+        CHECK(result->devices.size() == 1);
+        CHECK(!result->devices[0].numa_node.has_value());
     }
 
     // ---- 测试 3: 无 SysfsPci 数据 → nullopt ----
@@ -90,7 +90,7 @@ int main()
         RawStore raw;
         std::vector<std::string> warnings;
         auto result = parse_pci(raw, warnings);
-        assert(!result.has_value());
+        CHECK(!result.has_value());
     }
 
     // ---- 测试 4: 无效 PCI 地址 → 警告 ----
@@ -101,9 +101,9 @@ int main()
 
         std::vector<std::string> warnings;
         auto result = parse_pci(raw, warnings);
-        assert(result.has_value());
-        assert(result->devices.empty());
-        assert(!warnings.empty());
+        CHECK(result.has_value());
+        CHECK(result->devices.empty());
+        CHECK(!warnings.empty());
     }
 
     // ---- 测试 5: lspci 名称覆盖 sysfs device hex ----
@@ -124,12 +124,12 @@ int main()
 
         std::vector<std::string> warnings;
         auto result = parse_pci(raw, warnings);
-        assert(result.has_value());
-        assert(result->devices.size() == 1);
-        assert(result->devices[0].device_name ==
+        CHECK(result.has_value());
+        CHECK(result->devices.size() == 1);
+        CHECK(result->devices[0].device_name ==
                DeviceName{"NVIDIA Corporation GP102 [GeForce GTX 1080 Ti]"});
-        assert(result->devices[0].vendor == Vendor{"0x10de"});
-        assert(result->devices[0].device_class == PciClass{"0x030000"});
+        CHECK(result->devices[0].vendor == Vendor{"0x10de"});
+        CHECK(result->devices[0].device_class == PciClass{"0x030000"});
     }
 
     // ---- 测试 6: lspci 名称含方括号且带 rev ----
@@ -148,11 +148,11 @@ int main()
 
         std::vector<std::string> warnings;
         auto result = parse_pci(raw, warnings);
-        assert(result.has_value());
-        assert(result->devices.size() == 1);
-        assert(result->devices[0].device_name ==
+        CHECK(result.has_value());
+        CHECK(result->devices.size() == 1);
+        CHECK(result->devices[0].device_name ==
                DeviceName{"Intel Corporation Ice Lake Memory Map/VT-d"});
-        assert(result->devices[0].vendor == Vendor{"0x8086"});
+        CHECK(result->devices[0].vendor == Vendor{"0x8086"});
     }
 
     // ---- 测试 7: lspci 独有设备（无 sysfs）被加入列表 ----
@@ -175,18 +175,18 @@ int main()
 
         std::vector<std::string> warnings;
         auto result = parse_pci(raw, warnings);
-        assert(result.has_value());
-        assert(result->devices.size() == 2);
+        CHECK(result.has_value());
+        CHECK(result->devices.size() == 2);
 
         // 41:00.0 来自 sysfs，名称被 lspci 覆盖
-        assert((result->devices[0].address == PciAddress{0x0000, 0x41, 0x00, 0x0}));
-        assert(result->devices[0].device_name ==
+        CHECK((result->devices[0].address == PciAddress{0x0000, 0x41, 0x00, 0x0}));
+        CHECK(result->devices[0].device_name ==
                DeviceName{"NVIDIA Corporation GP102 [GeForce GTX 1080 Ti]"});
-        assert(result->devices[0].vendor == Vendor{"0x10de"});
+        CHECK(result->devices[0].vendor == Vendor{"0x10de"});
 
         // 65:00.0 仅来自 lspci
-        assert((result->devices[1].address == PciAddress{0x0000, 0x65, 0x00, 0x0}));
-        assert(result->devices[1].device_name == DeviceName{"Mellanox ConnectX-5"});
+        CHECK((result->devices[1].address == PciAddress{0x0000, 0x65, 0x00, 0x0}));
+        CHECK(result->devices[1].device_name == DeviceName{"Mellanox ConnectX-5"});
     }
 
     // ---- 测试 8: lspci 带域名 DDDD:BB:DD.F 格式 ----
@@ -205,11 +205,11 @@ int main()
 
         std::vector<std::string> warnings;
         auto result = parse_pci(raw, warnings);
-        assert(result.has_value());
-        assert(result->devices.size() == 1);
-        assert(result->devices[0].device_name ==
+        CHECK(result.has_value());
+        CHECK(result->devices.size() == 1);
+        CHECK(result->devices[0].device_name ==
                DeviceName{"NVIDIA Corporation GP102 [GeForce GTX 1080 Ti]"});
     }
 
-    return 0;
+    TEST_SUMMARY();
 }

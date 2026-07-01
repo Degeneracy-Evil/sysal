@@ -3,7 +3,7 @@
 #include "sysal/model/raw_store.hpp"
 #include "sysal/types/enums.hpp"
 
-#include <cassert>
+#include "test_macros.hpp"
 #include <chrono>
 #include <string>
 #include <vector>
@@ -31,34 +31,34 @@ int main()
 
         std::vector<std::string> warnings;
         auto result = parse_accelerator(raw, warnings);
-        assert(result.has_value());
+        CHECK(result.has_value());
 
         const auto& acc = *result;
-        assert(acc.devices.size() == 2);
+        CHECK(acc.devices.size() == 2);
 
         // 设备 0
-        assert(acc.devices[0].id == AcceleratorId{0});
-        assert(acc.devices[0].kind == AcceleratorKind::Gpu);
-        assert(acc.devices[0].vendor.value == "NVIDIA");
-        assert(acc.devices[0].name.value == "NVIDIA H20 96GB");
-        assert(acc.devices[0].pci_address.has_value());
-        assert(acc.devices[0].pci_address->domain == 0);
-        assert(acc.devices[0].pci_address->bus == 0x41);
-        assert(acc.devices[0].pci_address->device == 0x00);
-        assert(acc.devices[0].pci_address->function == 0x0);
-        assert(acc.devices[0].memory_size.has_value());
-        assert(acc.devices[0].memory_size->value == 97536ULL * 1024ULL * 1024ULL);
-        assert(acc.devices[0].visible_to_current_process == true);
-        assert(!acc.devices[0].driver.has_value());
+        CHECK(acc.devices[0].id == AcceleratorId{0});
+        CHECK(acc.devices[0].kind == AcceleratorKind::Gpu);
+        CHECK(acc.devices[0].vendor.value == "NVIDIA");
+        CHECK(acc.devices[0].name.value == "NVIDIA H20 96GB");
+        CHECK(acc.devices[0].pci_address.has_value());
+        CHECK(acc.devices[0].pci_address->domain == 0);
+        CHECK(acc.devices[0].pci_address->bus == 0x41);
+        CHECK(acc.devices[0].pci_address->device == 0x00);
+        CHECK(acc.devices[0].pci_address->function == 0x0);
+        CHECK(acc.devices[0].memory_size.has_value());
+        CHECK(acc.devices[0].memory_size->value == 97536ULL * 1024ULL * 1024ULL);
+        CHECK(acc.devices[0].visible_to_current_process == true);
+        CHECK(!acc.devices[0].driver.has_value());
 
         // 设备 1
-        assert(acc.devices[1].id == AcceleratorId{1});
-        assert(acc.devices[1].kind == AcceleratorKind::Gpu);
-        assert(acc.devices[1].name.value == "NVIDIA H20 96GB");
-        assert(acc.devices[1].pci_address.has_value());
-        assert(acc.devices[1].pci_address->bus == 0x42);
-        assert(acc.devices[1].memory_size.has_value());
-        assert(acc.devices[1].memory_size->value == 97536ULL * 1024ULL * 1024ULL);
+        CHECK(acc.devices[1].id == AcceleratorId{1});
+        CHECK(acc.devices[1].kind == AcceleratorKind::Gpu);
+        CHECK(acc.devices[1].name.value == "NVIDIA H20 96GB");
+        CHECK(acc.devices[1].pci_address.has_value());
+        CHECK(acc.devices[1].pci_address->bus == 0x42);
+        CHECK(acc.devices[1].memory_size.has_value());
+        CHECK(acc.devices[1].memory_size->value == 97536ULL * 1024ULL * 1024ULL);
     }
 
     // ---- 测试 2: NUMA 节点查找（D-4 修正） ----
@@ -73,12 +73,12 @@ int main()
 
         std::vector<std::string> warnings;
         auto result = parse_accelerator(raw, warnings);
-        assert(result.has_value());
+        CHECK(result.has_value());
 
         const auto& acc = *result;
-        assert(acc.devices.size() == 1);
-        assert(acc.devices[0].nearest_numa_node.has_value());
-        assert(*acc.devices[0].nearest_numa_node == NumaNodeId{0});
+        CHECK(acc.devices.size() == 1);
+        CHECK(acc.devices[0].nearest_numa_node.has_value());
+        CHECK(*acc.devices[0].nearest_numa_node == NumaNodeId{0});
     }
 
     // ---- 测试 3: 空 NvidiaSmi → nullopt ----
@@ -86,7 +86,7 @@ int main()
         RawStore raw;
         std::vector<std::string> warnings;
         auto result = parse_accelerator(raw, warnings);
-        assert(!result.has_value());
+        CHECK(!result.has_value());
     }
 
     // ---- 测试 4: GiB 单位解析 ----
@@ -99,13 +99,13 @@ int main()
 
         std::vector<std::string> warnings;
         auto result = parse_accelerator(raw, warnings);
-        assert(result.has_value());
+        CHECK(result.has_value());
 
         const auto& acc = *result;
-        assert(acc.devices.size() == 1);
-        assert(acc.devices[0].memory_size.has_value());
-        assert(acc.devices[0].memory_size->value == 80ULL * 1024ULL * 1024ULL * 1024ULL);
+        CHECK(acc.devices.size() == 1);
+        CHECK(acc.devices[0].memory_size.has_value());
+        CHECK(acc.devices[0].memory_size->value == 80ULL * 1024ULL * 1024ULL * 1024ULL);
     }
 
-    return 0;
+    TEST_SUMMARY();
 }

@@ -3,7 +3,7 @@
 #include "sysal/model/pci.hpp"
 #include "sysal/model/raw_store.hpp"
 
-#include <cassert>
+#include "test_macros.hpp"
 #include <chrono>
 #include <cstdint>
 
@@ -59,39 +59,39 @@ int main()
                                                  false});
 
     // find_package
-    assert(cpu.find_package(sysal::CpuPackageId{0}) != nullptr);
-    assert(cpu.find_package(sysal::CpuPackageId{0})->id == sysal::CpuPackageId{0});
-    assert(cpu.find_package(sysal::CpuPackageId{1}) != nullptr);
-    assert(cpu.find_package(sysal::CpuPackageId{99}) == nullptr);
+    CHECK(cpu.find_package(sysal::CpuPackageId{0}) != nullptr);
+    CHECK(cpu.find_package(sysal::CpuPackageId{0})->id == sysal::CpuPackageId{0});
+    CHECK(cpu.find_package(sysal::CpuPackageId{1}) != nullptr);
+    CHECK(cpu.find_package(sysal::CpuPackageId{99}) == nullptr);
 
     // find_core
-    assert(cpu.find_core(sysal::CpuCoreId{0}) != nullptr);
-    assert(cpu.find_core(sysal::CpuCoreId{99}) == nullptr);
+    CHECK(cpu.find_core(sysal::CpuCoreId{0}) != nullptr);
+    CHECK(cpu.find_core(sysal::CpuCoreId{99}) == nullptr);
 
     // find_logical_cpu
-    assert(cpu.find_logical_cpu(sysal::LogicalCpuId{0}) != nullptr);
-    assert(cpu.find_logical_cpu(sysal::LogicalCpuId{99}) == nullptr);
+    CHECK(cpu.find_logical_cpu(sysal::LogicalCpuId{0}) != nullptr);
+    CHECK(cpu.find_logical_cpu(sysal::LogicalCpuId{99}) == nullptr);
 
     // logical_cpus_of_package
     auto pkg0_cpus = cpu.logical_cpus_of_package(sysal::CpuPackageId{0});
-    assert(pkg0_cpus.size() == 4);
+    CHECK(pkg0_cpus.size() == 4);
     auto pkg1_cpus = cpu.logical_cpus_of_package(sysal::CpuPackageId{1});
-    assert(pkg1_cpus.size() == 4);
+    CHECK(pkg1_cpus.size() == 4);
 
     // logical_cpus_of_core
     auto core0_cpus = cpu.logical_cpus_of_core(sysal::CpuCoreId{0});
-    assert(core0_cpus.size() == 2);
+    CHECK(core0_cpus.size() == 2);
 
     // cores_of_package
     auto pkg0_cores = cpu.cores_of_package(sysal::CpuPackageId{0});
-    assert(pkg0_cores.size() == 2);
+    CHECK(pkg0_cores.size() == 2);
 
     // visible_logical_cpus
     auto visible = cpu.visible_logical_cpus();
-    assert(visible.size() == 4);
+    CHECK(visible.size() == 4);
     for(const auto* lc : visible)
     {
-        assert(lc->visible_to_current_process);
+        CHECK(lc->visible_to_current_process);
     }
 
     // ---- Accelerators 查询方法 ----
@@ -112,25 +112,25 @@ int main()
 
     // gpus
     auto gpus = acc.gpus();
-    assert(gpus.size() == 2);
+    CHECK(gpus.size() == 2);
 
     // npus
     auto npus = acc.npus();
-    assert(npus.size() == 1);
+    CHECK(npus.size() == 1);
 
     // by_kind
     auto by_gpu = acc.by_kind(sysal::AcceleratorKind::Gpu);
-    assert(by_gpu.size() == 2);
+    CHECK(by_gpu.size() == 2);
     auto by_fpga = acc.by_kind(sysal::AcceleratorKind::Fpga);
-    assert(by_fpga.empty());
+    CHECK(by_fpga.empty());
 
     // visible
     auto acc_visible = acc.visible();
-    assert(acc_visible.size() == 2);
+    CHECK(acc_visible.size() == 2);
 
     // find
-    assert(acc.find(sysal::AcceleratorId{0}) != nullptr);
-    assert(acc.find(sysal::AcceleratorId{99}) == nullptr);
+    CHECK(acc.find(sysal::AcceleratorId{0}) != nullptr);
+    CHECK(acc.find(sysal::AcceleratorId{99}) == nullptr);
 
     // ---- Pci 查询方法 ----
 
@@ -142,9 +142,9 @@ int main()
                                            sysal::DeviceName{"A100"}, sysal::PciClass{"030000"},
                                            sysal::NumaNodeId{1}});
 
-    assert(pci.find(sysal::PciAddress{0, 1, 0, 0}) != nullptr);
-    assert(pci.find(sysal::PciAddress{0, 1, 0, 0})->vendor.value == "NVIDIA");
-    assert(pci.find(sysal::PciAddress{0, 99, 0, 0}) == nullptr);
+    CHECK(pci.find(sysal::PciAddress{0, 1, 0, 0}) != nullptr);
+    CHECK(pci.find(sysal::PciAddress{0, 1, 0, 0})->vendor.value == "NVIDIA");
+    CHECK(pci.find(sysal::PciAddress{0, 99, 0, 0}) == nullptr);
 
     // ---- RawStore 查询方法 ----
 
@@ -159,24 +159,24 @@ int main()
 
     // get_all
     auto cpuinfo_all = store.get_all(sysal::RawSource::ProcCpuInfo);
-    assert(cpuinfo_all.size() == 2);
+    CHECK(cpuinfo_all.size() == 2);
     auto meminfo_all = store.get_all(sysal::RawSource::ProcMemInfo);
-    assert(meminfo_all.size() == 1);
+    CHECK(meminfo_all.size() == 1);
 
     // get
     auto cpuinfo_specific = store.get(sysal::RawSource::ProcCpuInfo, "/proc/cpuinfo");
-    assert(cpuinfo_specific.size() == 1);
-    assert(cpuinfo_specific[0]->payload == "payload1");
+    CHECK(cpuinfo_specific.size() == 1);
+    CHECK(cpuinfo_specific[0]->payload == "payload1");
 
     // has
-    assert(store.has(sysal::RawSource::ProcCpuInfo));
-    assert(store.has(sysal::RawSource::ProcMemInfo));
-    assert(!store.has(sysal::RawSource::SysfsCpu));
+    CHECK(store.has(sysal::RawSource::ProcCpuInfo));
+    CHECK(store.has(sysal::RawSource::ProcMemInfo));
+    CHECK(!store.has(sysal::RawSource::SysfsCpu));
 
     // count
-    assert(store.count(sysal::RawSource::ProcCpuInfo) == 2);
-    assert(store.count(sysal::RawSource::ProcMemInfo) == 1);
-    assert(store.count(sysal::RawSource::SysfsCpu) == 0);
+    CHECK(store.count(sysal::RawSource::ProcCpuInfo) == 2);
+    CHECK(store.count(sysal::RawSource::ProcMemInfo) == 1);
+    CHECK(store.count(sysal::RawSource::SysfsCpu) == 0);
 
-    return 0;
+    TEST_SUMMARY();
 }

@@ -4,7 +4,7 @@
 #include "sysal/test/replay.hpp"
 #include "sysal/version.hpp"
 
-#include <cassert>
+#include "test_macros.hpp"
 #include <string>
 
 using namespace sysal;
@@ -16,16 +16,16 @@ int main()
         auto sys = System::collect(Collect::Cpu | Collect::Memory | Collect::Platform);
 
         // CPU 逻辑 CPU 列表不为空
-        assert(!sys.info.cpu.logical_cpus.empty());
+        CHECK(!sys.info.cpu.logical_cpus.empty());
 
         // 成功采集器列表不为空
-        assert(!sys.meta.succeeded_collectors.empty());
+        CHECK(!sys.meta.succeeded_collectors.empty());
 
         // 平台 OS 名称不为空
-        assert(!sys.info.platform.os.name.empty());
+        CHECK(!sys.info.platform.os.name.empty());
 
         // 内存总量大于 0
-        assert(sys.info.memory.total_memory.value > 0);
+        CHECK(sys.info.memory.total_memory.value > 0);
     }
 
     // ---- 测试 2: System::refresh 保持同一对象 ----
@@ -36,7 +36,7 @@ int main()
         sys.refresh();
 
         // 刷新后 CPU 数量应与之前一致
-        assert(sys.info.cpu.logical_cpus.size() == original_cpu_count);
+        CHECK(sys.info.cpu.logical_cpus.size() == original_cpu_count);
     }
 
     // ---- 测试 3: 采集元数据正确 ----
@@ -44,14 +44,14 @@ int main()
         auto sys = System::collect(Collect::Platform | Collect::Execution);
 
         // sysal 版本
-        assert(sys.meta.sysal_version == sysal::VERSION_STRING);
+        CHECK(sys.meta.sysal_version == sysal::VERSION_STRING);
 
         // 请求的 flags
-        assert(has(sys.meta.requested_flags, Collect::Platform));
-        assert(has(sys.meta.requested_flags, Collect::Execution));
+        CHECK(has(sys.meta.requested_flags, Collect::Platform));
+        CHECK(has(sys.meta.requested_flags, Collect::Execution));
 
         // 采集耗时非负
-        assert(sys.meta.collect_duration.count() >= 0.0);
+        CHECK(sys.meta.collect_duration.count() >= 0.0);
     }
 
     // ---- 测试 4: 全部采集器失败时抛出 SysalError ----
@@ -65,11 +65,11 @@ int main()
         }
         catch(const SysalError& e)
         {
-            assert(e.kind() == ErrorKind::CollectionFailed);
+            CHECK(e.kind() == ErrorKind::CollectionFailed);
             threw = true;
         }
-        assert(threw);
+        CHECK(threw);
     }
 
-    return 0;
+    TEST_SUMMARY();
 }

@@ -3,7 +3,7 @@
 #include "sysal/model/raw_store.hpp"
 #include "sysal/types/enums.hpp"
 
-#include <cassert>
+#include "test_macros.hpp"
 #include <chrono>
 #include <string>
 #include <vector>
@@ -34,24 +34,24 @@ int main()
 
         std::vector<std::string> warnings;
         auto result = parse_storage(raw, warnings);
-        assert(result.has_value());
+        CHECK(result.has_value());
 
         const auto& stor = *result;
-        assert(stor.devices.size() == 2);
+        CHECK(stor.devices.size() == 2);
 
         // nvme0n1
-        assert(stor.devices[0].id == StorageId{0});
-        assert(stor.devices[0].name.value == "nvme0n1");
-        assert(stor.devices[0].kind == StorageKind::Nvme);
-        assert(stor.devices[0].capacity.has_value());
-        assert(stor.devices[0].capacity->value == 3750924672ULL * 512);
+        CHECK(stor.devices[0].id == StorageId{0});
+        CHECK(stor.devices[0].name.value == "nvme0n1");
+        CHECK(stor.devices[0].kind == StorageKind::Nvme);
+        CHECK(stor.devices[0].capacity.has_value());
+        CHECK(stor.devices[0].capacity->value == 3750924672ULL * 512);
 
         // sda (rotational=1 → Hdd)
-        assert(stor.devices[1].id == StorageId{1});
-        assert(stor.devices[1].name.value == "sda");
-        assert(stor.devices[1].kind == StorageKind::Hdd);
-        assert(stor.devices[1].capacity.has_value());
-        assert(stor.devices[1].capacity->value == 976773168ULL * 512);
+        CHECK(stor.devices[1].id == StorageId{1});
+        CHECK(stor.devices[1].name.value == "sda");
+        CHECK(stor.devices[1].kind == StorageKind::Hdd);
+        CHECK(stor.devices[1].capacity.has_value());
+        CHECK(stor.devices[1].capacity->value == 976773168ULL * 512);
     }
 
     // ---- 测试 2: 空 SysfsBlock → nullopt ----
@@ -59,7 +59,7 @@ int main()
         RawStore raw;
         std::vector<std::string> warnings;
         auto result = parse_storage(raw, warnings);
-        assert(!result.has_value());
+        CHECK(!result.has_value());
     }
 
     // ---- 测试 3: 未知设备类型 → Other ----
@@ -69,12 +69,12 @@ int main()
 
         std::vector<std::string> warnings;
         auto result = parse_storage(raw, warnings);
-        assert(result.has_value());
+        CHECK(result.has_value());
 
         const auto& stor = *result;
-        assert(stor.devices.size() == 1);
-        assert(stor.devices[0].name.value == "loop0");
-        assert(stor.devices[0].kind == StorageKind::Other);
+        CHECK(stor.devices.size() == 1);
+        CHECK(stor.devices[0].name.value == "loop0");
+        CHECK(stor.devices[0].kind == StorageKind::Other);
     }
 
     // ---- 测试 4: PCI 地址缺失警告（B-2） ----
@@ -85,7 +85,7 @@ int main()
 
         std::vector<std::string> warnings;
         auto result = parse_storage(raw, warnings);
-        assert(result.has_value());
+        CHECK(result.has_value());
 
         // 应有 B-2 警告
         bool has_b2_warning = false;
@@ -97,7 +97,7 @@ int main()
                 break;
             }
         }
-        assert(has_b2_warning);
+        CHECK(has_b2_warning);
     }
 
     // ---- 测试 5: rotational=0 → Ssd ----
@@ -110,12 +110,12 @@ int main()
 
         std::vector<std::string> warnings;
         auto result = parse_storage(raw, warnings);
-        assert(result.has_value());
+        CHECK(result.has_value());
 
         const auto& stor = *result;
-        assert(stor.devices.size() == 1);
-        assert(stor.devices[0].name.value == "sdb");
-        assert(stor.devices[0].kind == StorageKind::Ssd);
+        CHECK(stor.devices.size() == 1);
+        CHECK(stor.devices[0].name.value == "sdb");
+        CHECK(stor.devices[0].kind == StorageKind::Ssd);
     }
 
     // ---- 测试 6: nvme 设备无 rotational → Nvme ----
@@ -126,12 +126,12 @@ int main()
 
         std::vector<std::string> warnings;
         auto result = parse_storage(raw, warnings);
-        assert(result.has_value());
+        CHECK(result.has_value());
 
         const auto& stor = *result;
-        assert(stor.devices.size() == 1);
-        assert(stor.devices[0].name.value == "nvme1n1");
-        assert(stor.devices[0].kind == StorageKind::Nvme);
+        CHECK(stor.devices.size() == 1);
+        CHECK(stor.devices[0].name.value == "nvme1n1");
+        CHECK(stor.devices[0].kind == StorageKind::Nvme);
     }
 
     // ---- 测试 7: sd 设备无 rotational → Other ----
@@ -141,13 +141,13 @@ int main()
 
         std::vector<std::string> warnings;
         auto result = parse_storage(raw, warnings);
-        assert(result.has_value());
+        CHECK(result.has_value());
 
         const auto& stor = *result;
-        assert(stor.devices.size() == 1);
-        assert(stor.devices[0].name.value == "sdc");
-        assert(stor.devices[0].kind == StorageKind::Other);
+        CHECK(stor.devices.size() == 1);
+        CHECK(stor.devices[0].name.value == "sdc");
+        CHECK(stor.devices[0].kind == StorageKind::Other);
     }
 
-    return 0;
+    TEST_SUMMARY();
 }

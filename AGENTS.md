@@ -7,7 +7,7 @@ C++ 系统信息抽象库 — 收集、归一化、暴露服务器系统信息�
 ```bash
 xmake build          # 构建（静态库 + 动态库 + 全部测试）
 xmake -r             # 重新构建
-xmake testbench      # 编译并运行 testbench，终端输出
+xmake sysal_info      # 编译并运行 sysal_info，终端输出
 ```
 
 `compile_commands.json` 通过 `xmake project -k compile_commands build` 生成（`utils/check.sh` 自动调用）。

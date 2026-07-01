@@ -35,7 +35,7 @@ struct Platform
 | `Kernel` | 内核 | `release`、`version`、`compiled_at`、`architecture` |
 | `Architecture` | 硬件架构 | `name`（如 `x86_64`/`aarch64`）、`bits`（64/32）、`byte_order` |
 | `Firmware` | 固件 | `bios_vendor`、`bios_version`、`bios_date`、`uefi`（bool） |
-| `Virtualization` | 虚拟化 | `kind`（None/KVM/Xen/VMware/...）、`hypervisor`、`container`（bool） |
+| `Virtualization` | 虚拟化 | `kind`（None/KVM/Xen/VMware/...）、`hypervisor` |
 
 ## 设计说明
 

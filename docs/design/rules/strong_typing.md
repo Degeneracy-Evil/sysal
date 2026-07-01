@@ -124,7 +124,7 @@ using PciClass      = NamedString<PciClassTag>;       // PCI 设备类别
 ```cpp
 enum class Arch            { X86_64, AArch64, Riscv64, Other };
 enum class InterfaceState  { Up, Down, Unknown };
-enum class StorageKind     { Nvme, Sata, Sas, Other };
+enum class StorageKind     { Nvme, Ssd, Hdd, Other };
 enum class AcceleratorKind { Gpu, Npu, Fpga, Other };
-enum class IsaExtension    { Sse42, Avx, Avx2, Avx512f, Avx512cd, Avx512bw, Avx512dq, Avx512vl };
+enum class IsaExtension    { Sse, Sse2, Sse3, Ssse3, Sse41, Sse42, Avx, Avx2, Avx512f, Avx512cd, Avx512bw, Avx512dq, Avx512vl, Aes, Fma, F16c, Pclmulqdq };
 ```

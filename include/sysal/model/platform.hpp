@@ -54,7 +54,7 @@ struct Architecture
 /// @brief 固件
 struct Firmware
 {
-    std::string bios_vendor;  ///< BIOS 厂商
+    Vendor bios_vendor;       ///< BIOS 厂商
     std::string bios_version; ///< BIOS 版本
     std::string bios_date;    ///< BIOS 日期
     bool uefi{};              ///< 是否为 UEFI

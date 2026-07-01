@@ -1,3 +1,7 @@
+/// @file pci.cpp
+/// @brief PCI 解析器实现
+/// @details 从 sysfs 和 lspci 输出解析 PCI 设备信息。
+
 #include "pci.hpp"
 
 #include "parse_utils.hpp"
@@ -155,6 +159,11 @@ std::optional<Pci> parse_pci(const RawStore& raw, std::vector<std::string>& warn
     std::map<std::string, std::vector<const RawRecord*>> groups;
     for(const auto* rec : pci_records)
     {
+        if(rec->status != CollectStatus::Success)
+        {
+            continue;
+        }
+
         auto addr_str = extract_pci_address_from_path(rec->path_or_command);
         groups[addr_str].push_back(rec);
     }
@@ -266,6 +275,8 @@ std::optional<Pci> parse_pci(const RawStore& raw, std::vector<std::string>& warn
                 dev.device_name = DeviceName{name};
                 addr_index[addr_str] = pci.devices.size();
                 pci.devices.push_back(dev);
+                warnings.push_back("parse_pci: lspci 独有设备 " + addr_str +
+                                   "，sysfs 数据缺失");
             }
         }
     }

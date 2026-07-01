@@ -163,13 +163,18 @@ void parse_dmi(const RawStore& raw, Platform& platform,
 
     for(const auto* rec : dmi_records)
     {
+        if(rec->status != CollectStatus::Success)
+        {
+            continue;
+        }
+
         const auto& path = rec->path_or_command;
         const auto& payload = rec->payload;
 
         // BIOS 信息
         if(path.find("bios_vendor") != std::string::npos)
         {
-            firmware.bios_vendor = trim(payload);
+            firmware.bios_vendor = Vendor{trim(payload)};
             has_firmware = true;
         }
         else if(path.find("bios_version") != std::string::npos)
@@ -223,6 +228,11 @@ detect_virtualization(const RawStore& raw, [[maybe_unused]] std::vector<std::str
     auto cgroup_records = raw.get_all(RawSource::ProcOneCgroup);
     for(const auto* rec : cgroup_records)
     {
+        if(rec->status != CollectStatus::Success)
+        {
+            continue;
+        }
+
         const auto& content = rec->payload;
         if(content.find("kvm") != std::string::npos)
         {
@@ -247,9 +257,18 @@ std::optional<Platform> parse_platform(const RawStore& raw, std::vector<std::str
 
     // 解析 /etc/os-release → Os
     auto os_release = raw.get_all(RawSource::EtcOsRelease);
-    if(!os_release.empty())
+    const RawRecord* os_rec = nullptr;
+    for(const auto* rec : os_release)
     {
-        platform.os = parse_os_release(os_release[0]->payload, warnings);
+        if(rec->status == CollectStatus::Success)
+        {
+            os_rec = rec;
+            break;
+        }
+    }
+    if(os_rec != nullptr)
+    {
+        platform.os = parse_os_release(os_rec->payload, warnings);
     }
     else
     {
@@ -258,9 +277,18 @@ std::optional<Platform> parse_platform(const RawStore& raw, std::vector<std::str
 
     // 解析 /proc/version → Kernel
     auto proc_version = raw.get_all(RawSource::ProcVersion);
-    if(!proc_version.empty())
+    const RawRecord* ver_rec = nullptr;
+    for(const auto* rec : proc_version)
     {
-        platform.kernel = parse_proc_version(proc_version[0]->payload, warnings);
+        if(rec->status == CollectStatus::Success)
+        {
+            ver_rec = rec;
+            break;
+        }
+    }
+    if(ver_rec != nullptr)
+    {
+        platform.kernel = parse_proc_version(ver_rec->payload, warnings);
     }
     else
     {
@@ -269,9 +297,18 @@ std::optional<Platform> parse_platform(const RawStore& raw, std::vector<std::str
 
     // 解析 uname -m → Architecture
     auto uname_records = raw.get_all(RawSource::Uname);
-    if(!uname_records.empty())
+    const RawRecord* uname_rec = nullptr;
+    for(const auto* rec : uname_records)
     {
-        auto arch_name = parse_arch_name(uname_records[0]->payload);
+        if(rec->status == CollectStatus::Success)
+        {
+            uname_rec = rec;
+            break;
+        }
+    }
+    if(uname_rec != nullptr)
+    {
+        auto arch_name = parse_arch_name(uname_rec->payload);
         platform.architecture.name = arch_name;
         platform.architecture.bits = infer_bits(arch_name);
         platform.architecture.byte_order = "little"; // x86_64/aarch64/riscv64 均为小端
@@ -287,9 +324,13 @@ std::optional<Platform> parse_platform(const RawStore& raw, std::vector<std::str
 
     // 解析主机名
     auto hostname_records = raw.get_all(RawSource::ProcHostname);
-    if(!hostname_records.empty() && !hostname_records[0]->payload.empty())
+    for(const auto* rec : hostname_records)
     {
-        platform.host.hostname = trim(hostname_records[0]->payload);
+        if(rec->status == CollectStatus::Success && !rec->payload.empty())
+        {
+            platform.host.hostname = trim(rec->payload);
+            break;
+        }
     }
 
     // 检测虚拟化

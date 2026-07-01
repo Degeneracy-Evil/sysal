@@ -91,9 +91,10 @@ std::vector<std::string> decode_capabilities(std::string_view hex)
 
 /// @brief 解析范围格式字符串为整数列表
 /// @param s 范围格式字符串，如 "0-3,5,7-9"
-/// @return 展开后的整数列表
+/// @return 展开后的整数列表（最多 MAX_IDS 个，超出截断）
 std::vector<std::uint32_t> parse_range_list(std::string_view s)
 {
+    constexpr std::size_t MAX_IDS = 1024;
     std::vector<std::uint32_t> result;
     auto parts = split(s, ',');
     for(const auto& part : parts)
@@ -110,9 +111,13 @@ std::vector<std::uint32_t> parse_range_list(std::string_view s)
             auto hi = parse_uint(trimmed.substr(dash + 1));
             if(lo.has_value() && hi.has_value())
             {
-                for(auto i = *lo; i <= *hi; ++i)
+                for(auto i = *lo; i <= *hi && result.size() < MAX_IDS; ++i)
                 {
                     result.push_back(static_cast<std::uint32_t>(i));
+                }
+                if(result.size() >= MAX_IDS && *hi > result.back())
+                {
+                    break;
                 }
             }
         }
@@ -121,6 +126,10 @@ std::vector<std::uint32_t> parse_range_list(std::string_view s)
             auto val = parse_uint(trimmed);
             if(val.has_value())
             {
+                if(result.size() >= MAX_IDS)
+                {
+                    break;
+                }
                 result.push_back(static_cast<std::uint32_t>(*val));
             }
         }
@@ -342,6 +351,11 @@ std::optional<Container> detect_container(const RawStore& raw, const ExecutionCo
     auto cgroup_records = raw.get_all(RawSource::ProcOneCgroup);
     for(const auto* rec : cgroup_records)
     {
+        if(rec->status != CollectStatus::Success)
+        {
+            continue;
+        }
+
         const auto& content = rec->payload;
         if(content.find("docker") != std::string::npos)
         {
@@ -394,26 +408,38 @@ std::optional<ExecutionContext> parse_execution(const RawStore& raw,
 
     // 解析 /proc/self/status
     auto status_records = raw.get_all(RawSource::ProcSelfStatus);
-    if(!status_records.empty())
+    for(const auto* rec : status_records)
     {
-        parse_proc_self_status(status_records[0]->payload, ctx, warnings);
-        has_data = true;
+        if(rec->status == CollectStatus::Success)
+        {
+            parse_proc_self_status(rec->payload, ctx, warnings);
+            has_data = true;
+            break;
+        }
     }
 
     // 解析 /proc/self/cgroup
     auto cgroup_records = raw.get_all(RawSource::ProcSelfCgroup);
-    if(!cgroup_records.empty())
+    for(const auto* rec : cgroup_records)
     {
-        parse_proc_self_cgroup(cgroup_records[0]->payload, ctx);
-        has_data = true;
+        if(rec->status == CollectStatus::Success)
+        {
+            parse_proc_self_cgroup(rec->payload, ctx);
+            has_data = true;
+            break;
+        }
     }
 
     // 解析环境变量
     auto env_records = raw.get_all(RawSource::Environment);
-    if(!env_records.empty())
+    for(const auto* rec : env_records)
     {
-        parse_environment(env_records[0]->payload, ctx);
-        has_data = true;
+        if(rec->status == CollectStatus::Success)
+        {
+            parse_environment(rec->payload, ctx);
+            has_data = true;
+            break;
+        }
     }
 
     // 容器检测

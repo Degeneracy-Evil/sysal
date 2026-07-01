@@ -110,17 +110,17 @@ xmake -r       # 重新构建
 
 `compile_commands.json` 通过 `xmake project -k compile_commands build` 生成（`utils/check.sh` 会自动调用）。
 
-## 运行 testbench
+## 运行 sysal_info
 
 ```bash
-xmake testbench    # 编译并运行 testbench，终端输出全部采集结果
+xmake sysal_info    # 编译并运行 sysal_info，终端输出全部采集结果
 ```
 
 ## 测试
 
 ```bash
 xmake run test_replay    # raw replay 测试
-xmake run testbench      # 运行 testbench（输出被抑制，仅看退出码）
+xmake run sysal_info      # 运行 sysal_info（输出被抑制，仅看退出码）
 ```
 
 ## CI
@@ -129,9 +129,9 @@ push 到 `main` 或 PR 时，GitHub Actions 自动运行 `utils/check.sh` 全量
 
 ## 版本
 
-当前版本 v0.0.2，版本号集中定义在 `include/sysal/version.hpp`。
+当前版本 v0.0.3，版本号集中定义在 `include/sysal/version.hpp`。
 
-## v0.0.2 范围
+## v0.0.3 范围
 
 **实现**：公共 API（`System::collect` / `refresh` / `Collect` 位掩码）、全部数据模型、Linux 支持（procfs / sysfs / PCI）、nvidia-smi 命令输出采集、lspci 设备名解析、Storage HDD/SSD 检测、ISA 扩展（SSE/AVX/AVX-512/AES/FMA 等 17 项）、容器检测（Docker/Podman/LXC/K8s）、nlohmann/json 序列化、raw replay 测试。
 
