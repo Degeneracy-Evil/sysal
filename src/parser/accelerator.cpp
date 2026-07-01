@@ -7,6 +7,7 @@
 #include "parse_utils.hpp"
 
 #include <string_view>
+#include <unordered_map>
 
 namespace sysal::detail
 {
@@ -60,21 +61,17 @@ std::optional<AcceleratorDevice> parse_nvidia_smi_row(std::string_view line,
                 if(parts.size() > 1)
                 {
                     auto unit = trim(parts[1]);
-                    if(unit == "MiB")
+                    static const std::unordered_map<std::string, std::uint64_t> unit_multipliers = {
+                        {"MiB", 1024ULL * 1024ULL},
+                        {"GiB", 1024ULL * 1024ULL * 1024ULL},
+                        {"KiB", 1024ULL},
+                        {"B", 1ULL},
+                    };
+
+                    auto it = unit_multipliers.find(unit);
+                    if(it != unit_multipliers.end())
                     {
-                        multiplier = 1024ULL * 1024ULL;
-                    }
-                    else if(unit == "GiB")
-                    {
-                        multiplier = 1024ULL * 1024ULL * 1024ULL;
-                    }
-                    else if(unit == "KiB")
-                    {
-                        multiplier = 1024ULL;
-                    }
-                    else if(unit == "B")
-                    {
-                        multiplier = 1ULL;
+                        multiplier = it->second;
                     }
                     else
                     {

@@ -135,37 +135,19 @@ std::vector<IsaExtension> parse_isa_extensions(const std::string& flags)
         flag_set.insert(trim(f));
     }
 
-    if(flag_set.count("sse4_2"))
+    static const std::vector<std::pair<std::string, IsaExtension>> isa_map = {
+        {"sse4_2", IsaExtension::Sse42},      {"avx", IsaExtension::Avx},
+        {"avx2", IsaExtension::Avx2},         {"avx512f", IsaExtension::Avx512f},
+        {"avx512cd", IsaExtension::Avx512cd}, {"avx512bw", IsaExtension::Avx512bw},
+        {"avx512dq", IsaExtension::Avx512dq}, {"avx512vl", IsaExtension::Avx512vl},
+    };
+
+    for(const auto& [flag, ext] : isa_map)
     {
-        extensions.push_back(IsaExtension::Sse42);
-    }
-    if(flag_set.count("avx"))
-    {
-        extensions.push_back(IsaExtension::Avx);
-    }
-    if(flag_set.count("avx2"))
-    {
-        extensions.push_back(IsaExtension::Avx2);
-    }
-    if(flag_set.count("avx512f"))
-    {
-        extensions.push_back(IsaExtension::Avx512f);
-    }
-    if(flag_set.count("avx512cd"))
-    {
-        extensions.push_back(IsaExtension::Avx512cd);
-    }
-    if(flag_set.count("avx512bw"))
-    {
-        extensions.push_back(IsaExtension::Avx512bw);
-    }
-    if(flag_set.count("avx512dq"))
-    {
-        extensions.push_back(IsaExtension::Avx512dq);
-    }
-    if(flag_set.count("avx512vl"))
-    {
-        extensions.push_back(IsaExtension::Avx512vl);
+        if(flag_set.count(flag))
+        {
+            extensions.push_back(ext);
+        }
     }
 
     return extensions;
