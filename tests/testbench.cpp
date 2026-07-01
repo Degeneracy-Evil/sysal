@@ -6,6 +6,7 @@
 #include "sysal/core/sysal.hpp"
 #include "sysal/serialization/serialization.hpp"
 #include "sysal/test/replay.hpp"
+#include "sysal/version.hpp"
 
 #include <cassert>
 #include <chrono>
@@ -294,7 +295,7 @@ int main()
     assert(sys.info.memory.total_memory.value > 0);
     assert(!sys.info.platform.os.name.empty());
     assert(!sys.meta.succeeded_collectors.empty());
-    assert(sys.meta.sysal_version == "0.0.1");
+    assert(sys.meta.sysal_version == sysal::VERSION_STRING);
     assert(sys.meta.collect_duration.count() >= 0.0);
 
     label("Collect duration (s)",

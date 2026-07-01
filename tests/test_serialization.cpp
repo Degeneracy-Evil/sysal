@@ -4,6 +4,7 @@
 #include "sysal/core/error.hpp"
 #include "sysal/core/system.hpp"
 #include "sysal/serialization/serialization.hpp"
+#include "sysal/version.hpp"
 
 #include <cassert>
 #include <cstdlib>
@@ -220,7 +221,7 @@ void test_compatible_version()
 
     System sys = from_json(good_json);
     CHECK(sys.info.platform.host.hostname == "h");
-    CHECK(sys.meta.sysal_version == "0.0.1");
+    CHECK(sys.meta.sysal_version == sysal::VERSION_STRING);
 }
 
 } // namespace

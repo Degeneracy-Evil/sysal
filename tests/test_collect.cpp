@@ -2,6 +2,7 @@
 #include "sysal/core/system.hpp"
 #include "sysal/model/raw_store.hpp"
 #include "sysal/test/replay.hpp"
+#include "sysal/version.hpp"
 
 #include <cassert>
 #include <string>
@@ -43,7 +44,7 @@ int main()
         auto sys = System::collect(Collect::Platform | Collect::Execution);
 
         // sysal 版本
-        assert(sys.meta.sysal_version == "0.0.1");
+        assert(sys.meta.sysal_version == sysal::VERSION_STRING);
 
         // 请求的 flags
         assert(has(sys.meta.requested_flags, Collect::Platform));

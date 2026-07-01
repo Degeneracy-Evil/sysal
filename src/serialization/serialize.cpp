@@ -11,6 +11,7 @@
 #include "sysal/serialization/serialization.hpp"
 #include "sysal/test/replay.hpp"
 #include "sysal/types/enums.hpp"
+#include "sysal/version.hpp"
 
 #include <cstdint>
 #include <fstream>
@@ -1901,7 +1902,8 @@ System from_json(std::string_view json)
         const auto* ver_val = meta_val->get("sysal_version");
         if(ver_val && ver_val->type == detail::JsonVal::Type::Str)
         {
-            if(!ver_val->str_val.starts_with("0.0."))
+            if(!ver_val->str_val.starts_with(std::to_string(sysal::VERSION_MAJOR) + "." +
+                                             std::to_string(sysal::VERSION_MINOR) + "."))
             {
                 throw SysalError(ErrorKind::DeserializationError,
                                  "incompatible version: " + ver_val->str_val);

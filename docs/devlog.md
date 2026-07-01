@@ -1,5 +1,18 @@
 # 开发记录
 
+### 2026-07-01 集中版本管理 + GitHub Release v0.0.1
+
+- **变更类型**: src / tests / build
+- **涉及文件**: include/sysal/version.hpp (新增), src/pipeline/pipeline.cpp, src/serialization/serialize.cpp, tests/testbench.cpp, tests/test_collect.cpp, tests/test_serialization.cpp, xmake.lua, docs/devlog.md
+- **变更内容**:
+  1. 新建 `include/sysal/version.hpp`：`inline constexpr` 定义 `VERSION_MAJOR=0`、`VERSION_MINOR=0`、`VERSION_PATCH=1`、`VERSION_STRING="0.0.1"`
+  2. `pipeline.cpp`：`meta.sysal_version = "0.0.1"` 改为 `sysal::VERSION_STRING`
+  3. `serialize.cpp`：版本兼容性检查 `starts_with("0.0.")` 改为用 `VERSION_MAJOR`/`VERSION_MINOR` 动态构建前缀
+  4. `testbench.cpp`、`test_collect.cpp`、`test_serialization.cpp`：版本断言改为 `sysal::VERSION_STRING`
+  5. `xmake.lua`：添加 `set_version("0.0.1")`
+- **原因**: 版本号从单点硬编码改为集中管理，便于版本升级时统一修改
+- **验证**: `xmake -r` 构建成功；`xmake run test_collect` 通过；`xmake run test_serialization` 14 passed
+
 ### 2026-07-01 整理 xmake.lua 结构
 
 - **变更类型**: build / refactor

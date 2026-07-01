@@ -23,6 +23,7 @@
 #include "sysal/core/system.hpp"
 #include "sysal/model/raw_store.hpp"
 #include "sysal/test/replay.hpp"
+#include "sysal/version.hpp"
 
 #include <chrono>
 #include <string>
@@ -149,7 +150,7 @@ System run_replay(const RawStore& raw, Collect flags, std::vector<std::string>& 
     // 构建 SnapshotMeta
     SnapshotMeta meta;
     meta.collect_time = start;
-    meta.sysal_version = "0.0.1";
+    meta.sysal_version = sysal::VERSION_STRING;
     meta.collect_duration = end - start;
     meta.requested_flags = flags;
     meta.succeeded_collectors = std::move(succeeded_collectors);

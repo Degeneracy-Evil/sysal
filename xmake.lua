@@ -8,6 +8,7 @@
 set_languages("c++23")
 set_toolchains("clang")
 set_rundir(".")
+set_version("0.0.1")
 
 -- 全局编译/链接选项，所有 target 共享
 add_cxxflags("-Wall", "-Wextra", "-Werror", "-stdlib=libc++", {force = true})
