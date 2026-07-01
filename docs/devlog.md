@@ -1,5 +1,15 @@
 # 开发记录
 
+### 2026-07-01 添加 xmake testbench task + 移除 testbench 内部 include 路径
+
+- **变更类型**: build / chore
+- **涉及文件**: xmake.lua, docs/devlog.md
+- **变更内容**:
+  1. xmake.lua: 添加 `task("testbench")` 插件任务，`xmake testbench` 一键编译并运行 testbench，终端输出完整可见
+  2. xmake.lua: `test_target_shared` 移除 `add_includedirs("src")`，testbench 不再能访问 `src/` 内部头文件，强制封装边界
+- **原因**: testbench 需要便捷的运行方式查看终端输出；作为链接动态库的外部程序，testbench 不应访问库内部头文件
+- **验证**: `xmake -r` 构建成功；`xmake testbench` 运行正常，终端输出 17 section 完整内容
+
 ### 2026-07-01 拆分静态库/动态库目标 + 重写 testbench 完整能力测试
 
 - **变更类型**: build / tests / chore

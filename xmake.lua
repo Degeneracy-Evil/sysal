@@ -81,7 +81,6 @@ local function test_target_shared(name, source)
         set_kind("binary")
         add_files(source)
         add_deps("sysal_shared")
-        add_includedirs("src")
         add_cxxflags("-UNDEBUG", {force = true})
 end
 
@@ -105,3 +104,16 @@ test_target("test_collect", "tests/test_collect.cpp")
 test_target("test_serialization", "tests/test_serialization.cpp")
 test_target("test_replay", "tests/test_replay.cpp")
 test_target_shared("testbench", "tests/testbench.cpp")
+
+---------------------------------------- testbench 运行任务
+
+task("testbench")
+    set_category("plugin")
+    on_run(function ()
+        os.execv("xmake", {"run", "testbench"})
+    end)
+    set_menu {
+        usage = "xmake testbench",
+        description = "Build and run testbench with terminal output",
+        options = {}
+    }
