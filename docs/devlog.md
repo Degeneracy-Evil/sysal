@@ -1,5 +1,19 @@
 # 开发记录
 
+### 2026-07-01 整理 xmake.lua 结构
+
+- **变更类型**: build / refactor
+- **涉及文件**: xmake.lua, docs/devlog.md
+- **变更内容**:
+  1. 删除 `after_build` 手写 compile_commands.json 生成（18 行），check.sh 已有 `xmake project -k compile_commands` 自动生成
+  2. 合并 `test_target` 和 `test_target_shared` 为一个函数，通过 `link_shared` 布尔参数控制链接静态/动态库
+  3. 19 个 test_target 调用改为循环 + 列表
+  4. 四层视觉结构：全局配置 / 库 / 测试 / task，用 `==========` 分隔
+  5. git hooks `on_load` 加注释说明为何挂在 `sysal_static` 上
+  6. 静态库 `set_targetdir` 加注释说明 workaround 原因
+- **原因**: 原 xmake.lua 有重复代码、职责混乱（项目级逻辑挂在 target 上）、冗余的手写 JSON 生成
+- **验证**: `xmake -r` 构建成功；`xmake testbench` 运行正常；`xmake project -k compile_commands build` 生成 compile_commands.json
+
 ### 2026-07-01 添加 xmake testbench task + 移除 testbench 内部 include 路径
 
 - **变更类型**: build / chore

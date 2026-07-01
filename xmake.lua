@@ -1,5 +1,9 @@
 -- sysal 构建配置
 -- C++23 / clang / libc++ / lld / compiler-rt
+--
+-- compile_commands.json 生成：utils/check.sh 自动调用
+--   xmake project -k compile_commands build
+-- 或手动执行上述命令。
 
 set_languages("c++23")
 set_toolchains("clang")
@@ -16,17 +20,19 @@ local SYSAL_SOURCES = {
     "src/**.cpp"
 }
 
----------------------------------------- 静态库
+-- ========== 库 ==========
 
 target("sysal_static")
     set_kind("static")
     set_basename("sysal")
+    -- 静态库放到 static/ 子目录，避免链接器在同目录下优先选择 .so
     set_targetdir("$(builddir)/$(plat)/$(arch)/$(mode)/static")
     add_files(SYSAL_SOURCES)
     add_includedirs("src")
 
     on_load(function (target)
-        -- 首次构建时自动配置 git hooks
+        -- 项目级一次性设置：首次构建时自动配置 git hooks
+        -- 挂在 sysal_static 上，因为 xmake 默认构建所有 target，此 target 必被加载
         if os.isdir(".githooks") and os.isdir(".git") then
             local configured = try { function() os.runv("git", {"config", "core.hooksPath"}); return true end }
             if not configured then
@@ -35,77 +41,58 @@ target("sysal_static")
         end
     end)
 
-    after_build(function (target)
-        -- 自动生成 compile_commands.json 供 clang-tidy / clangd 使用
-        local cc_file = path.join(os.projectdir(), "build", "compile_commands.json")
-        if not os.isfile(cc_file) then
-            local project_dir = os.projectdir()
-            local entries = {}
-            for _, sourcefile in ipairs(target:sourcefiles()) do
-                local abs_source = path.absolute(sourcefile, project_dir)
-                local cmd = "clang++ -std=c++23 -Wall -Wextra -Werror -stdlib=libc++ -Iinclude -Isrc -c " .. abs_source
-                table.insert(entries, string.format(
-                    '{"directory":"%s","command":"%s","file":"%s"}',
-                    project_dir, cmd, abs_source
-                ))
-            end
-            local json = "[" .. table.concat(entries, ",") .. "]"
-            io.writefile(cc_file, json)
-        end
-    end)
-
----------------------------------------- 动态库
-
 target("sysal_shared")
     set_kind("shared")
     set_basename("sysal")
     add_files(SYSAL_SOURCES)
     add_includedirs("src")
 
----------------------------------------- 测试目标
+-- ========== 测试 ==========
 
--- 辅助函数：创建测试 binary target（链接静态库）
-local function test_target(name, source)
+-- 辅助函数：创建测试 binary target
+-- link_shared=true 链接动态库（不暴露内部头），否则链接静态库（可访问 src/ 内部头）
+local function test_target(name, source, link_shared)
     target(name)
         set_kind("binary")
         add_files(source)
-        add_deps("sysal_static")
-        add_includedirs("src")
-        -- 测试必须启用 assert：显式取消 NDEBUG
+        add_deps(link_shared and "sysal_shared" or "sysal_static")
+        if not link_shared then
+            add_includedirs("src")
+        end
         add_cxxflags("-UNDEBUG", {force = true})
 end
 
--- testbench 链接动态库
-local function test_target_shared(name, source)
-    target(name)
-        set_kind("binary")
-        add_files(source)
-        add_deps("sysal_shared")
-        add_cxxflags("-UNDEBUG", {force = true})
+-- 单元测试（链接静态库，白盒可访问内部头）
+local unit_tests = {
+    "test_types",
+    "test_model",
+    "test_json",
+    "test_parse_utils",
+    "test_raw_store_io",
+    "test_reader",
+    "test_parse_platform",
+    "test_parse_cpu",
+    "test_parse_memory",
+    "test_parse_accelerator",
+    "test_parse_storage",
+    "test_parse_pci",
+    "test_parse_network",
+    "test_parse_software",
+    "test_parse_execution",
+    "test_resolve",
+    "test_collect",
+    "test_serialization",
+    "test_replay",
+}
+
+for _, name in ipairs(unit_tests) do
+    test_target(name, "tests/" .. name .. ".cpp")
 end
 
-test_target("test_types", "tests/test_types.cpp")
-test_target("test_model", "tests/test_model.cpp")
-test_target("test_json", "tests/test_json.cpp")
-test_target("test_parse_utils", "tests/test_parse_utils.cpp")
-test_target("test_raw_store_io", "tests/test_raw_store_io.cpp")
-test_target("test_reader", "tests/test_reader.cpp")
-test_target("test_parse_platform", "tests/test_parse_platform.cpp")
-test_target("test_parse_cpu", "tests/test_parse_cpu.cpp")
-test_target("test_parse_memory", "tests/test_parse_memory.cpp")
-test_target("test_parse_accelerator", "tests/test_parse_accelerator.cpp")
-test_target("test_parse_storage", "tests/test_parse_storage.cpp")
-test_target("test_parse_pci", "tests/test_parse_pci.cpp")
-test_target("test_parse_network", "tests/test_parse_network.cpp")
-test_target("test_parse_software", "tests/test_parse_software.cpp")
-test_target("test_parse_execution", "tests/test_parse_execution.cpp")
-test_target("test_resolve", "tests/test_resolve.cpp")
-test_target("test_collect", "tests/test_collect.cpp")
-test_target("test_serialization", "tests/test_serialization.cpp")
-test_target("test_replay", "tests/test_replay.cpp")
-test_target_shared("testbench", "tests/testbench.cpp")
+-- testbench 链接动态库，仅访问公共头
+test_target("testbench", "tests/testbench.cpp", true)
 
----------------------------------------- testbench 运行任务
+-- ========== task ==========
 
 task("testbench")
     set_category("plugin")
