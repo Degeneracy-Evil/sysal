@@ -77,7 +77,7 @@ int main()
         CHECK(stor.devices[0].kind == StorageKind::Other);
     }
 
-    // ---- 测试 4: PCI 地址缺失警告（B-2） ----
+    // ---- 测试 4: 单设备无 rotational ----
     {
         RawStore raw;
         raw.records.push_back(
@@ -86,18 +86,10 @@ int main()
         std::vector<std::string> warnings;
         auto result = parse_storage(raw, warnings);
         CHECK(result.has_value());
-
-        // 应有 B-2 警告
-        bool has_b2_warning = false;
-        for(const auto& w : warnings)
-        {
-            if(w.find("B-2") != std::string::npos)
-            {
-                has_b2_warning = true;
-                break;
-            }
-        }
-        CHECK(has_b2_warning);
+        CHECK(result->devices.size() == 1);
+        CHECK(result->devices[0].name.value == "nvme0n1");
+        CHECK(result->devices[0].kind == StorageKind::Nvme);
+        CHECK(result->devices[0].capacity.has_value());
     }
 
     // ---- 测试 5: rotational=0 → Ssd ----

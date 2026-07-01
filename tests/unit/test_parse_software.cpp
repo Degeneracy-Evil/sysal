@@ -24,9 +24,8 @@ int main()
         RawStore raw;
         raw.records.push_back(make_record(
             RawSource::NvidiaSmi, "nvidia-smi",
-            "+-----------------------------------------------------------------------------+\n"
-            "| NVIDIA-SMI 535.129.03   Driver Version: 535.129.03   CUDA Version: 12.2     |\n"
-            "+-----------------------------------------------------------------------------+\n"));
+            "0, NVIDIA A100 80GB PCIe, 81920 MiB, 00000000:65:00.0, 535.129.03\n"
+            "1, NVIDIA A100 80GB PCIe, 81920 MiB, 00000000:ca:00.0, 535.129.03\n"));
         raw.records.push_back(make_record(RawSource::Nvcc, "nvcc --version",
                                           "nvcc: NVIDIA (R) Cuda compiler driver\n"
                                           "Cuda compilation tools, release 12.4, V12.4.131\n"));
@@ -69,7 +68,7 @@ int main()
         RawStore raw;
         raw.records.push_back(
             make_record(RawSource::NvidiaSmi, "nvidia-smi",
-                        "| NVIDIA-SMI 470.42   Driver Version: 470.42   CUDA Version: 11.4 |\n"));
+                        "0, NVIDIA GeForce RTX 3090, 24576 MiB, 00000000:01:00.0, 470.42\n"));
 
         std::vector<std::string> warnings;
         auto result = parse_software(raw, warnings);

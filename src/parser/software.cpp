@@ -14,29 +14,25 @@ namespace sysal::detail
 namespace
 {
 
-/// @brief 从 nvidia-smi 输出中提取驱动版本
-/// @param payload nvidia-smi 命令输出
+/// @brief 从 nvidia-smi CSV 输出中提取驱动版本
+/// @param payload nvidia-smi --query-gpu=...,driver_version --format=csv,noheader 输出
 /// @return 驱动版本字符串（若找到）
 std::optional<std::string> extract_nvidia_driver_version(std::string_view payload)
 {
-    // nvidia-smi 输出格式示例：
-    // +-----------------------------------------------------------------------------+
-    // | NVIDIA-SMI 535.129.03   Driver Version: 535.129.03   CUDA Version: 12.2     |
+    // CSV 格式: index,name,memory.total,pci.bus_id,driver_version
+    // 示例: 0, NVIDIA A100 80GB PCIe, 81920 MiB, 00000000:65:00.0, 595.58.03
     auto lines = split(payload, '\n');
     for(const auto& line : lines)
     {
         auto trimmed_line = trim(line);
-        auto pos = trimmed_line.find("Driver Version:");
-        if(pos != std::string::npos)
+        if(trimmed_line.empty())
         {
-            auto rest = trimmed_line.substr(pos + 15); // "Driver Version:" 长度
-            auto version = trim(rest);
-            // 版本号后可能还有其他字段，取第一个空格前的部分
-            auto space = version.find(' ');
-            if(space != std::string::npos)
-            {
-                version = version.substr(0, space);
-            }
+            continue;
+        }
+        auto fields = split(trimmed_line, ',');
+        if(fields.size() >= 5)
+        {
+            auto version = trim(fields[4]);
             if(!version.empty())
             {
                 return std::string(version);

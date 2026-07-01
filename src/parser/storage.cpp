@@ -143,14 +143,6 @@ std::optional<Storage> parse_storage(const RawStore& raw, std::vector<std::strin
             }
         }
 
-        // B-2 修正：PCI 地址暂不可用，仅对物理设备发出警告
-        auto symlink_it = attrs.find("device");
-        if(symlink_it == attrs.end() && dev.kind != StorageKind::Other)
-        {
-            warnings.push_back("parse_storage: 块设备 " + dev_name +
-                               " 无 PCI 地址信息（B-2 待修正）");
-        }
-
         storage.devices.push_back(std::move(dev));
         ++seq;
     }
