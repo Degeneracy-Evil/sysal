@@ -20,13 +20,17 @@ static RawRecord make_record(RawSource source, const std::string& path, const st
 
 int main()
 {
-    // ---- 测试 1: 2 块设备（nvme0n1 + sda） ----
+    // ---- 测试 1: 2 块设备（nvme0n1 + sda，sda 为 HDD） ----
     {
         RawStore raw;
         raw.records.push_back(
             make_record(RawSource::SysfsBlock, "/sys/block/nvme0n1/size", "3750924672\n"));
         raw.records.push_back(
+            make_record(RawSource::SysfsBlock, "/sys/block/nvme0n1/queue/rotational", "0\n"));
+        raw.records.push_back(
             make_record(RawSource::SysfsBlock, "/sys/block/sda/size", "976773168\n"));
+        raw.records.push_back(
+            make_record(RawSource::SysfsBlock, "/sys/block/sda/queue/rotational", "1\n"));
 
         std::vector<std::string> warnings;
         auto result = parse_storage(raw, warnings);
@@ -42,10 +46,10 @@ int main()
         assert(stor.devices[0].capacity.has_value());
         assert(stor.devices[0].capacity->value == 3750924672ULL * 512);
 
-        // sda
+        // sda (rotational=1 → Hdd)
         assert(stor.devices[1].id == StorageId{1});
         assert(stor.devices[1].name.value == "sda");
-        assert(stor.devices[1].kind == StorageKind::Sata);
+        assert(stor.devices[1].kind == StorageKind::Hdd);
         assert(stor.devices[1].capacity.has_value());
         assert(stor.devices[1].capacity->value == 976773168ULL * 512);
     }
@@ -94,6 +98,55 @@ int main()
             }
         }
         assert(has_b2_warning);
+    }
+
+    // ---- 测试 5: rotational=0 → Ssd ----
+    {
+        RawStore raw;
+        raw.records.push_back(
+            make_record(RawSource::SysfsBlock, "/sys/block/sdb/size", "500118192\n"));
+        raw.records.push_back(
+            make_record(RawSource::SysfsBlock, "/sys/block/sdb/queue/rotational", "0\n"));
+
+        std::vector<std::string> warnings;
+        auto result = parse_storage(raw, warnings);
+        assert(result.has_value());
+
+        const auto& stor = *result;
+        assert(stor.devices.size() == 1);
+        assert(stor.devices[0].name.value == "sdb");
+        assert(stor.devices[0].kind == StorageKind::Ssd);
+    }
+
+    // ---- 测试 6: nvme 设备无 rotational → Nvme ----
+    {
+        RawStore raw;
+        raw.records.push_back(
+            make_record(RawSource::SysfsBlock, "/sys/block/nvme1n1/size", "1000\n"));
+
+        std::vector<std::string> warnings;
+        auto result = parse_storage(raw, warnings);
+        assert(result.has_value());
+
+        const auto& stor = *result;
+        assert(stor.devices.size() == 1);
+        assert(stor.devices[0].name.value == "nvme1n1");
+        assert(stor.devices[0].kind == StorageKind::Nvme);
+    }
+
+    // ---- 测试 7: sd 设备无 rotational → Other ----
+    {
+        RawStore raw;
+        raw.records.push_back(make_record(RawSource::SysfsBlock, "/sys/block/sdc/size", "2000\n"));
+
+        std::vector<std::string> warnings;
+        auto result = parse_storage(raw, warnings);
+        assert(result.has_value());
+
+        const auto& stor = *result;
+        assert(stor.devices.size() == 1);
+        assert(stor.devices[0].name.value == "sdc");
+        assert(stor.devices[0].kind == StorageKind::Other);
     }
 
     return 0;

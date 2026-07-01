@@ -106,5 +106,110 @@ int main()
         assert(!warnings.empty());
     }
 
+    // ---- 测试 5: lspci 名称覆盖 sysfs device hex ----
+    {
+        RawStore raw;
+        raw.records.push_back(
+            make_record(RawSource::SysfsPci, "/sys/bus/pci/devices/0000:41:00.0/vendor", "0x10de"));
+        raw.records.push_back(
+            make_record(RawSource::SysfsPci, "/sys/bus/pci/devices/0000:41:00.0/device", "0x1b06"));
+        raw.records.push_back(make_record(RawSource::SysfsPci,
+                                          "/sys/bus/pci/devices/0000:41:00.0/class", "0x030000"));
+        raw.records.push_back(
+            make_record(RawSource::SysfsPci, "/sys/bus/pci/devices/0000:41:00.0/numa_node", "0"));
+
+        raw.records.push_back(make_record(RawSource::Lspci, "lspci -nn",
+                                          "41:00.0 VGA compatible controller [0300]: NVIDIA "
+                                          "Corporation GP102 [GeForce GTX 1080 Ti] [10de:1b06]\n"));
+
+        std::vector<std::string> warnings;
+        auto result = parse_pci(raw, warnings);
+        assert(result.has_value());
+        assert(result->devices.size() == 1);
+        assert(result->devices[0].device_name ==
+               DeviceName{"NVIDIA Corporation GP102 [GeForce GTX 1080 Ti]"});
+        assert(result->devices[0].vendor == Vendor{"0x10de"});
+        assert(result->devices[0].device_class == PciClass{"0x030000"});
+    }
+
+    // ---- 测试 6: lspci 名称含方括号且带 rev ----
+    {
+        RawStore raw;
+        raw.records.push_back(
+            make_record(RawSource::SysfsPci, "/sys/bus/pci/devices/0000:00:00.0/vendor", "0x8086"));
+        raw.records.push_back(
+            make_record(RawSource::SysfsPci, "/sys/bus/pci/devices/0000:00:00.0/device", "0x09a2"));
+        raw.records.push_back(make_record(RawSource::SysfsPci,
+                                          "/sys/bus/pci/devices/0000:00:00.0/class", "0x088000"));
+
+        raw.records.push_back(make_record(RawSource::Lspci, "lspci -nn",
+                                          "00:00.0 System peripheral [0880]: Intel Corporation Ice "
+                                          "Lake Memory Map/VT-d [8086:09a2] (rev 04)\n"));
+
+        std::vector<std::string> warnings;
+        auto result = parse_pci(raw, warnings);
+        assert(result.has_value());
+        assert(result->devices.size() == 1);
+        assert(result->devices[0].device_name ==
+               DeviceName{"Intel Corporation Ice Lake Memory Map/VT-d"});
+        assert(result->devices[0].vendor == Vendor{"0x8086"});
+    }
+
+    // ---- 测试 7: lspci 独有设备（无 sysfs）被加入列表 ----
+    {
+        RawStore raw;
+        // sysfs 仅有 41:00.0
+        raw.records.push_back(
+            make_record(RawSource::SysfsPci, "/sys/bus/pci/devices/0000:41:00.0/vendor", "0x10de"));
+        raw.records.push_back(
+            make_record(RawSource::SysfsPci, "/sys/bus/pci/devices/0000:41:00.0/device", "0x1b06"));
+        raw.records.push_back(make_record(RawSource::SysfsPci,
+                                          "/sys/bus/pci/devices/0000:41:00.0/class", "0x030000"));
+
+        // lspci 含 41:00.0 与 65:00.0（后者无 sysfs）
+        raw.records.push_back(
+            make_record(RawSource::Lspci, "lspci -nn",
+                        "41:00.0 VGA compatible controller [0300]: NVIDIA Corporation GP102 "
+                        "[GeForce GTX 1080 Ti] [10de:1b06]\n"
+                        "65:00.0 Network controller [0200]: Mellanox ConnectX-5 [15b3:158b]\n"));
+
+        std::vector<std::string> warnings;
+        auto result = parse_pci(raw, warnings);
+        assert(result.has_value());
+        assert(result->devices.size() == 2);
+
+        // 41:00.0 来自 sysfs，名称被 lspci 覆盖
+        assert((result->devices[0].address == PciAddress{0x0000, 0x41, 0x00, 0x0}));
+        assert(result->devices[0].device_name ==
+               DeviceName{"NVIDIA Corporation GP102 [GeForce GTX 1080 Ti]"});
+        assert(result->devices[0].vendor == Vendor{"0x10de"});
+
+        // 65:00.0 仅来自 lspci
+        assert((result->devices[1].address == PciAddress{0x0000, 0x65, 0x00, 0x0}));
+        assert(result->devices[1].device_name == DeviceName{"Mellanox ConnectX-5"});
+    }
+
+    // ---- 测试 8: lspci 带域名 DDDD:BB:DD.F 格式 ----
+    {
+        RawStore raw;
+        raw.records.push_back(
+            make_record(RawSource::SysfsPci, "/sys/bus/pci/devices/0000:41:00.0/vendor", "0x10de"));
+        raw.records.push_back(
+            make_record(RawSource::SysfsPci, "/sys/bus/pci/devices/0000:41:00.0/device", "0x1b06"));
+        raw.records.push_back(make_record(RawSource::SysfsPci,
+                                          "/sys/bus/pci/devices/0000:41:00.0/class", "0x030000"));
+
+        raw.records.push_back(make_record(RawSource::Lspci, "lspci -nn",
+                                          "0000:41:00.0 VGA compatible controller [0300]: NVIDIA "
+                                          "Corporation GP102 [GeForce GTX 1080 Ti] [10de:1b06]\n"));
+
+        std::vector<std::string> warnings;
+        auto result = parse_pci(raw, warnings);
+        assert(result.has_value());
+        assert(result->devices.size() == 1);
+        assert(result->devices[0].device_name ==
+               DeviceName{"NVIDIA Corporation GP102 [GeForce GTX 1080 Ti]"});
+    }
+
     return 0;
 }

@@ -30,9 +30,9 @@ enum class InterfaceState
 /// @brief 存储设备类型
 enum class StorageKind
 {
-    Nvme, ///< NVMe
-    Sata, ///< SATA
-    Sas,  ///< SAS
+    Nvme, ///< NVMe SSD
+    Ssd,  ///< SATA/SAS SSD（rotational=0）
+    Hdd,  ///< 机械硬盘（rotational=1）
     Other ///< 其他或未知
 };
 
@@ -48,6 +48,11 @@ enum class AcceleratorKind
 /// @brief CPU ISA 扩展
 enum class IsaExtension
 {
+    Sse,      ///< SSE
+    Sse2,     ///< SSE2
+    Sse3,     ///< SSE3
+    Ssse3,    ///< SSSE3
+    Sse41,    ///< SSE4.1
     Sse42,    ///< SSE4.2
     Avx,      ///< AVX
     Avx2,     ///< AVX2
@@ -55,7 +60,11 @@ enum class IsaExtension
     Avx512cd, ///< AVX-512 Conflict Detection
     Avx512bw, ///< AVX-512 Byte/Word
     Avx512dq, ///< AVX-512 Doubleword/Quadword
-    Avx512vl  ///< AVX-512 Vector Length
+    Avx512vl, ///< AVX-512 Vector Length
+    Aes,      ///< AES 指令集
+    Fma,      ///< FMA
+    F16c,     ///< F16C
+    Pclmulqdq ///< PCLMULQDQ
 };
 
 /// @brief 原始数据来源

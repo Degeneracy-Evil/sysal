@@ -11,18 +11,23 @@ namespace sysal::detail
 namespace
 {
 
-/// @brief 从块设备名称推断存储类型
+/// @brief 从块设备名称与 rotational 属性推断存储类型
 /// @param name 块设备名称（如 "nvme0n1"、"sda"）
+/// @param rotational sysfs queue/rotational 内容（"0"=SSD, "1"=HDD），可能为空
 /// @return 推断的存储类型
-StorageKind infer_storage_kind(std::string_view name)
+StorageKind infer_storage_kind(std::string_view name, const std::string& rotational)
 {
     if(name.find("nvme") == 0)
     {
         return StorageKind::Nvme;
     }
-    if(name.find("sd") == 0)
+    if(rotational == "0")
     {
-        return StorageKind::Sata;
+        return StorageKind::Ssd;
+    }
+    if(rotational == "1")
+    {
+        return StorageKind::Hdd;
     }
     return StorageKind::Other;
 }
@@ -98,7 +103,10 @@ std::optional<Storage> parse_storage(const RawStore& raw, std::vector<std::strin
         StorageDevice dev;
         dev.id = StorageId{seq};
         dev.name = DeviceName{dev_name};
-        dev.kind = infer_storage_kind(dev_name);
+
+        auto rot_it = attrs.find("rotational");
+        std::string rotational = (rot_it != attrs.end()) ? trim(rot_it->second) : std::string{};
+        dev.kind = infer_storage_kind(dev_name, rotational);
 
         // 从 size 文件读取容量（512 字节扇区数）
         auto size_it = attrs.find("size");

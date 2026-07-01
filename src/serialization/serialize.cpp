@@ -232,7 +232,6 @@ using json = nlohmann::json;
     return json{
         {"kind", static_cast<std::uint32_t>(v.kind)},
         {"hypervisor", v.hypervisor},
-        {"container", v.container},
     };
 }
 
@@ -241,7 +240,6 @@ using json = nlohmann::json;
     Virtualization v;
     v.kind = static_cast<VirtualizationKind>(j.at("kind").get<std::uint32_t>());
     j.at("hypervisor").get_to(v.hypervisor);
-    v.container = j.at("container").get<bool>();
     return v;
 }
 

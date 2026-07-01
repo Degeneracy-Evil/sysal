@@ -207,40 +207,28 @@ void parse_dmi(const RawStore& raw, Platform& platform,
     }
 }
 
-/// @brief 检测虚拟化信息
+/// @brief 检测硬件虚拟化信息
 /// @param raw 原始证据存储
 /// @param warnings 警告列表
 /// @return 虚拟化信息（若检测到）
+/// @details 仅检测硬件虚拟化（KVM/Xen/VMware），容器信息由 ExecutionContext.container 承载。
 std::optional<Virtualization>
 detect_virtualization(const RawStore& raw, [[maybe_unused]] std::vector<std::string>& warnings)
 {
     Virtualization virt;
     bool detected = false;
 
-    // 检查 /proc/1/cgroup 内容
+    // 检查 /proc/1/cgroup 内容中的硬件虚拟化线索
     auto cgroup_records = raw.get_all(RawSource::ProcOneCgroup);
     for(const auto* rec : cgroup_records)
     {
         const auto& content = rec->payload;
-        if(content.find("docker") != std::string::npos ||
-           content.find("kubepods") != std::string::npos)
-        {
-            virt.container = true;
-            detected = true;
-        }
         if(content.find("kvm") != std::string::npos)
         {
             virt.kind = VirtualizationKind::Kvm;
             virt.hypervisor = "KVM";
             detected = true;
         }
-    }
-
-    // 检查 /.dockerenv 是否存在
-    if(raw.has(RawSource::RootDockerenv))
-    {
-        virt.container = true;
-        detected = true;
     }
 
     if(detected)

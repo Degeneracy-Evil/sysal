@@ -129,11 +129,11 @@ push 到 `main` 或 PR 时，GitHub Actions 自动运行 `utils/check.sh` 全量
 
 ## 版本
 
-当前版本 v0.0.1，版本号集中定义在 `include/sysal/version.hpp`。
+当前版本 v0.0.2，版本号集中定义在 `include/sysal/version.hpp`。
 
-## v0.0.1 范围
+## v0.0.2 范围
 
-**实现**：公共 API（`System::collect` / `refresh` / `Collect` 位掩码）、全部数据模型、Linux 支持（procfs / sysfs / PCI）、nvidia-smi 命令输出采集、raw replay 测试、JSON 序列化。
+**实现**：公共 API（`System::collect` / `refresh` / `Collect` 位掩码）、全部数据模型、Linux 支持（procfs / sysfs / PCI）、nvidia-smi 命令输出采集、lspci 设备名解析、Storage HDD/SSD 检测、ISA 扩展（SSE/AVX/AVX-512/AES/FMA 等 17 项）、容器检测（Docker/Podman/LXC/K8s）、nlohmann/json 序列化、raw replay 测试。
 
 **不实现**：性能评分、基准测试、算子选择、调度策略、守护进程、数据库存储、Web API、完整跨平台、拓扑信息（已有 hwloc）、NVML/ibverbs 库链接。
 

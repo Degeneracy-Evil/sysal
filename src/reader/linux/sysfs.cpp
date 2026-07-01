@@ -236,6 +236,9 @@ void read_block_sysfs(RawStore& raw)
 
         read_sysfs_file(raw, RawSource::SysfsBlock, (dir / "size").string());
 
+        // queue/rotational: "0"=SSD, "1"=HDD
+        read_sysfs_file(raw, RawSource::SysfsBlock, (dir / "queue" / "rotational").string());
+
         // device/ 子目录下的型号等信息
         if(fs::exists(dir / "device"))
         {

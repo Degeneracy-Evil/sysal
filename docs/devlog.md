@@ -1,5 +1,46 @@
 # 开发记录
 
+### 2026-07-01 R5b ISA 扩展枚举扩展 + 版本号升级至 0.0.2
+
+- **变更类型**: src / tests / chore
+- **涉及文件**: include/sysal/types/enums.hpp, src/parser/cpu.cpp, tests/test_parse_cpu.cpp, include/sysal/version.hpp, docs/devlog.md
+- **变更内容**:
+  1. `IsaExtension` 枚举从 8 个扩展到 17 个：新增 `Sse, Sse2, Sse3, Ssse3, Sse41, Aes, Fma, F16c, Pclmulqdq`；枚举顺序按 ISA 代际排列（SSE→AVX→AVX-512→其他）
+  2. `cpu.cpp` `isa_map` 查找表同步扩展，匹配 /proc/cpuinfo flags 字段名（`sse`, `sse2`, `sse3`, `ssse3`, `sse4_1`, `sse4_2`, `aes`, `fma`, `f16c`, `pclmulqdq`）
+  3. `test_parse_cpu.cpp` 新增测试 8：验证全部 17 个 ISA 扩展的解析与顺序
+  4. `version.hpp` 版本号从 `0.0.1` 升级至 `0.0.2`
+- **原因**: 原 IsaExtension 仅覆盖 AVX 系列，缺少 SSE 系列和 AES/FMA 等常见扩展；版本号随 v0.0.2 功能集更新
+- **验证**: `xmake -r` build ok；全部测试通过
+
+### 2026-07-01 R5c 解析 lspci 输出填充 PciDevice.device_name 人类可读名
+
+- **变更类型**: src / tests
+- **涉及文件**: src/parser/pci.cpp, tests/test_parse_pci.cpp, docs/devlog.md
+- **变更内容**:
+  1. `pci.cpp` 新增 `normalize_lspci_address()`：将 lspci 短格式 `BB:DD.F` 补域名前缀 `0000:` 归一化为 `DDDD:BB:DD.F`，长格式保持不变
+  2. `pci.cpp` 新增 `parse_lspci_line()`：用 string find/substr（非 regex）解析单行 `lspci -nn` 输出，提取归一化地址与设备名；设备名定位靠 `]: ` 分隔类名段、再以 `rfind('[')` 找最后一个含 `vendor:device` 十六进制对的方括号，取其前内容，正确处理设备名自身含方括号的情况（如 `[GeForce GTX 1080 Ti]`）
+  3. `parse_pci()` 在 sysfs 解析后增加 lspci 合并阶段：按地址匹配，已有 sysfs 设备则用 lspci 名覆盖 `device_name`；lspci 独有设备（无 sysfs）则新增到 `pci.devices`（仅地址与名称已知）
+  4. `test_parse_pci.cpp` 新增测试 5/6/7/8：覆盖 lspci 名覆盖 sysfs hex、名称含方括号带 rev、lspci 独有设备入列、带域名 `DDDD:BB:DD.F` 格式
+- **原因**: sysfs `device` 文件仅给 hex ID（如 `0x1e04`），非人类可读；`lspci -nn` 已由 reader 采集到 `RawSource::Lspci`，需在 parser 层合并以填充 `PciDevice.device_name` 为人类可读名
+- **验证**: `xmake -r` build ok；`test_parse_pci` 通过；`testbench` 退出码 0，PCI 段输出真实人类可读名（如 "Intel Corporation Ice Lake Memory Map/VT-d"、"Intel Corporation Ice Lake CBDMA [QuickData Technology]"）
+
+### 2026-07-01 R5a 存储 HDD/SSD 识别 + R5d 容器设计清理
+
+- **变更类型**: src / refactor / tests
+- **涉及文件**: src/reader/linux/sysfs.cpp, src/parser/storage.cpp, src/parser/platform.cpp, src/serialization/serialize.cpp, include/sysal/model/platform.hpp, tests/test_parse_storage.cpp, tests/test_parse_platform.cpp, tests/testbench.cpp, docs/devlog.md
+- **变更内容**:
+  1. R5a：`read_block_sysfs()` 新增读取 `/sys/block/<dev>/queue/rotational`（"0"=SSD, "1"=HDD）
+  2. R5a：`infer_storage_kind()` 签名改为接受 `rotational` 参数；新逻辑：nvme 前缀→Nvme，rotational="0"→Ssd，"1"→Hdd，无数据→Other；移除旧的 `sd→Sata` 映射
+  3. R5a：`parse_storage()` 从 `device_attrs` 取出 `rotational` 并 trim 后传入 `infer_storage_kind`
+  4. R5a：`test_parse_storage.cpp` 更新测试 1（sda rotational=1→Hdd），新增测试 5/6/7 覆盖 rotational=0→Ssd、nvme 无 rotational→Nvme、sd 无 rotational→Other
+  5. R5d：`Virtualization` 结构体移除 `bool container` 字段
+  6. R5d：`detect_virtualization()` 移除 docker/kubepods cgroup 检测与 `/.dockerenv` 检测，仅保留 KVM 硬件虚拟化检测；容器信息统一由 `ExecutionContext.container` 承载
+  7. R5d：`virt_to_json`/`virt_from_json` 移除 `container` 字段（旧 JSON 含该字段将被 nlohmann::json 默认忽略）
+  8. R5d：`test_parse_platform.cpp` 测试 2 改为断言容器环境不再产生 Virtualization
+  9. 修复 `testbench.cpp` 中 `storage_kind_str`（Sata/Sas→Ssd/Hdd）与 `isa_str`（补全 9 个缺失的 IsaExtension case，消除 -Wswitch -Werror）
+- **原因**: StorageKind 枚举已重构（移除 Sata/Sas，新增 Ssd/Hdd），需基于 sysfs rotational 标志正确分类；Virtualization.container 与 ExecutionContext.container 职责重叠，移除前者以统一容器信息归属
+- **验证**: `xmake -r` build ok；全部 19 个测试通过（test_parse_storage / test_parse_platform / test_serialization 及其余）；testbench 退出码 0
+
 ### 2026-07-01 check.sh 排除 vendored 第三方代码
 
 - **变更类型**: chore

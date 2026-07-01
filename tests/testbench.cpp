@@ -97,6 +97,16 @@ const char* isa_str(sysal::IsaExtension e)
 {
     switch(e)
     {
+    case sysal::IsaExtension::Sse:
+        return "SSE";
+    case sysal::IsaExtension::Sse2:
+        return "SSE2";
+    case sysal::IsaExtension::Sse3:
+        return "SSE3";
+    case sysal::IsaExtension::Ssse3:
+        return "SSSE3";
+    case sysal::IsaExtension::Sse41:
+        return "SSE4.1";
     case sysal::IsaExtension::Sse42:
         return "SSE4.2";
     case sysal::IsaExtension::Avx:
@@ -113,6 +123,14 @@ const char* isa_str(sysal::IsaExtension e)
         return "AVX-512DQ";
     case sysal::IsaExtension::Avx512vl:
         return "AVX-512VL";
+    case sysal::IsaExtension::Aes:
+        return "AES";
+    case sysal::IsaExtension::Fma:
+        return "FMA";
+    case sysal::IsaExtension::F16c:
+        return "F16C";
+    case sysal::IsaExtension::Pclmulqdq:
+        return "PCLMULQDQ";
     }
     return "?";
 }
@@ -137,10 +155,10 @@ const char* storage_kind_str(sysal::StorageKind k)
     {
     case sysal::StorageKind::Nvme:
         return "NVMe";
-    case sysal::StorageKind::Sata:
-        return "SATA";
-    case sysal::StorageKind::Sas:
-        return "SAS";
+    case sysal::StorageKind::Ssd:
+        return "SSD";
+    case sysal::StorageKind::Hdd:
+        return "HDD";
     case sysal::StorageKind::Other:
         return "Other";
     }

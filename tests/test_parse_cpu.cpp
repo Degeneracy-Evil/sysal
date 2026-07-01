@@ -281,5 +281,41 @@ int main()
         assert(!warnings.empty());
     }
 
+    // ---- 测试 8: 全部 ISA 扩展解析 ----
+    {
+        RawStore raw;
+        raw.records.push_back(make_record(
+            RawSource::ProcCpuInfo, "/proc/cpuinfo",
+            "processor\t: 0\n"
+            "physical id\t: 0\n"
+            "core id\t\t: 0\n"
+            "flags\t\t: sse sse2 sse3 ssse3 sse4_1 sse4_2 aes fma f16c avx avx2 avx512f "
+            "avx512cd avx512bw avx512dq avx512vl pclmulqdq\n"));
+
+        std::vector<std::string> warnings;
+        auto result = parse_cpu(raw, warnings);
+        assert(result.has_value());
+
+        const auto& cpu = *result;
+        assert(cpu.isa_extensions.size() == 17);
+        assert(cpu.isa_extensions[0] == IsaExtension::Sse);
+        assert(cpu.isa_extensions[1] == IsaExtension::Sse2);
+        assert(cpu.isa_extensions[2] == IsaExtension::Sse3);
+        assert(cpu.isa_extensions[3] == IsaExtension::Ssse3);
+        assert(cpu.isa_extensions[4] == IsaExtension::Sse41);
+        assert(cpu.isa_extensions[5] == IsaExtension::Sse42);
+        assert(cpu.isa_extensions[6] == IsaExtension::Avx);
+        assert(cpu.isa_extensions[7] == IsaExtension::Avx2);
+        assert(cpu.isa_extensions[8] == IsaExtension::Avx512f);
+        assert(cpu.isa_extensions[9] == IsaExtension::Avx512cd);
+        assert(cpu.isa_extensions[10] == IsaExtension::Avx512bw);
+        assert(cpu.isa_extensions[11] == IsaExtension::Avx512dq);
+        assert(cpu.isa_extensions[12] == IsaExtension::Avx512vl);
+        assert(cpu.isa_extensions[13] == IsaExtension::Aes);
+        assert(cpu.isa_extensions[14] == IsaExtension::Fma);
+        assert(cpu.isa_extensions[15] == IsaExtension::F16c);
+        assert(cpu.isa_extensions[16] == IsaExtension::Pclmulqdq);
+    }
+
     return 0;
 }

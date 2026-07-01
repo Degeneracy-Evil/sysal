@@ -65,7 +65,6 @@ struct Virtualization
 {
     VirtualizationKind kind{}; ///< 虚拟化类型
     std::string hypervisor;    ///< 虚拟机监控程序
-    bool container{};          ///< 是否为容器
 };
 
 /// @brief 平台信息

@@ -87,7 +87,7 @@ int main()
         assert(!p.virtualization.has_value());
     }
 
-    // ---- 测试 2: 虚拟化检测（Docker 容器） ----
+    // ---- 测试 2: 容器环境不再产生 Virtualization（容器信息由 ExecutionContext 承载） ----
     {
         RawStore raw;
         raw.records.push_back(
@@ -102,8 +102,8 @@ int main()
         std::vector<std::string> warnings;
         auto result = parse_platform(raw, warnings);
         assert(result.has_value());
-        assert(result->virtualization.has_value());
-        assert(result->virtualization->container == true);
+        // detect_virtualization 仅检测硬件虚拟化，容器不再产生 Virtualization
+        assert(!result->virtualization.has_value());
     }
 
     // ---- 测试 3: 虚拟化检测（KVM） ----

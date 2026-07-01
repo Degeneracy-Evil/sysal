@@ -136,10 +136,23 @@ std::vector<IsaExtension> parse_isa_extensions(const std::string& flags)
     }
 
     static const std::vector<std::pair<std::string, IsaExtension>> isa_map = {
-        {"sse4_2", IsaExtension::Sse42},      {"avx", IsaExtension::Avx},
-        {"avx2", IsaExtension::Avx2},         {"avx512f", IsaExtension::Avx512f},
-        {"avx512cd", IsaExtension::Avx512cd}, {"avx512bw", IsaExtension::Avx512bw},
-        {"avx512dq", IsaExtension::Avx512dq}, {"avx512vl", IsaExtension::Avx512vl},
+        {"sse", IsaExtension::Sse},
+        {"sse2", IsaExtension::Sse2},
+        {"sse3", IsaExtension::Sse3},
+        {"ssse3", IsaExtension::Ssse3},
+        {"sse4_1", IsaExtension::Sse41},
+        {"sse4_2", IsaExtension::Sse42},
+        {"avx", IsaExtension::Avx},
+        {"avx2", IsaExtension::Avx2},
+        {"avx512f", IsaExtension::Avx512f},
+        {"avx512cd", IsaExtension::Avx512cd},
+        {"avx512bw", IsaExtension::Avx512bw},
+        {"avx512dq", IsaExtension::Avx512dq},
+        {"avx512vl", IsaExtension::Avx512vl},
+        {"aes", IsaExtension::Aes},
+        {"fma", IsaExtension::Fma},
+        {"f16c", IsaExtension::F16c},
+        {"pclmulqdq", IsaExtension::Pclmulqdq},
     };
 
     for(const auto& [flag, ext] : isa_map)
