@@ -93,7 +93,7 @@ docs/design/
 
 | 文件 | 职能 |
 |---|---|
-| [roadmap.md](roadmap.md) | v0.0.1 实现范围、非目标、未来扩展（缓存内置 / 跨平台 / 拓扑模块） |
+| [roadmap.md](roadmap.md) | v0.0.3 实现范围、非目标、未来扩展（缓存内置 / 跨平台 / 拓扑模块） |
 
 ## 阅读顺序
 
@@ -105,4 +105,4 @@ docs/design/
 4. [data_model/cpu.md](data_model/cpu.md) — 理解 CPU 模型（最重要）
 5. [architecture/pipeline.md](architecture/pipeline.md) — 理解内部管线和模块结构
 6. [rules/strong_typing.md](rules/strong_typing.md) — 理解类型系统
-7. [roadmap.md](roadmap.md) — 理解 v0.0.1 范围
+7. [roadmap.md](roadmap.md) — 理解 v0.0.3 范围

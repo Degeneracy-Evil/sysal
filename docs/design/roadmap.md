@@ -1,6 +1,6 @@
 # 路线图
 
-## v0.0.1 实现范围
+## v0.0.3 实现范围
 
 ### 公共 API
 
@@ -64,7 +64,7 @@ Reader → RawStore → Parser → ParseResult → Resolver → System
 | Raw | 可选原始记录 |
 | warnings | 采集 / 解析 / 解决过程中的非致命问题 |
 
-## v0.0.1 非目标
+## v0.0.3 非目标
 
 - 性能评分
 - 基准测试执行
@@ -80,6 +80,27 @@ Reader → RawStore → Parser → ParseResult → Resolver → System
 - 拓扑信息（已有 hwloc 等成熟库）
 - 全局 `init()` 函数（无此需求）
 
+## v0.0.2 实现范围
+
+| 组件 | 说明 |
+|------|------|
+| nlohmann/json 序列化 | `to_json` / `from_json` 非侵入式序列化 |
+| 表驱动分发 | Reader 和 Parser 改用表驱动模式，替代 if-else 链 |
+| 容器检测细化 | Docker、Podman、LXC、Kubernetes 检测 |
+| ISA 扩展 | 从 5 项扩展到 17 项（SSE/AVX/AVX-512/AES/FMA 等） |
+| lspci 设备名合并 | 将 lspci 输出中的设备名合并到 PCI 模型中 |
+| Storage HDD/SSD 检测 | 通过 sysfs rotational 标志区分 HDD 和 SSD |
+| UEFI 检测 | 通过 sysfs DMI 检测 UEFI 固件 |
+
+## v0.0.3 实现范围
+
+| 组件 | 说明 |
+|------|------|
+| 代码审查修复 | 范围限制、CollectStatus 检查、枚举验证、assert→CHECK、死代码移除 |
+| testbench→sysal_info 重命名 | 示例程序从 testbench 更名为 sysal_info |
+| capabilities 解码 | PCI capabilities 解析 |
+| 设计文档对齐 | 全部设计文档与实际代码保持一致 |
+
 ## 未来扩展
 
 ### 缓存
@@ -89,7 +110,7 @@ Reader → RawStore → Parser → ParseResult → Resolver → System
 
 ### 跨平台
 
-v0.0.1 仅支持 Linux。扩展路径：
+v0.0.3 仅支持 Linux。扩展路径：
 
 1. `RawSource` 枚举增加平台特定的值（如 `WmiCpu`、`SysctlHw`）
 2. Reader 位于 `src/reader/<platform>/` 下，由 xmake 构建时选择
@@ -97,7 +118,7 @@ v0.0.1 仅支持 Linux。扩展路径：
 
 ### 拓扑信息
 
-v0.0.1 不提供 NUMA / PCI 关系图等拓扑抽象，因为已有 hwloc 等成熟库可胜任。
+v0.0.3 不提供 NUMA / PCI 关系图等拓扑抽象，因为已有 hwloc 等成熟库可胜任。
 设备级 `numa_node` 字段保留在 `PciDevice`、`AcceleratorDevice`、`CpuCore`、`LogicalCpu` 上，
 直接从 sysfs 读取。
 

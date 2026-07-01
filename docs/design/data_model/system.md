@@ -15,7 +15,7 @@ class System
 public:
     // 静态工厂：执行一次完整采集，默认采集全部域
     // 失败时抛出 SysalError
-    static System collect(Collect flags = Collect::full);
+    static System collect(Collect flags = full);
 
     // 在已有对象上重新采集，替换内部状态
     // 失败时抛出 SysalError

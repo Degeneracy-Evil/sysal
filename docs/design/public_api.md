@@ -92,7 +92,7 @@ class System
 public:
     // 静态工厂：执行一次完整采集，默认采集全部域
     // 失败时抛出 SysalError
-    static System collect(Collect flags = Collect::full);
+    static System collect(Collect flags = full);
 
     // 在已有对象上重新采集，替换内部状态
     // 失败时抛出 SysalError
@@ -157,7 +157,7 @@ sysal **不使用** `Expected<T, E>` 或其他非抛出式结果类型。
 
 ```cpp
 try {
-    sysal::System sys = sysal::System::collect(sysal::Collect::full);
+    sysal::System sys = sysal::System::collect(sysal::full);
     // 使用 sys.info.cpu / sys.info.memory ...
 } catch (const sysal::SysalError& e) {
     // 处理采集失败
@@ -185,7 +185,7 @@ sysal::System dispatch = sysal::System::collect(
 
 // 4) 同时保留原始证据
 sysal::System with_raw = sysal::System::collect(
-    Collect::full | Collect::Raw
+    full | Collect::Raw
 );
 
 // 5) 读取类型化模型

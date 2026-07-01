@@ -1,5 +1,57 @@
 # 开发记录
 
+### 2026-07-02 消除 sysal_info 全部 warnings
+
+- **变更类型**: src / fix / tests
+- **涉及文件**: src/parser/storage.cpp, src/parser/software.cpp, tests/unit/test_parse_software.cpp, tests/unit/test_parse_storage.cpp
+- **变更内容**:
+  1. `storage.cpp`: 移除 B-2 PCI 地址 TODO warning（功能未实现，不应产生运行时噪声）
+  2. `software.cpp` `extract_nvidia_driver_version()`: 从搜索 `"Driver Version:"` 表格文本改为从 CSV 第 5 列提取 driver_version（匹配 reader 的 `--query-gpu=...,driver_version --format=csv,noheader` 命令）
+  3. `test_parse_software.cpp`: 测试 payload 从表格格式更新为 CSV 格式
+  4. `test_parse_storage.cpp`: 移除 B-2 warning 断言，改为设备属性检查
+- **原因**: sysal_info 报告 6 条 warnings（5 条 B-2 TODO + 1 条 nvidia-smi 解析失败），均为 parser 与 reader 不匹配或未实现功能产生的噪声
+- **验证**: `xmake -r` build ok；全部 18 个测试通过；sysal_info 报告 0 warnings
+
+### 2026-07-02 v0.0.3 版本号升级 + 设计文档对齐
+
+- **变更类型**: docs / chore
+- **涉及文件**: include/sysal/version.hpp, README.md, tests/unit/test_serialization.cpp, docs/design/rules/strong_typing.md, docs/design/data_model/platform.md, docs/design/testing/serialization.md, docs/design/architecture/pipeline.md, docs/design/data_model/raw_store.md
+- **变更内容**:
+  1. `version.hpp`: 版本号从 0.0.2 升级至 0.0.3
+  2. `test_serialization.cpp`: 内联 JSON sysal_version 同步更新为 "0.0.3"
+  3. `README.md`: 版本号更新为 v0.0.3
+  4. `strong_typing.md`: StorageKind 枚举更新为 {Nvme, Ssd, Hdd, Other}；IsaExtension 枚举更新为 17 个值
+  5. `platform.md`: Virtualization 表行移除 `container（bool）` 字段
+  6. `serialization.md`: "手写 JSON 引擎" 描述更新为 nlohmann/json
+  7. `pipeline.md`: 源文件布局移除已删除的 `json.hpp`
+  8. `raw_store.md`: RawSource 枚举补充 `ProcHostname`
+- **原因**: v0.0.2/v0.0.3 代码变更后设计文档存在 5 处过时引用
+- **验证**: grep 确认 docs/design/ 中无 Sata/Sas/json.hpp/手写/container(bool) 残留
+
+### 2026-07-02 删除冲突解决死代码 + lspci warning + 序列化 round-trip 扩展
+
+- **变更类型**: src / tests
+- **涉及文件**: src/resolver/resolve.cpp, src/parser/pci.cpp, tests/unit/test_serialization.cpp
+- **变更内容**:
+  1. `resolve.cpp`: 删除 `TrustLevel` 枚举、`resolve_conflict` 函数及两个 `#pragma clang diagnostic` 守卫（dead code，从未被调用）；删除 `resolve()` 中的"冲突解决框架"注释块
+  2. `pci.cpp`: lspci 独有设备（无 sysfs 对应）添加 warning `"lspci 独有设备，sysfs 数据缺失"`
+  3. `test_serialization.cpp` `test_round_trip()`: 扩展 collect flags 覆盖 Accelerator/Network/Storage/Pci；新增 round-trip 断言从 6 个增至 37 个，覆盖 accelerator（name/kind/memory_size）、storage（name/kind/capacity）、pci（address/vendor）、network（name/state）、platform（kernel.release/architecture）、meta（collect_duration/requested_flags）
+- **原因**: v0.0.2 评审 P0（冲突解决死代码）+ P2（lspci 部分填充无提示 + 序列化 round-trip 覆盖率低）
+- **验证**: `xmake -r` build ok；test_resolve 34 passed；test_parse_pci 40 passed；test_serialization 37 passed
+
+### 2026-07-02 修复 kernel version 语义 + storage 虚拟设备 + capabilities 解码
+
+- **变更类型**: src / fix / tests
+- **涉及文件**: src/parser/platform.cpp, src/parser/storage.cpp, src/parser/execution.cpp, tests/unit/test_parse_platform.cpp, tests/unit/test_parse_execution.cpp
+- **变更内容**:
+  1. `platform.cpp` `parse_proc_version()`: `version` 改为从 `release` 截取 `-` 前的上游版本号（如 "6.8.0"），`compiled_at` 为时间戳（如 "Sat Apr 11 ..."）
+  2. `storage.cpp` `infer_storage_kind()`: 新增虚拟设备前缀过滤（loop/ram/sr/dm-/md/zram/fd），虚拟设备归为 `Other` 不按 rotational 分类
+  3. `execution.cpp`: 新增 `decode_capabilities()` 函数，将 CapEff 十六进制位掩码解码为人类可读名称（CAP_CHOWN/CAP_NET_ADMIN 等 40 个 Linux capability）；`is_root` 修复：仅当 euid==0 且 Uid 行实际被解析时才为 true
+  4. `test_parse_platform.cpp`: kernel version 断言更新为 "5.15.0"
+  5. `test_parse_execution.cpp`: capabilities 断言从 `"000001ff"` 更新为 8 个 CAP_ 名称
+- **原因**: kernel version 语义应为上游版本号而非 #构建字符串；loop 设备 rotational=1 被误报为 HDD；capabilities 输出原始 hex 无意义；is_root 在无 Uid 行时默认 0 误报
+- **验证**: `xmake -r` build ok；全部测试通过；sysal_info 输出 "Kernel version: 6.8.0"、"loop0 (Other)"、"sda (HDD)"、UEFI: yes
+
 ### 2026-07-01 testbench 重命名为 sysal_info + 统一 CHECK 宏
 
 - **变更类型**: refactor / tests / build / docs

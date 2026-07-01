@@ -43,7 +43,7 @@ System from_json(std::string_view json);
   },
   "meta": {
     "collect_time": 1782036690146,
-    "sysal_version": "0.0.1",
+    "sysal_version": "0.0.3",
     "collect_duration": 0.158,
     "requested_flags": 1023,
     "succeeded_collectors": ["platform", "cpu", ...],

@@ -1,45 +1,52 @@
 # 冲突解决策略
 
-当多个数据来源对同一字段提供不同值时，sysal 需要确定性地选择一个并记录冲突。
+## 当前实现（v0.0.3）
 
-## 冲突的前提条件
+v0.0.3 的 Resolver 职责有限：将 `ParseResult` 中的字段移动到 `SystemInfo`，
+计算可见性，交叉校验便利索引。当前版本是**单来源**的——每个字段只来自一个
+Parser，不存在多来源冲突。
 
-冲突仅在**多个来源提供同一字段**时发生。例如：
-- GPU 显存：NVML 报告 96GB，sysfs 报告 98GB → 冲突
-- GPU 名称：NVML 报告 "H20"，lspci 报告 "GA140" → 冲突
+### Resolver 管线
 
-如果某字段只有一个来源，则不存在冲突。如果某来源未提供该字段，也不构成冲突。
-
-## 来源信任优先级（高 → 低）
-
-```txt
-1. 专用后端（NVML、ibverbs）     — 直接查询硬件，最可信
-2. sysfs                         — 内核结构化数据
-3. procfs                        — 内核文本数据
-4. 命令输出（lspci、nvidia-smi） — 可能有版本偏差
-5. 推断 / 默认值                  — 最后手段
+```
+ParseResult → resolve() → SystemInfo
 ```
 
-## 按冲突类别的规则
+`resolve()` 函数（`src/resolver/resolve.cpp`）做三件事：
 
-| 类别 | 规则 | 示例 |
-|---|---|---|
-| **数量** | 最高信任来源胜出 | GPU 显存：NVML 96GB 对比 sysfs 98GB → 采用 NVML |
-| **可见性** | 执行上下文胜出 | CPU：procfs 192 对比 cpuset 32 → 采用 cpuset 32 |
-| **标识** | 最高信任胜出，不匹配时记录警告 | GPU 名称：NVML "H20" 对比 lspci "GA140" → 采用 NVML + 警告 |
-| **状态** | 最新采集时间胜出 | 链路状态：sysfs 对比 ethtool → 采用最新采集的 |
-| **归属** | 专用后端胜出，其次 sysfs | NUMA 归属：NVML 对比 sysfs → 采用 NVML；sysfs 对比 procfs → 采用 sysfs |
+1. **移动字段**：将 `ParseResult` 中各子域（platform、cpu、memory 等）的
+   `std::optional` 值移动到 `SystemInfo` 对应成员。若某子域为 `nullopt`，
+   保留默认构造值。
+2. **计算可见性**：以 `ExecutionContext` 中的便利索引
+   （`visible_logical_cpu_ids`、`visible_accelerator_ids`）为依据，
+   设置各资源子域的 `visible_to_current_process` 字段。
+3. **交叉校验**：检测便利索引中的幻影 ID（引用了模型中不存在的资源），
+   记录警告。同时记录约束提示（如 cpuset 限制了可见 CPU 数量）。
 
-## 冲突记录格式
+### 可见性计算
 
-所有冲突以警告字符串形式记录在 `System` 对象的 `warnings` 成员中。
-格式为：`[conflict] <字段名>: <高优先级来源>=<值>, <低优先级来源>=<值>, adopted=<采用的来源>`
+| 子域 | 依据 | 说明 |
+|------|------|------|
+| CPU | `visible_logical_cpu_ids` | cpuset 约束，空列表=全部可见 |
+| Accelerator | `visible_accelerator_ids` | CUDA_VISIBLE_DEVICES 等约束 |
+| Network | 全部可见 | v0.0.3 中网络命名空间检测推迟 |
 
-示例：
+### 交叉校验
 
-```txt
-[conflict] gpu_memory_size: NVML=96GB, sysfs=98GB, adopted=NVML
-[conflict] gpu_name: NVML=H20, lspci=GA140, adopted=NVML
-```
+Resolver 检测两类问题并写入 `warnings`：
 
-非冲突的普通警告（如某来源不可用）不需要此格式，直接描述问题即可。
+- **幻影 ID**：便利索引引用了模型中不存在的资源 ID
+- **约束提示**：可见资源数量少于模型中的总量（信息性）
+
+## 未来方向
+
+当 NVML、ibverbs 等后端加入后，同一字段可能来自多个来源
+（如 GPU 显存：NVML 报告 96GB，sysfs 报告 98GB），届时需要多来源冲突解决。
+
+计划中的冲突解决框架：
+
+- **来源信任优先级**：专用后端（NVML、ibverbs）> sysfs > procfs > 命令输出 > 推断值
+- **冲突类别**：数量冲突、可见性冲突、标识冲突、状态冲突、归属冲突
+- **记录格式**：`[conflict] <字段名>: <高优先级来源>=<值>, <低优先级来源>=<值>, adopted=<采用的来源>`
+
+当前版本不实现此框架。当多来源场景出现时，再按需引入。

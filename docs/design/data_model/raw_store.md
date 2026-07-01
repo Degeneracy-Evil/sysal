@@ -62,6 +62,7 @@ struct RawStore
     std::vector<const RawRecord*> get(RawSource source,
                                       std::string_view path_or_command) const;
     bool has(RawSource source) const;
+    bool has_success(RawSource source) const; ///< 检查指定来源是否有成功采集的记录
     std::size_t count(RawSource source) const;
 };
 ```

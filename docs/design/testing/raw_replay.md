@@ -14,7 +14,7 @@ namespace sysal::test
 RawStore load_raw_store(const std::string& path);
 
 // 基于原始数据回放采集，跳过 Reader 阶段（失败时抛 SysalError）
-System collect_from_raw(const RawStore& raw, Collect flags = Collect::full);
+System collect_from_raw(const RawStore& raw, Collect flags = full);
 
 // 将原始数据保存到 JSON 文件（失败时抛 SysalError）
 void save_raw_store(const RawStore& raw, const std::string& path);
@@ -26,14 +26,14 @@ void save_raw_store(const RawStore& raw, const std::string& path);
 
 ```cpp
 // 1. 采集（一次性，在真实硬件上）：
-auto sys = sysal::System::collect(sysal::Collect::full | sysal::Collect::Raw);
+auto sys = sysal::System::collect(sysal::full | sysal::Collect::Raw);
 // 前置条件：sys.raw 必须有值（即请求中包含 Collect::Raw）
 assert(sys.raw.has_value());
 sysal::test::save_raw_store(*sys.raw, "tests/fixtures/gpu_server_8xH20.json");
 
 // 2. 回放（CI / 开发机，无需硬件）：
 auto raw = sysal::test::load_raw_store("tests/fixtures/gpu_server_8xH20.json");
-auto sys = sysal::test::collect_from_raw(raw, sysal::Collect::full);
+auto sys = sysal::test::collect_from_raw(raw, sysal::full);
 
 // 3. 断言：
 assert(sys.info.accelerators.gpus().size() == 8);
@@ -68,15 +68,13 @@ Fixture 文件就是 `save_raw_store` 输出的 JSON，格式为 `RawStore` 的�
 ```txt
 tests/
 ├── fixtures/
-│   ├── cpu_only_192cpu.json
-│   ├── gpu_server_8xH20.json
-│   ├── container_docker.json
-│   └── numa_8node.json
-├── test_replay.cpp               # 当前回放测试入口
+│   └── dev_machine.json
+├── integration/
+│   └── test_replay.cpp               # 当前回放测试入口
 └── examples/sysal_info.cpp       # 全量 API 演示
 ```
 
-v0.0.1 使用单个 `test_replay.cpp` 作为回放测试入口，后续可按子域拆分。
+v0.0.3 使用单个 `test_replay.cpp` 作为回放测试入口，后续可按子域拆分。
 
 ## 错误处理
 
