@@ -20,6 +20,8 @@ local SYSAL_SOURCES = {
 
 target("sysal_static")
     set_kind("static")
+    set_basename("sysal")
+    set_targetdir("$(builddir)/$(plat)/$(arch)/$(mode)/static")
     add_files(SYSAL_SOURCES)
     add_includedirs("src")
 
@@ -56,6 +58,7 @@ target("sysal_static")
 
 target("sysal_shared")
     set_kind("shared")
+    set_basename("sysal")
     add_files(SYSAL_SOURCES)
     add_includedirs("src")
 

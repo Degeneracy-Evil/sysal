@@ -5,13 +5,13 @@
 - **变更类型**: build / tests / chore
 - **涉及文件**: xmake.lua, utils/check.sh, tests/testbench.cpp, docs/devlog.md
 - **变更内容**:
-  1. xmake.lua: 原 `sysal` 目标拆分为 `sysal_static`（static）和 `sysal_shared`（shared），共享同一源文件列表 `SYSAL_SOURCES`
+  1. xmake.lua: 原 `sysal` 目标拆分为 `sysal_static`（static）和 `sysal_shared`（shared），共享同一源文件列表 `SYSAL_SOURCES`；`set_basename("sysal")` 使输出为 `libsysal.a` / `libsysal.so`；静态库通过 `set_targetdir` 放到 `static/` 子目录避免链接器优先选择 `.so`
   2. xmake.lua: 新增 `test_target_shared` 辅助函数，testbench 改用 `test_target_shared` 链接 `sysal_shared`；19 个单元测试仍链接 `sysal_static`
   3. xmake.lua: `on_load`（git hooks）和 `after_build`（compile_commands.json）保留在 `sysal_static` 目标上
   4. utils/check.sh: 测试目标发现 grep 正则从 `test_target\("` 扩展为 `(?:test_target|test_target_shared)\("`，确保 testbench 被发现
   5. tests/testbench.cpp: 从 323 行打印 demo 重写为 856 行完整能力测试，覆盖 17 个 section：全量采集、Platform/CPU/Memory/Accelerators/Network/Storage/PCI/Software/Execution 各域详细输出与查询方法测试、可见性筛选、Raw Store、Warnings/Meta、JSON 序列化往返、部分采集、Refresh、错误处理（空 RawStore 抛 SysalError）
 - **原因**: 作为库需要同时提供静态库和动态库两种构建目标；testbench 需完整测试所有公共 API 能力
-- **验证**: `xmake -r` 构建成功（libsysal_static.a + libsysal_shared.so + 全部测试）；`ldd testbench` 确认链接 libsysal_shared.so；`utils/check.sh` 全部 4 项通过（20 测试）
+- **验证**: `xmake -r` 构建成功（`libsysal.a` 在 `static/` 子目录 + `libsysal.so` 在主目录 + 全部测试）；`ldd test_types` 确认无动态依赖（静态链接）；`ldd testbench` 确认链接 `libsysal.so`；`utils/check.sh` 全部 4 项通过（20 测试）
 
 ### 2026-07-01 F3: 一致性修复（/// @file 头、include 风格、testbench 断言、NDEBUG 防护）
 
