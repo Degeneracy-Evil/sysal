@@ -74,8 +74,11 @@ int main()
         assert(ctx.permission.euid == 0);
         assert(ctx.permission.egid == 0);
         assert(ctx.permission.is_root == true);
-        assert(ctx.permission.capabilities.size() == 1);
-        assert(ctx.permission.capabilities[0] == "000001ff");
+        assert(ctx.permission.capabilities.size() == 8);
+        assert(ctx.permission.capabilities[0] == "CAP_CHOWN");
+        assert(ctx.permission.capabilities[1] == "CAP_DAC_OVERRIDE");
+        assert(ctx.permission.capabilities[2] == "CAP_FOWNER");
+        assert(ctx.permission.capabilities[7] == "CAP_SETPCAP");
 
         // 容器
         assert(ctx.container.has_value());

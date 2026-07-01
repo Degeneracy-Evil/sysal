@@ -6,6 +6,7 @@
 
 #include "parse_utils.hpp"
 
+#include <cstdint>
 #include <string_view>
 
 namespace sysal::detail
@@ -13,6 +14,80 @@ namespace sysal::detail
 
 namespace
 {
+
+/// @brief 将 CapEff 十六进制位掩码解码为能力名称列表
+/// @param hex /proc/self/status 中 CapEff 行的十六进制字符串
+/// @return 能力名称列表（如 "CAP_CHOWN", "CAP_NET_ADMIN"）
+std::vector<std::string> decode_capabilities(std::string_view hex)
+{
+    static constexpr struct
+    {
+        std::uint8_t bit;
+        std::string_view name;
+    } cap_table[] = {
+        {0,  "CAP_CHOWN"             },
+        {1,  "CAP_DAC_OVERRIDE"      },
+        {3,  "CAP_FOWNER"            },
+        {4,  "CAP_FSETID"            },
+        {5,  "CAP_KILL"              },
+        {6,  "CAP_SETGID"            },
+        {7,  "CAP_SETUID"            },
+        {8,  "CAP_SETPCAP"           },
+        {10, "CAP_NET_BIND_SERVICE"  },
+        {11, "CAP_NET_BROADCAST"     },
+        {12, "CAP_NET_ADMIN"         },
+        {13, "CAP_NET_RAW"           },
+        {14, "CAP_IPC_LOCK"          },
+        {15, "CAP_IPC_OWNER"         },
+        {16, "CAP_SYS_MODULE"        },
+        {17, "CAP_SYS_RAWIO"         },
+        {18, "CAP_SYS_CHROOT"        },
+        {19, "CAP_SYS_PTRACE"        },
+        {20, "CAP_SYS_PACCT"         },
+        {21, "CAP_SYS_ADMIN"         },
+        {22, "CAP_SYS_BOOT"          },
+        {23, "CAP_SYS_NICE"          },
+        {24, "CAP_SYS_RESOURCE"      },
+        {25, "CAP_SYS_TIME"          },
+        {26, "CAP_SYS_TTY_CONFIG"    },
+        {27, "CAP_MKNOD"             },
+        {28, "CAP_LEASE"             },
+        {29, "CAP_AUDIT_WRITE"       },
+        {30, "CAP_AUDIT_CONTROL"     },
+        {31, "CAP_SETFCAP"           },
+        {32, "CAP_MAC_OVERRIDE"      },
+        {33, "CAP_MAC_ADMIN"         },
+        {34, "CAP_SYSLOG"            },
+        {35, "CAP_WAKE_ALARM"        },
+        {36, "CAP_BLOCK_SUSPEND"     },
+        {37, "CAP_AUDIT_READ"        },
+        {38, "CAP_PERFMON"           },
+        {39, "CAP_BPF"               },
+        {40, "CAP_CHECKPOINT_RESTORE"},
+    };
+
+    auto trimmed = trim(hex);
+    if(trimmed.empty())
+    {
+        return {};
+    }
+
+    auto val = parse_hex(trimmed);
+    if(!val.has_value())
+    {
+        return {};
+    }
+
+    std::vector<std::string> caps;
+    for(const auto& [bit, name] : cap_table)
+    {
+        if((*val >> bit) & 1ULL)
+        {
+            caps.emplace_back(name);
+        }
+    }
+    return caps;
+}
 
 /// @brief 解析范围格式字符串为整数列表
 /// @param s 范围格式字符串，如 "0-3,5,7-9"
@@ -132,7 +207,7 @@ void parse_proc_self_status(std::string_view payload, ExecutionContext& ctx,
         }
         else if(key == "CapEff")
         {
-            ctx.permission.capabilities.push_back(value);
+            ctx.permission.capabilities = decode_capabilities(value);
         }
         else if(key == "Cpus_allowed_list")
         {
@@ -151,7 +226,14 @@ void parse_proc_self_status(std::string_view payload, ExecutionContext& ctx,
         }
     }
 
-    ctx.permission.is_root = (ctx.permission.euid == 0);
+    if(ctx.permission.euid != 0 || ctx.permission.egid != 0)
+    {
+        ctx.permission.is_root = false;
+    }
+    else if(ctx.permission.euid == 0)
+    {
+        ctx.permission.is_root = true;
+    }
 }
 
 /// @brief 解析 /proc/self/cgroup 内容

@@ -118,12 +118,7 @@ Kernel parse_proc_version(std::string_view payload, std::vector<std::string>& wa
 
         if(ts_pos != std::string_view::npos)
         {
-            auto version_end = ts_pos;
-            if(version_end > 0 && after_hash[version_end - 1] == ' ')
-            {
-                version_end--;
-            }
-            kernel.version = std::string(after_hash.substr(0, version_end));
+            kernel.version = std::string(after_hash);
             kernel.compiled_at = std::string(after_hash.substr(ts_pos));
         }
         else

@@ -21,6 +21,16 @@ StorageKind infer_storage_kind(std::string_view name, const std::string& rotatio
     {
         return StorageKind::Nvme;
     }
+    // 虚拟设备不按 rotational 分类
+    static constexpr std::string_view virtual_prefixes[] = {
+        "loop", "ram", "sr", "dm-", "md", "zram", "fd"};
+    for(auto prefix : virtual_prefixes)
+    {
+        if(name.find(prefix) == 0)
+        {
+            return StorageKind::Other;
+        }
+    }
     if(rotational == "0")
     {
         return StorageKind::Ssd;
@@ -124,10 +134,9 @@ std::optional<Storage> parse_storage(const RawStore& raw, std::vector<std::strin
             }
         }
 
-        // B-2 修正：PCI 地址暂不可用，留空并发出警告
-        // 未来可从 device/symlink 路径解析 PCI 地址
+        // B-2 修正：PCI 地址暂不可用，仅对物理设备发出警告
         auto symlink_it = attrs.find("device");
-        if(symlink_it == attrs.end())
+        if(symlink_it == attrs.end() && dev.kind != StorageKind::Other)
         {
             warnings.push_back("parse_storage: 块设备 " + dev_name +
                                " 无 PCI 地址信息（B-2 待修正）");
