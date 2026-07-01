@@ -1,5 +1,27 @@
 # 开发记录
 
+### 2026-07-01 check.sh 排除 vendored 第三方代码
+
+- **变更类型**: chore
+- **涉及文件**: utils/check.sh
+- **变更内容**: pre-commit hook 模式下，从 STAGED_FILES 和 STAGED_CPP_FILES 中过滤掉 `third_party/` 路径，避免对 vendored nlohmann/json 头文件执行 clang-format/clang-tidy
+- **原因**: vendored 第三方库代码不应被项目 lint 规则检查，否则 clang-tidy 会报大量 warning/error 导致 pre-commit 失败
+- **验证**: `git commit` pre-commit hook 通过
+
+### 2026-07-01 用 nlohmann/json 替换手写 JSON 引擎
+
+- **变更类型**: src / refactor / build / chore
+- **涉及文件**: src/serialization/serialize.cpp, src/serialization/json.hpp（删除）, xmake.lua, third_party/nlohmann/（新增 vendored 头文件）, docs/devlog.md
+- **变更内容**:
+  1. 删除 745 行手写 JSON 引擎 `src/serialization/json.hpp`（JsonObj/JsonArr/JsonVal/JsonParser/escape_string/dump_json 等全部移除）
+  2. 重写 1942 行 `src/serialization/serialize.cpp`（约 1490 行），使用 nlohmann/json 库替代手写引擎。所有模型类型（Platform/Cpu/Memory/Accelerator/Network/Storage/Pci/Software/Execution/SystemInfo/SnapshotMeta/RawStore）的 to_json/from_json 转换函数改为基于 `nlohmann::json` 实现
+  3. 公共 API（`to_json`/`from_json`/`save_raw_store`/`load_raw_store`）签名与行为保持不变；JSON 格式完全兼容（字段名、枚举整数值、StrongId 整数值、NamedString 字符串值、ScalarUnit uint64 值、optional 字段省略规则、版本兼容性检查均不变）
+  4. 错误处理：捕获 `nlohmann::json::exception` 并重新抛出为 `SysalError(DeserializationError, ...)`
+  5. xmake.lua：添加 `add_includedirs("third_party")` 引入 vendored nlohmann/json 头文件（因 GitHub 不可达，无法通过 `add_requires("nlohmann_json")` 从 xrepo 下载，改为 vendor 到 `third_party/nlohmann/`）
+  6. xmake.lua：从 `unit_tests` 列表移除 `test_json` 并删除 `tests/test_json.cpp`（该测试直接测试已删除的手写 JSON 引擎内部 API）
+- **原因**: 用成熟的外部库替代手写 JSON 引擎，减少维护负担，提升健壮性（UTF-8 处理、数字精度、边缘 case 等）
+- **验证**: `xmake -r` build ok；`test_serialization` 14 passed；`test_raw_store_io` all passed；`test_replay` ALL PASSED；`testbench` Round-trip OK
+
 ### 2026-07-01 更新 README.md 和 AGENTS.md
 
 - **变更类型**: docs

@@ -2,9 +2,9 @@
 /// @brief JSON 序列化与反序列化实现
 /// @details 实现 RawStore ↔ JSON 与 System ↔ JSON 的转换，以及基于文件的
 ///          save/load 操作。System 序列化输出顶层对象含 info、meta、warnings、
-///          raw 四个字段。
+///          raw 四个字段。使用 nlohmann/json 库进行 JSON 处理。
 
-#include "serialization/json.hpp"
+#include <nlohmann/json.hpp>
 
 #include "sysal/core/error.hpp"
 #include "sysal/model/raw_store.hpp"
@@ -13,152 +13,1337 @@
 #include "sysal/types/enums.hpp"
 #include "sysal/version.hpp"
 
+#include <chrono>
 #include <cstdint>
 #include <fstream>
 #include <sstream>
 #include <string>
+#include <string_view>
+#include <utility>
+#include <vector>
 
-namespace sysal::test
+namespace sysal
 {
-
 namespace
 {
 
-// ───────────────────────────── RawStore 序列化 ─────────────────────────────
+using json = nlohmann::json;
 
-/// @brief 将 RawRecord 序列化为 JSON 对象文本
-/// @param rec 原始记录
-/// @return JSON 对象字符串
-[[nodiscard]] std::string raw_record_to_json(const RawRecord& rec)
+// ───────────────────────────── 辅助工具 ─────────────────────────────
+
+/// @brief 将时间点转换为 epoch 毫秒
+/// @param tp 系统时钟时间点
+/// @return epoch 毫秒数
+[[nodiscard]] std::int64_t time_point_to_ms(std::chrono::system_clock::time_point tp)
 {
-    detail::JsonObj obj;
-    obj.add("source", std::to_string(static_cast<std::uint64_t>(rec.source)));
-    obj.add("path_or_command", detail::escape_string(rec.path_or_command));
-    obj.add("payload", detail::escape_string(rec.payload));
-    obj.add("status", std::to_string(static_cast<std::uint64_t>(rec.status)));
-    obj.add("collected_at", detail::time_point_to_ms(rec.collected_at));
-    return obj.build(true, 2);
+    return std::chrono::duration_cast<std::chrono::milliseconds>(tp.time_since_epoch()).count();
 }
 
-/// @brief 将 RawStore 序列化为 JSON 文本
-/// @param store 原始证据存储
-/// @return JSON 文本字符串
-[[nodiscard]] std::string raw_store_to_json(const RawStore& store)
+/// @brief 将 epoch 毫秒数转换为系统时钟时间点
+/// @param ms epoch 毫秒数
+/// @return 对应的 time_point
+[[nodiscard]] std::chrono::system_clock::time_point ms_to_time_point(std::int64_t ms)
 {
-    detail::JsonArr arr;
-    for(const auto& rec : store.records)
+    return std::chrono::system_clock::time_point(std::chrono::milliseconds(ms));
+}
+
+/// @brief 从 JSON 数组读取字符串列表
+/// @param arr JSON 数组
+/// @return 字符串向量
+[[nodiscard]] std::vector<std::string> str_array_from_json(const json& arr)
+{
+    std::vector<std::string> result;
+    for(const auto& elem : arr)
     {
-        arr.add(raw_record_to_json(rec));
+        result.push_back(elem.get<std::string>());
     }
-    detail::JsonObj root;
-    root.add("records", arr.build(true, 1));
-    return root.build(true, 0);
+    return result;
 }
 
-/// @brief 从 JsonVal 解析 RawRecord
-/// @param obj JSON 对象值
-/// @return 解析后的 RawRecord
-/// @throws SysalError 字段缺失或类型错误时抛出
-[[nodiscard]] RawRecord raw_record_from_json(const detail::JsonVal& obj)
+// ───────────────────────────── PciAddress ─────────────────────────────
+
+[[nodiscard]] json pci_address_to_json(const PciAddress& addr)
+{
+    return json{
+        {"domain", static_cast<unsigned>(addr.domain)},
+        {"bus", static_cast<unsigned>(addr.bus)},
+        {"device", static_cast<unsigned>(addr.device)},
+        {"function", static_cast<unsigned>(addr.function)},
+    };
+}
+
+[[nodiscard]] PciAddress pci_address_from_json(const json& j)
+{
+    PciAddress addr;
+    addr.domain = static_cast<std::uint16_t>(j.at("domain").get<unsigned>());
+    addr.bus = static_cast<std::uint8_t>(j.at("bus").get<unsigned>());
+    addr.device = static_cast<std::uint8_t>(j.at("device").get<unsigned>());
+    addr.function = static_cast<std::uint8_t>(j.at("function").get<unsigned>());
+    return addr;
+}
+
+// ───────────────────────────── RawRecord / RawStore ─────────────────────────────
+
+[[nodiscard]] json raw_record_to_json(const RawRecord& rec)
+{
+    return json{
+        {"source", static_cast<std::uint64_t>(rec.source)},
+        {"path_or_command", rec.path_or_command},
+        {"payload", rec.payload},
+        {"status", static_cast<std::uint64_t>(rec.status)},
+        {"collected_at", time_point_to_ms(rec.collected_at)},
+    };
+}
+
+[[nodiscard]] RawRecord raw_record_from_json(const json& j)
 {
     RawRecord rec;
-
-    // source
-    const auto* source_val = obj.get("source");
-    if(!source_val)
-    {
-        throw SysalError(ErrorKind::DeserializationError, "missing 'source' field in record");
-    }
-    auto source_int = source_val->as_u64();
-    if(!source_int)
-    {
-        throw SysalError(ErrorKind::DeserializationError, "'source' must be an integer");
-    }
-    rec.source = static_cast<RawSource>(*source_int);
-
-    // path_or_command
-    const auto* path_val = obj.get("path_or_command");
-    if(!path_val)
-    {
-        throw SysalError(ErrorKind::DeserializationError,
-                         "missing 'path_or_command' field in record");
-    }
-    const auto* path_str = path_val->as_str();
-    if(!path_str)
-    {
-        throw SysalError(ErrorKind::DeserializationError, "'path_or_command' must be a string");
-    }
-    rec.path_or_command = *path_str;
-
-    // payload
-    const auto* payload_val = obj.get("payload");
-    if(!payload_val)
-    {
-        throw SysalError(ErrorKind::DeserializationError, "missing 'payload' field in record");
-    }
-    const auto* payload_str = payload_val->as_str();
-    if(!payload_str)
-    {
-        throw SysalError(ErrorKind::DeserializationError, "'payload' must be a string");
-    }
-    rec.payload = *payload_str;
-
-    // status
-    const auto* status_val = obj.get("status");
-    if(!status_val)
-    {
-        throw SysalError(ErrorKind::DeserializationError, "missing 'status' field in record");
-    }
-    auto status_int = status_val->as_u64();
-    if(!status_int)
-    {
-        throw SysalError(ErrorKind::DeserializationError, "'status' must be an integer");
-    }
-    rec.status = static_cast<CollectStatus>(*status_int);
-
-    // collected_at
-    const auto* time_val = obj.get("collected_at");
-    if(!time_val)
-    {
-        throw SysalError(ErrorKind::DeserializationError, "missing 'collected_at' field in record");
-    }
-    auto time_int = time_val->as_i64();
-    if(!time_int)
-    {
-        throw SysalError(ErrorKind::DeserializationError, "'collected_at' must be an integer");
-    }
-    rec.collected_at = detail::ms_to_time_point(*time_int);
-
+    rec.source = static_cast<RawSource>(j.at("source").get<std::uint64_t>());
+    j.at("path_or_command").get_to(rec.path_or_command);
+    j.at("payload").get_to(rec.payload);
+    rec.status = static_cast<CollectStatus>(j.at("status").get<std::uint64_t>());
+    rec.collected_at = ms_to_time_point(j.at("collected_at").get<std::int64_t>());
     return rec;
 }
 
-/// @brief 从 JsonVal 解析 RawStore
-/// @param root JSON 根对象
-/// @return 解析后的 RawStore
-/// @throws SysalError 结构错误时抛出
-[[nodiscard]] RawStore raw_store_from_json(const detail::JsonVal& root)
+[[nodiscard]] json raw_store_to_json(const RawStore& store)
 {
-    const auto* records_val = root.get("records");
-    if(!records_val || records_val->type != detail::JsonVal::Type::Arr)
+    json arr = json::array();
+    for(const auto& rec : store.records)
     {
-        throw SysalError(ErrorKind::DeserializationError,
-                         "missing or invalid 'records' array in RawStore JSON");
+        arr.push_back(raw_record_to_json(rec));
     }
+    return json{{"records", std::move(arr)}};
+}
 
+[[nodiscard]] RawStore raw_store_from_json(const json& root)
+{
     RawStore store;
-    for(const auto& elem : records_val->arr_val)
+    for(const auto& elem : root.at("records"))
     {
-        if(elem.type != detail::JsonVal::Type::Obj)
-        {
-            throw SysalError(ErrorKind::DeserializationError,
-                             "each element in 'records' must be a JSON object");
-        }
         store.records.push_back(raw_record_from_json(elem));
     }
     return store;
 }
 
+// ───────────────────────────── Platform ─────────────────────────────
+
+[[nodiscard]] json host_to_json(const Host& h)
+{
+    return json{
+        {"hostname", h.hostname},   {"machine_id", h.machine_id}, {"product_name", h.product_name},
+        {"vendor", h.vendor.value}, {"serial", h.serial},
+    };
+}
+
+[[nodiscard]] Host host_from_json(const json& j)
+{
+    Host h;
+    j.at("hostname").get_to(h.hostname);
+    j.at("machine_id").get_to(h.machine_id);
+    j.at("product_name").get_to(h.product_name);
+    j.at("vendor").get_to(h.vendor.value);
+    j.at("serial").get_to(h.serial);
+    return h;
+}
+
+[[nodiscard]] json os_to_json(const Os& o)
+{
+    return json{
+        {"name", o.name},
+        {"version", o.version},
+        {"distribution", o.distribution},
+        {"distribution_version", o.distribution_version},
+        {"codename", o.codename},
+    };
+}
+
+[[nodiscard]] Os os_from_json(const json& j)
+{
+    Os o;
+    j.at("name").get_to(o.name);
+    j.at("version").get_to(o.version);
+    j.at("distribution").get_to(o.distribution);
+    j.at("distribution_version").get_to(o.distribution_version);
+    j.at("codename").get_to(o.codename);
+    return o;
+}
+
+[[nodiscard]] json kernel_to_json(const Kernel& k)
+{
+    return json{
+        {"release", k.release},
+        {"version", k.version},
+        {"compiled_at", k.compiled_at},
+        {"architecture", k.architecture},
+    };
+}
+
+[[nodiscard]] Kernel kernel_from_json(const json& j)
+{
+    Kernel k;
+    j.at("release").get_to(k.release);
+    j.at("version").get_to(k.version);
+    j.at("compiled_at").get_to(k.compiled_at);
+    j.at("architecture").get_to(k.architecture);
+    return k;
+}
+
+[[nodiscard]] json arch_to_json(const Architecture& a)
+{
+    return json{
+        {"name", a.name},
+        {"bits", a.bits},
+        {"byte_order", a.byte_order},
+    };
+}
+
+[[nodiscard]] Architecture arch_from_json(const json& j)
+{
+    Architecture a;
+    j.at("name").get_to(a.name);
+    a.bits = j.at("bits").get<std::uint32_t>();
+    j.at("byte_order").get_to(a.byte_order);
+    return a;
+}
+
+[[nodiscard]] json firmware_to_json(const Firmware& f)
+{
+    return json{
+        {"bios_vendor", f.bios_vendor},
+        {"bios_version", f.bios_version},
+        {"bios_date", f.bios_date},
+        {"uefi", f.uefi},
+    };
+}
+
+[[nodiscard]] Firmware firmware_from_json(const json& j)
+{
+    Firmware f;
+    j.at("bios_vendor").get_to(f.bios_vendor);
+    j.at("bios_version").get_to(f.bios_version);
+    j.at("bios_date").get_to(f.bios_date);
+    f.uefi = j.at("uefi").get<bool>();
+    return f;
+}
+
+[[nodiscard]] json virt_to_json(const Virtualization& v)
+{
+    return json{
+        {"kind", static_cast<std::uint32_t>(v.kind)},
+        {"hypervisor", v.hypervisor},
+        {"container", v.container},
+    };
+}
+
+[[nodiscard]] Virtualization virt_from_json(const json& j)
+{
+    Virtualization v;
+    v.kind = static_cast<VirtualizationKind>(j.at("kind").get<std::uint32_t>());
+    j.at("hypervisor").get_to(v.hypervisor);
+    v.container = j.at("container").get<bool>();
+    return v;
+}
+
+[[nodiscard]] json platform_to_json(const Platform& p)
+{
+    json j = {
+        {"host", host_to_json(p.host)},
+        {"os", os_to_json(p.os)},
+        {"kernel", kernel_to_json(p.kernel)},
+        {"architecture", arch_to_json(p.architecture)},
+    };
+    if(p.firmware)
+    {
+        j["firmware"] = firmware_to_json(*p.firmware);
+    }
+    if(p.virtualization)
+    {
+        j["virtualization"] = virt_to_json(*p.virtualization);
+    }
+    return j;
+}
+
+[[nodiscard]] Platform platform_from_json(const json& j)
+{
+    Platform p;
+    p.host = host_from_json(j.at("host"));
+    p.os = os_from_json(j.at("os"));
+    p.kernel = kernel_from_json(j.at("kernel"));
+    p.architecture = arch_from_json(j.at("architecture"));
+    if(j.contains("firmware"))
+    {
+        p.firmware = firmware_from_json(j.at("firmware"));
+    }
+    if(j.contains("virtualization"))
+    {
+        p.virtualization = virt_from_json(j.at("virtualization"));
+    }
+    return p;
+}
+
+// ───────────────────────────── Cpu ─────────────────────────────
+
+[[nodiscard]] json cpu_package_to_json(const CpuPackage& pkg)
+{
+    json j = {
+        {"id", pkg.id.value()},
+        {"vendor", pkg.vendor.value},
+        {"model_name", pkg.model_name.value},
+        {"physical_cores", pkg.physical_cores},
+        {"logical_threads", pkg.logical_threads},
+    };
+    if(pkg.base_frequency)
+    {
+        j["base_frequency"] = pkg.base_frequency->value;
+    }
+    if(pkg.max_frequency)
+    {
+        j["max_frequency"] = pkg.max_frequency->value;
+    }
+    return j;
+}
+
+[[nodiscard]] CpuPackage cpu_package_from_json(const json& j)
+{
+    CpuPackage pkg;
+    pkg.id = CpuPackageId(j.at("id").get<std::uint32_t>());
+    j.at("vendor").get_to(pkg.vendor.value);
+    j.at("model_name").get_to(pkg.model_name.value);
+    pkg.physical_cores = j.at("physical_cores").get<std::uint32_t>();
+    pkg.logical_threads = j.at("logical_threads").get<std::uint32_t>();
+    if(j.contains("base_frequency"))
+    {
+        pkg.base_frequency = Frequency{j.at("base_frequency").get<std::uint64_t>()};
+    }
+    if(j.contains("max_frequency"))
+    {
+        pkg.max_frequency = Frequency{j.at("max_frequency").get<std::uint64_t>()};
+    }
+    return pkg;
+}
+
+[[nodiscard]] json cpu_core_to_json(const CpuCore& c)
+{
+    json j = {
+        {"id", c.id.value()},
+        {"package_id", c.package_id.value()},
+        {"logical_threads", c.logical_threads},
+    };
+    if(c.numa_node)
+    {
+        j["numa_node"] = c.numa_node->value();
+    }
+    return j;
+}
+
+[[nodiscard]] CpuCore cpu_core_from_json(const json& j)
+{
+    CpuCore c;
+    c.id = CpuCoreId(j.at("id").get<std::uint32_t>());
+    c.package_id = CpuPackageId(j.at("package_id").get<std::uint32_t>());
+    c.logical_threads = j.at("logical_threads").get<std::uint32_t>();
+    if(j.contains("numa_node"))
+    {
+        c.numa_node = NumaNodeId(j.at("numa_node").get<std::uint32_t>());
+    }
+    return c;
+}
+
+[[nodiscard]] json logical_cpu_to_json(const LogicalCpu& lc)
+{
+    json j = {
+        {"id", lc.id.value()},
+        {"core_id", lc.core_id.value()},
+        {"package_id", lc.package_id.value()},
+        {"visible_to_current_process", lc.visible_to_current_process},
+    };
+    if(lc.numa_node)
+    {
+        j["numa_node"] = lc.numa_node->value();
+    }
+    return j;
+}
+
+[[nodiscard]] LogicalCpu logical_cpu_from_json(const json& j)
+{
+    LogicalCpu lc;
+    lc.id = LogicalCpuId(j.at("id").get<std::uint32_t>());
+    lc.core_id = CpuCoreId(j.at("core_id").get<std::uint32_t>());
+    lc.package_id = CpuPackageId(j.at("package_id").get<std::uint32_t>());
+    if(j.contains("numa_node"))
+    {
+        lc.numa_node = NumaNodeId(j.at("numa_node").get<std::uint32_t>());
+    }
+    lc.visible_to_current_process = j.at("visible_to_current_process").get<bool>();
+    return lc;
+}
+
+[[nodiscard]] json numa_node_to_json(const NumaNode& n)
+{
+    json cpus = json::array();
+    for(const auto& cpu_id : n.cpus)
+    {
+        cpus.push_back(cpu_id.value());
+    }
+    return json{{"id", n.id.value()}, {"cpus", std::move(cpus)}};
+}
+
+[[nodiscard]] NumaNode numa_node_from_json(const json& j)
+{
+    NumaNode n;
+    n.id = NumaNodeId(j.at("id").get<std::uint32_t>());
+    for(const auto& elem : j.at("cpus"))
+    {
+        n.cpus.push_back(LogicalCpuId(elem.get<std::uint32_t>()));
+    }
+    return n;
+}
+
+[[nodiscard]] json cpu_to_json(const Cpu& c)
+{
+    json packages = json::array();
+    for(const auto& pkg : c.packages)
+    {
+        packages.push_back(cpu_package_to_json(pkg));
+    }
+    json cores = json::array();
+    for(const auto& core : c.cores)
+    {
+        cores.push_back(cpu_core_to_json(core));
+    }
+    json logical_cpus = json::array();
+    for(const auto& lc : c.logical_cpus)
+    {
+        logical_cpus.push_back(logical_cpu_to_json(lc));
+    }
+    json numa_nodes = json::array();
+    for(const auto& n : c.numa_nodes)
+    {
+        numa_nodes.push_back(numa_node_to_json(n));
+    }
+    json isa = json::array();
+    for(const auto& ext : c.isa_extensions)
+    {
+        isa.push_back(static_cast<std::uint32_t>(ext));
+    }
+    return json{
+        {"arch", static_cast<std::uint32_t>(c.arch)},
+        {"packages", std::move(packages)},
+        {"cores", std::move(cores)},
+        {"logical_cpus", std::move(logical_cpus)},
+        {"numa_nodes", std::move(numa_nodes)},
+        {"isa_extensions", std::move(isa)},
+    };
+}
+
+[[nodiscard]] Cpu cpu_from_json(const json& j)
+{
+    Cpu c;
+    c.arch = static_cast<Arch>(j.at("arch").get<std::uint32_t>());
+    for(const auto& elem : j.at("packages"))
+    {
+        c.packages.push_back(cpu_package_from_json(elem));
+    }
+    for(const auto& elem : j.at("cores"))
+    {
+        c.cores.push_back(cpu_core_from_json(elem));
+    }
+    for(const auto& elem : j.at("logical_cpus"))
+    {
+        c.logical_cpus.push_back(logical_cpu_from_json(elem));
+    }
+    for(const auto& elem : j.at("numa_nodes"))
+    {
+        c.numa_nodes.push_back(numa_node_from_json(elem));
+    }
+    for(const auto& elem : j.at("isa_extensions"))
+    {
+        c.isa_extensions.push_back(static_cast<IsaExtension>(elem.get<std::uint32_t>()));
+    }
+    return c;
+}
+
+// ───────────────────────────── Memory ─────────────────────────────
+
+[[nodiscard]] json numa_memory_to_json(const NumaMemory& nm)
+{
+    json j = {
+        {"node", nm.node.value()},
+        {"total", nm.total.value},
+    };
+    if(nm.available)
+    {
+        j["available"] = nm.available->value;
+    }
+    return j;
+}
+
+[[nodiscard]] NumaMemory numa_memory_from_json(const json& j)
+{
+    NumaMemory nm;
+    nm.node = NumaNodeId(j.at("node").get<std::uint32_t>());
+    nm.total = MemorySize{j.at("total").get<std::uint64_t>()};
+    if(j.contains("available"))
+    {
+        nm.available = MemorySize{j.at("available").get<std::uint64_t>()};
+    }
+    return nm;
+}
+
+[[nodiscard]] json memory_to_json(const Memory& m)
+{
+    json j = {{"total_memory", m.total_memory.value}};
+    if(m.available_memory)
+    {
+        j["available_memory"] = m.available_memory->value;
+    }
+    json arr = json::array();
+    for(const auto& nm : m.numa_memory)
+    {
+        arr.push_back(numa_memory_to_json(nm));
+    }
+    j["numa_memory"] = std::move(arr);
+    return j;
+}
+
+[[nodiscard]] Memory memory_from_json(const json& j)
+{
+    Memory m;
+    m.total_memory = MemorySize{j.at("total_memory").get<std::uint64_t>()};
+    if(j.contains("available_memory"))
+    {
+        m.available_memory = MemorySize{j.at("available_memory").get<std::uint64_t>()};
+    }
+    if(j.contains("numa_memory"))
+    {
+        for(const auto& elem : j.at("numa_memory"))
+        {
+            m.numa_memory.push_back(numa_memory_from_json(elem));
+        }
+    }
+    return m;
+}
+
+// ───────────────────────────── Accelerator ─────────────────────────────
+
+[[nodiscard]] json accel_device_to_json(const AcceleratorDevice& d)
+{
+    json j = {
+        {"id", d.id.value()},
+        {"kind", static_cast<std::uint32_t>(d.kind)},
+        {"vendor", d.vendor.value},
+        {"name", d.name.value},
+        {"visible_to_current_process", d.visible_to_current_process},
+    };
+    if(d.pci_address)
+    {
+        j["pci_address"] = pci_address_to_json(*d.pci_address);
+    }
+    if(d.nearest_numa_node)
+    {
+        j["nearest_numa_node"] = d.nearest_numa_node->value();
+    }
+    if(d.memory_size)
+    {
+        j["memory_size"] = d.memory_size->value;
+    }
+    if(d.driver)
+    {
+        j["driver"] = d.driver->value();
+    }
+    return j;
+}
+
+[[nodiscard]] AcceleratorDevice accel_device_from_json(const json& j)
+{
+    AcceleratorDevice d;
+    d.id = AcceleratorId(j.at("id").get<std::uint32_t>());
+    d.kind = static_cast<AcceleratorKind>(j.at("kind").get<std::uint32_t>());
+    j.at("vendor").get_to(d.vendor.value);
+    j.at("name").get_to(d.name.value);
+    if(j.contains("pci_address"))
+    {
+        d.pci_address = pci_address_from_json(j.at("pci_address"));
+    }
+    if(j.contains("nearest_numa_node"))
+    {
+        d.nearest_numa_node = NumaNodeId(j.at("nearest_numa_node").get<std::uint32_t>());
+    }
+    if(j.contains("memory_size"))
+    {
+        d.memory_size = MemorySize{j.at("memory_size").get<std::uint64_t>()};
+    }
+    if(j.contains("driver"))
+    {
+        d.driver = DriverId(j.at("driver").get<std::uint32_t>());
+    }
+    d.visible_to_current_process = j.at("visible_to_current_process").get<bool>();
+    return d;
+}
+
+[[nodiscard]] json accelerators_to_json(const Accelerators& a)
+{
+    json arr = json::array();
+    for(const auto& dev : a.devices)
+    {
+        arr.push_back(accel_device_to_json(dev));
+    }
+    return json{{"devices", std::move(arr)}};
+}
+
+[[nodiscard]] Accelerators accelerators_from_json(const json& j)
+{
+    Accelerators a;
+    for(const auto& elem : j.at("devices"))
+    {
+        a.devices.push_back(accel_device_from_json(elem));
+    }
+    return a;
+}
+
+// ───────────────────────────── Network ─────────────────────────────
+
+[[nodiscard]] json net_iface_to_json(const NetworkInterface& ni)
+{
+    json j = {
+        {"name", ni.name.value},
+        {"mac", ni.mac.value},
+        {"state", static_cast<std::uint32_t>(ni.state)},
+        {"visible_to_current_process", ni.visible_to_current_process},
+    };
+    if(ni.speed)
+    {
+        j["speed"] = ni.speed->value;
+    }
+    json addrs = json::array();
+    for(const auto& addr : ni.addresses)
+    {
+        addrs.push_back(addr.value);
+    }
+    j["addresses"] = std::move(addrs);
+    if(ni.pci_address)
+    {
+        j["pci_address"] = pci_address_to_json(*ni.pci_address);
+    }
+    return j;
+}
+
+[[nodiscard]] NetworkInterface net_iface_from_json(const json& j)
+{
+    NetworkInterface ni;
+    j.at("name").get_to(ni.name.value);
+    j.at("mac").get_to(ni.mac.value);
+    ni.state = static_cast<InterfaceState>(j.at("state").get<std::uint32_t>());
+    if(j.contains("speed"))
+    {
+        ni.speed = Bandwidth{j.at("speed").get<std::uint64_t>()};
+    }
+    if(j.contains("addresses"))
+    {
+        for(const auto& elem : j.at("addresses"))
+        {
+            IpAddress ip;
+            ip.value = elem.get<std::string>();
+            ni.addresses.push_back(std::move(ip));
+        }
+    }
+    if(j.contains("pci_address"))
+    {
+        ni.pci_address = pci_address_from_json(j.at("pci_address"));
+    }
+    ni.visible_to_current_process = j.at("visible_to_current_process").get<bool>();
+    return ni;
+}
+
+[[nodiscard]] json network_to_json(const Network& n)
+{
+    json arr = json::array();
+    for(const auto& iface : n.interfaces)
+    {
+        arr.push_back(net_iface_to_json(iface));
+    }
+    return json{{"interfaces", std::move(arr)}};
+}
+
+[[nodiscard]] Network network_from_json(const json& j)
+{
+    Network n;
+    for(const auto& elem : j.at("interfaces"))
+    {
+        n.interfaces.push_back(net_iface_from_json(elem));
+    }
+    return n;
+}
+
+// ───────────────────────────── Storage ─────────────────────────────
+
+[[nodiscard]] json storage_dev_to_json(const StorageDevice& sd)
+{
+    json j = {
+        {"id", sd.id.value()},
+        {"name", sd.name.value},
+        {"kind", static_cast<std::uint32_t>(sd.kind)},
+    };
+    if(sd.capacity)
+    {
+        j["capacity"] = sd.capacity->value;
+    }
+    if(sd.pci_address)
+    {
+        j["pci_address"] = pci_address_to_json(*sd.pci_address);
+    }
+    return j;
+}
+
+[[nodiscard]] StorageDevice storage_dev_from_json(const json& j)
+{
+    StorageDevice sd;
+    sd.id = StorageId(j.at("id").get<std::uint32_t>());
+    j.at("name").get_to(sd.name.value);
+    if(j.contains("capacity"))
+    {
+        sd.capacity = MemorySize{j.at("capacity").get<std::uint64_t>()};
+    }
+    if(j.contains("pci_address"))
+    {
+        sd.pci_address = pci_address_from_json(j.at("pci_address"));
+    }
+    sd.kind = static_cast<StorageKind>(j.at("kind").get<std::uint32_t>());
+    return sd;
+}
+
+[[nodiscard]] json storage_to_json(const Storage& s)
+{
+    json arr = json::array();
+    for(const auto& dev : s.devices)
+    {
+        arr.push_back(storage_dev_to_json(dev));
+    }
+    return json{{"devices", std::move(arr)}};
+}
+
+[[nodiscard]] Storage storage_from_json(const json& j)
+{
+    Storage s;
+    for(const auto& elem : j.at("devices"))
+    {
+        s.devices.push_back(storage_dev_from_json(elem));
+    }
+    return s;
+}
+
+// ───────────────────────────── Pci ─────────────────────────────
+
+[[nodiscard]] json pci_device_to_json(const PciDevice& pd)
+{
+    json j = {
+        {"address", pci_address_to_json(pd.address)},
+        {"vendor", pd.vendor.value},
+        {"device_name", pd.device_name.value},
+        {"device_class", pd.device_class.value},
+    };
+    if(pd.numa_node)
+    {
+        j["numa_node"] = pd.numa_node->value();
+    }
+    return j;
+}
+
+[[nodiscard]] PciDevice pci_device_from_json(const json& j)
+{
+    PciDevice pd;
+    pd.address = pci_address_from_json(j.at("address"));
+    j.at("vendor").get_to(pd.vendor.value);
+    j.at("device_name").get_to(pd.device_name.value);
+    j.at("device_class").get_to(pd.device_class.value);
+    if(j.contains("numa_node"))
+    {
+        pd.numa_node = NumaNodeId(j.at("numa_node").get<std::uint32_t>());
+    }
+    return pd;
+}
+
+[[nodiscard]] json pci_to_json(const Pci& p)
+{
+    json arr = json::array();
+    for(const auto& dev : p.devices)
+    {
+        arr.push_back(pci_device_to_json(dev));
+    }
+    return json{{"devices", std::move(arr)}};
+}
+
+[[nodiscard]] Pci pci_from_json(const json& j)
+{
+    Pci p;
+    for(const auto& elem : j.at("devices"))
+    {
+        p.devices.push_back(pci_device_from_json(elem));
+    }
+    return p;
+}
+
+// ───────────────────────────── Software ─────────────────────────────
+
+[[nodiscard]] json driver_to_json(const Driver& d)
+{
+    return json{
+        {"id", d.id.value()}, {"name", d.name}, {"version", d.version},
+        {"loaded", d.loaded}, {"path", d.path},
+    };
+}
+
+[[nodiscard]] Driver driver_from_json(const json& j)
+{
+    Driver d;
+    d.id = DriverId(j.at("id").get<std::uint32_t>());
+    j.at("name").get_to(d.name);
+    j.at("version").get_to(d.version);
+    d.loaded = j.at("loaded").get<bool>();
+    j.at("path").get_to(d.path);
+    return d;
+}
+
+[[nodiscard]] json runtime_to_json(const Runtime& r)
+{
+    return json{
+        {"name", r.name},
+        {"version", r.version},
+        {"path", r.path},
+        {"env_var", r.env_var},
+    };
+}
+
+[[nodiscard]] Runtime runtime_from_json(const json& j)
+{
+    Runtime r;
+    j.at("name").get_to(r.name);
+    j.at("version").get_to(r.version);
+    j.at("path").get_to(r.path);
+    j.at("env_var").get_to(r.env_var);
+    return r;
+}
+
+[[nodiscard]] json compiler_to_json(const Compiler& c)
+{
+    return json{
+        {"name", c.name},
+        {"version", c.version},
+        {"path", c.path},
+        {"target", c.target},
+    };
+}
+
+[[nodiscard]] Compiler compiler_from_json(const json& j)
+{
+    Compiler c;
+    j.at("name").get_to(c.name);
+    j.at("version").get_to(c.version);
+    j.at("path").get_to(c.path);
+    j.at("target").get_to(c.target);
+    return c;
+}
+
+[[nodiscard]] json library_to_json(const Library& l)
+{
+    return json{
+        {"name", l.name},
+        {"version", l.version},
+        {"path", l.path},
+        {"kind", l.kind},
+    };
+}
+
+[[nodiscard]] Library library_from_json(const json& j)
+{
+    Library l;
+    j.at("name").get_to(l.name);
+    j.at("version").get_to(l.version);
+    j.at("path").get_to(l.path);
+    j.at("kind").get_to(l.kind);
+    return l;
+}
+
+[[nodiscard]] json cuda_to_json(const Cuda& c)
+{
+    return json{
+        {"version", c.version},
+        {"driver_version", c.driver_version},
+        {"nvcc_path", c.nvcc_path},
+        {"home", c.home},
+    };
+}
+
+[[nodiscard]] Cuda cuda_from_json(const json& j)
+{
+    Cuda c;
+    j.at("version").get_to(c.version);
+    j.at("driver_version").get_to(c.driver_version);
+    j.at("nvcc_path").get_to(c.nvcc_path);
+    j.at("home").get_to(c.home);
+    return c;
+}
+
+[[nodiscard]] json rocm_to_json(const Rocm& r)
+{
+    return json{
+        {"version", r.version},
+        {"hip_path", r.hip_path},
+        {"rocm_path", r.rocm_path},
+    };
+}
+
+[[nodiscard]] Rocm rocm_from_json(const json& j)
+{
+    Rocm r;
+    j.at("version").get_to(r.version);
+    j.at("hip_path").get_to(r.hip_path);
+    j.at("rocm_path").get_to(r.rocm_path);
+    return r;
+}
+
+[[nodiscard]] json level_zero_to_json(const LevelZero& lz)
+{
+    return json{
+        {"version", lz.version},
+        {"loader_path", lz.loader_path},
+    };
+}
+
+[[nodiscard]] LevelZero level_zero_from_json(const json& j)
+{
+    LevelZero lz;
+    j.at("version").get_to(lz.version);
+    j.at("loader_path").get_to(lz.loader_path);
+    return lz;
+}
+
+[[nodiscard]] json mpi_to_json(const Mpi& m)
+{
+    return json{
+        {"implementation", m.implementation},
+        {"version", m.version},
+        {"path", m.path},
+    };
+}
+
+[[nodiscard]] Mpi mpi_from_json(const json& j)
+{
+    Mpi m;
+    j.at("implementation").get_to(m.implementation);
+    j.at("version").get_to(m.version);
+    j.at("path").get_to(m.path);
+    return m;
+}
+
+[[nodiscard]] json rdma_to_json(const RdmaStack& r)
+{
+    return json{
+        {"rdma_core_version", r.rdma_core_version},
+        {"ibverbs_path", r.ibverbs_path},
+        {"ucx_version", r.ucx_version},
+    };
+}
+
+[[nodiscard]] RdmaStack rdma_from_json(const json& j)
+{
+    RdmaStack r;
+    j.at("rdma_core_version").get_to(r.rdma_core_version);
+    j.at("ibverbs_path").get_to(r.ibverbs_path);
+    j.at("ucx_version").get_to(r.ucx_version);
+    return r;
+}
+
+[[nodiscard]] json software_to_json(const SoftwareStack& sw)
+{
+    json j;
+
+    json drivers = json::array();
+    for(const auto& d : sw.drivers)
+    {
+        drivers.push_back(driver_to_json(d));
+    }
+    j["drivers"] = std::move(drivers);
+
+    json runtimes = json::array();
+    for(const auto& r : sw.runtimes)
+    {
+        runtimes.push_back(runtime_to_json(r));
+    }
+    j["runtimes"] = std::move(runtimes);
+
+    json compilers = json::array();
+    for(const auto& c : sw.compilers)
+    {
+        compilers.push_back(compiler_to_json(c));
+    }
+    j["compilers"] = std::move(compilers);
+
+    json libraries = json::array();
+    for(const auto& l : sw.libraries)
+    {
+        libraries.push_back(library_to_json(l));
+    }
+    j["libraries"] = std::move(libraries);
+
+    if(sw.cuda)
+    {
+        j["cuda"] = cuda_to_json(*sw.cuda);
+    }
+    if(sw.rocm)
+    {
+        j["rocm"] = rocm_to_json(*sw.rocm);
+    }
+    if(sw.level_zero)
+    {
+        j["level_zero"] = level_zero_to_json(*sw.level_zero);
+    }
+    if(sw.mpi)
+    {
+        j["mpi"] = mpi_to_json(*sw.mpi);
+    }
+    if(sw.rdma)
+    {
+        j["rdma"] = rdma_to_json(*sw.rdma);
+    }
+
+    return j;
+}
+
+[[nodiscard]] SoftwareStack software_from_json(const json& j)
+{
+    SoftwareStack sw;
+
+    for(const auto& elem : j.at("drivers"))
+    {
+        sw.drivers.push_back(driver_from_json(elem));
+    }
+    for(const auto& elem : j.at("runtimes"))
+    {
+        sw.runtimes.push_back(runtime_from_json(elem));
+    }
+    for(const auto& elem : j.at("compilers"))
+    {
+        sw.compilers.push_back(compiler_from_json(elem));
+    }
+    for(const auto& elem : j.at("libraries"))
+    {
+        sw.libraries.push_back(library_from_json(elem));
+    }
+
+    if(j.contains("cuda"))
+    {
+        sw.cuda = cuda_from_json(j.at("cuda"));
+    }
+    if(j.contains("rocm"))
+    {
+        sw.rocm = rocm_from_json(j.at("rocm"));
+    }
+    if(j.contains("level_zero"))
+    {
+        sw.level_zero = level_zero_from_json(j.at("level_zero"));
+    }
+    if(j.contains("mpi"))
+    {
+        sw.mpi = mpi_from_json(j.at("mpi"));
+    }
+    if(j.contains("rdma"))
+    {
+        sw.rdma = rdma_from_json(j.at("rdma"));
+    }
+
+    return sw;
+}
+
+// ───────────────────────────── Execution ─────────────────────────────
+
+[[nodiscard]] json process_to_json(const Process& p)
+{
+    return json{
+        {"pid", p.pid},   {"ppid", p.ppid}, {"uid", p.uid}, {"gid", p.gid},
+        {"comm", p.comm}, {"exe", p.exe},   {"cwd", p.cwd},
+    };
+}
+
+[[nodiscard]] Process process_from_json(const json& j)
+{
+    Process p;
+    p.pid = j.at("pid").get<std::int32_t>();
+    p.ppid = j.at("ppid").get<std::int32_t>();
+    p.uid = j.at("uid").get<std::uint32_t>();
+    p.gid = j.at("gid").get<std::uint32_t>();
+    j.at("comm").get_to(p.comm);
+    j.at("exe").get_to(p.exe);
+    j.at("cwd").get_to(p.cwd);
+    return p;
+}
+
+[[nodiscard]] json environment_to_json(const Environment& e)
+{
+    json arr = json::array();
+    for(const auto& [k, v] : e.entries)
+    {
+        arr.push_back(json{{"key", k}, {"value", v}});
+    }
+    return json{{"entries", std::move(arr)}};
+}
+
+[[nodiscard]] Environment environment_from_json(const json& j)
+{
+    Environment e;
+    for(const auto& elem : j.at("entries"))
+    {
+        e.entries.emplace_back(elem.at("key").get<std::string>(),
+                               elem.at("value").get<std::string>());
+    }
+    return e;
+}
+
+[[nodiscard]] json cgroup_to_json(const Cgroup& c)
+{
+    json j = {
+        {"version", static_cast<std::uint32_t>(c.version)},
+        {"path", c.path},
+    };
+    json arr = json::array();
+    for(const auto& ctrl : c.controllers)
+    {
+        arr.push_back(ctrl);
+    }
+    j["controllers"] = std::move(arr);
+    return j;
+}
+
+[[nodiscard]] Cgroup cgroup_from_json(const json& j)
+{
+    Cgroup c;
+    c.version = static_cast<CgroupVersion>(j.at("version").get<std::uint32_t>());
+    j.at("path").get_to(c.path);
+    if(j.contains("controllers"))
+    {
+        c.controllers = str_array_from_json(j.at("controllers"));
+    }
+    return c;
+}
+
+[[nodiscard]] json cpuset_to_json(const Cpuset& cs)
+{
+    return json{
+        {"cpus", cs.cpus},
+        {"mems", cs.mems},
+        {"cpus_effective", cs.cpus_effective},
+        {"mems_effective", cs.mems_effective},
+    };
+}
+
+[[nodiscard]] Cpuset cpuset_from_json(const json& j)
+{
+    Cpuset cs;
+    j.at("cpus").get_to(cs.cpus);
+    j.at("mems").get_to(cs.mems);
+    j.at("cpus_effective").get_to(cs.cpus_effective);
+    j.at("mems_effective").get_to(cs.mems_effective);
+    return cs;
+}
+
+[[nodiscard]] json permission_to_json(const Permission& p)
+{
+    json j = {
+        {"euid", p.euid},
+        {"egid", p.egid},
+        {"is_root", p.is_root},
+    };
+    json arr = json::array();
+    for(const auto& cap : p.capabilities)
+    {
+        arr.push_back(cap);
+    }
+    j["capabilities"] = std::move(arr);
+    return j;
+}
+
+[[nodiscard]] Permission permission_from_json(const json& j)
+{
+    Permission p;
+    p.euid = j.at("euid").get<std::uint32_t>();
+    p.egid = j.at("egid").get<std::uint32_t>();
+    if(j.contains("capabilities"))
+    {
+        p.capabilities = str_array_from_json(j.at("capabilities"));
+    }
+    p.is_root = j.at("is_root").get<bool>();
+    return p;
+}
+
+[[nodiscard]] json container_to_json(const Container& c)
+{
+    return json{
+        {"kind", static_cast<std::uint32_t>(c.kind)},
+        {"id", c.id},
+        {"runtime", c.runtime},
+    };
+}
+
+[[nodiscard]] Container container_from_json(const json& j)
+{
+    Container c;
+    c.kind = static_cast<ContainerKind>(j.at("kind").get<std::uint32_t>());
+    j.at("id").get_to(c.id);
+    j.at("runtime").get_to(c.runtime);
+    return c;
+}
+
+[[nodiscard]] json execution_to_json(const ExecutionContext& e)
+{
+    json j = {
+        {"process", process_to_json(e.process)},
+        {"environment", environment_to_json(e.environment)},
+        {"cgroup", cgroup_to_json(e.cgroup)},
+        {"cpuset", cpuset_to_json(e.cpuset)},
+        {"permission", permission_to_json(e.permission)},
+    };
+    if(e.container)
+    {
+        j["container"] = container_to_json(*e.container);
+    }
+
+    json vcpu = json::array();
+    for(const auto& id : e.visible_logical_cpu_ids)
+    {
+        vcpu.push_back(id.value());
+    }
+    j["visible_logical_cpu_ids"] = std::move(vcpu);
+
+    json vacc = json::array();
+    for(const auto& id : e.visible_accelerator_ids)
+    {
+        vacc.push_back(id.value());
+    }
+    j["visible_accelerator_ids"] = std::move(vacc);
+
+    json vnet = json::array();
+    for(const auto& name : e.visible_network_interface_names)
+    {
+        vnet.push_back(name.value);
+    }
+    j["visible_network_interface_names"] = std::move(vnet);
+
+    return j;
+}
+
+[[nodiscard]] ExecutionContext execution_from_json(const json& j)
+{
+    ExecutionContext e;
+    e.process = process_from_json(j.at("process"));
+    e.environment = environment_from_json(j.at("environment"));
+    e.cgroup = cgroup_from_json(j.at("cgroup"));
+    e.cpuset = cpuset_from_json(j.at("cpuset"));
+    e.permission = permission_from_json(j.at("permission"));
+
+    if(j.contains("container"))
+    {
+        e.container = container_from_json(j.at("container"));
+    }
+
+    for(const auto& elem : j.at("visible_logical_cpu_ids"))
+    {
+        e.visible_logical_cpu_ids.push_back(LogicalCpuId(elem.get<std::uint32_t>()));
+    }
+    for(const auto& elem : j.at("visible_accelerator_ids"))
+    {
+        e.visible_accelerator_ids.push_back(AcceleratorId(elem.get<std::uint32_t>()));
+    }
+    for(const auto& elem : j.at("visible_network_interface_names"))
+    {
+        InterfaceName in;
+        in.value = elem.get<std::string>();
+        e.visible_network_interface_names.push_back(std::move(in));
+    }
+
+    return e;
+}
+
+// ───────────────────────────── SystemInfo ─────────────────────────────
+
+[[nodiscard]] json system_info_to_json(const SystemInfo& info)
+{
+    return json{
+        {"platform", platform_to_json(info.platform)},
+        {"cpu", cpu_to_json(info.cpu)},
+        {"memory", memory_to_json(info.memory)},
+        {"accelerators", accelerators_to_json(info.accelerators)},
+        {"network", network_to_json(info.network)},
+        {"storage", storage_to_json(info.storage)},
+        {"pci", pci_to_json(info.pci)},
+        {"software", software_to_json(info.software)},
+        {"execution", execution_to_json(info.execution)},
+    };
+}
+
+[[nodiscard]] SystemInfo system_info_from_json(const json& j)
+{
+    SystemInfo info;
+    info.platform = platform_from_json(j.at("platform"));
+    info.cpu = cpu_from_json(j.at("cpu"));
+    info.memory = memory_from_json(j.at("memory"));
+    info.accelerators = accelerators_from_json(j.at("accelerators"));
+    info.network = network_from_json(j.at("network"));
+    info.storage = storage_from_json(j.at("storage"));
+    info.pci = pci_from_json(j.at("pci"));
+    info.software = software_from_json(j.at("software"));
+    info.execution = execution_from_json(j.at("execution"));
+    return info;
+}
+
+// ───────────────────────────── SnapshotMeta ─────────────────────────────
+
+[[nodiscard]] json meta_to_json(const SnapshotMeta& m)
+{
+    json j = {
+        {"collect_time", time_point_to_ms(m.collect_time)},
+        {"sysal_version", m.sysal_version},
+        {"collect_duration", m.collect_duration.count()},
+        {"requested_flags", static_cast<std::uint32_t>(m.requested_flags)},
+    };
+
+    json succ = json::array();
+    for(const auto& s : m.succeeded_collectors)
+    {
+        succ.push_back(s);
+    }
+    j["succeeded_collectors"] = std::move(succ);
+
+    json fail = json::array();
+    for(const auto& f : m.failed_collectors)
+    {
+        fail.push_back(f);
+    }
+    j["failed_collectors"] = std::move(fail);
+
+    return j;
+}
+
+[[nodiscard]] SnapshotMeta meta_from_json(const json& j)
+{
+    SnapshotMeta m;
+    m.collect_time = ms_to_time_point(j.at("collect_time").get<std::int64_t>());
+    j.at("sysal_version").get_to(m.sysal_version);
+    m.collect_duration = std::chrono::duration<double>(j.at("collect_duration").get<double>());
+    m.requested_flags = static_cast<Collect>(j.at("requested_flags").get<std::uint32_t>());
+    m.succeeded_collectors = str_array_from_json(j.at("succeeded_collectors"));
+    m.failed_collectors = str_array_from_json(j.at("failed_collectors"));
+    return m;
+}
+
 } // namespace
+
+// ══════════════════════════════════════════════════════════════════════════
+// 公共接口：sysal::test
+// ══════════════════════════════════════════════════════════════════════════
+
+namespace test
+{
 
 void save_raw_store(const RawStore& raw, const std::string& path)
 {
@@ -167,7 +1352,7 @@ void save_raw_store(const RawStore& raw, const std::string& path)
     {
         throw SysalError(ErrorKind::IoError, "cannot open file for writing: " + path);
     }
-    ofs << raw_store_to_json(raw);
+    ofs << raw_store_to_json(raw).dump(4);
     if(!ofs)
     {
         throw SysalError(ErrorKind::IoError, "write failed: " + path);
@@ -190,1753 +1375,102 @@ RawStore load_raw_store(const std::string& path)
 
     try
     {
-        auto root = detail::parse_json(oss.str());
-        if(root.type != detail::JsonVal::Type::Obj)
+        auto root = json::parse(oss.str());
+        if(!root.is_object())
         {
             throw SysalError(ErrorKind::DeserializationError,
                              "RawStore JSON root must be an object");
         }
         return raw_store_from_json(root);
     }
-    catch(const detail::JsonError& e)
+    catch(const json::exception& e)
     {
         throw SysalError(ErrorKind::DeserializationError, e.what());
     }
 }
 
-} // namespace sysal::test
+} // namespace test
 
 // ══════════════════════════════════════════════════════════════════════════
-// System ↔ JSON 序列化（namespace sysal）
-// ══════════════════════════════════════════════════════════════════════════
-
-namespace sysal
-{
-
-namespace
-{
-
-// ──────────────────────────── 辅助：JSON 值构建 ────────────────────────────
-
-[[nodiscard]] std::string json_str(std::string_view s) { return detail::escape_string(s); }
-
-[[nodiscard]] std::string json_u64(std::uint64_t v) { return std::to_string(v); }
-
-[[nodiscard]] std::string json_u32(std::uint32_t v) { return std::to_string(v); }
-
-[[nodiscard]] std::string json_i32(std::int32_t v) { return std::to_string(v); }
-
-[[nodiscard]] std::string json_bool(bool v) { return v ? "true" : "false"; }
-
-[[nodiscard]] std::string json_double(double v)
-{
-    // 使用 snprintf 保证精度
-    char buf[64];
-    std::snprintf(buf, sizeof(buf), "%.6f", v);
-    return buf;
-}
-
-// ──────────────────────── 辅助：JSON 值读取 ────────────────────────────────
-
-/// @brief 从 JsonVal 读取字符串字段，缺失时抛出
-[[nodiscard]] std::string req_str(const detail::JsonVal& obj, std::string_view key)
-{
-    const auto* v = obj.get(key);
-    if(!v)
-    {
-        throw SysalError(ErrorKind::DeserializationError, "missing field: " + std::string(key));
-    }
-    const auto* s = v->as_str();
-    if(!s)
-    {
-        throw SysalError(ErrorKind::DeserializationError,
-                         "field '" + std::string(key) + "' must be a string");
-    }
-    return *s;
-}
-
-/// @brief 从 JsonVal 读取 uint64 字段，缺失时抛出
-[[nodiscard]] std::uint64_t req_u64(const detail::JsonVal& obj, std::string_view key)
-{
-    const auto* v = obj.get(key);
-    if(!v)
-    {
-        throw SysalError(ErrorKind::DeserializationError, "missing field: " + std::string(key));
-    }
-    auto n = v->as_u64();
-    if(!n)
-    {
-        throw SysalError(ErrorKind::DeserializationError,
-                         "field '" + std::string(key) + "' must be an integer");
-    }
-    return *n;
-}
-
-/// @brief 从 JsonVal 读取 int64 字段，缺失时抛出
-[[nodiscard]] std::int64_t req_i64(const detail::JsonVal& obj, std::string_view key)
-{
-    const auto* v = obj.get(key);
-    if(!v)
-    {
-        throw SysalError(ErrorKind::DeserializationError, "missing field: " + std::string(key));
-    }
-    auto n = v->as_i64();
-    if(!n)
-    {
-        throw SysalError(ErrorKind::DeserializationError,
-                         "field '" + std::string(key) + "' must be an integer");
-    }
-    return *n;
-}
-
-/// @brief 从 JsonVal 读取 bool 字段，缺失时抛出
-[[nodiscard]] bool req_bool(const detail::JsonVal& obj, std::string_view key)
-{
-    const auto* v = obj.get(key);
-    if(!v)
-    {
-        throw SysalError(ErrorKind::DeserializationError, "missing field: " + std::string(key));
-    }
-    auto b = v->as_bool();
-    if(!b)
-    {
-        throw SysalError(ErrorKind::DeserializationError,
-                         "field '" + std::string(key) + "' must be a boolean");
-    }
-    return *b;
-}
-
-/// @brief 从 JsonVal 读取 double 字段（从 Num str_val 解析），缺失时抛出
-[[nodiscard]] double req_double(const detail::JsonVal& obj, std::string_view key)
-{
-    const auto* v = obj.get(key);
-    if(!v)
-    {
-        throw SysalError(ErrorKind::DeserializationError, "missing field: " + std::string(key));
-    }
-    if(v->type != detail::JsonVal::Type::Num)
-    {
-        throw SysalError(ErrorKind::DeserializationError,
-                         "field '" + std::string(key) + "' must be a number");
-    }
-    // 用 strtod 解析（from_chars 不支持 double 在部分实现中）
-    char* end = nullptr;
-    double result = std::strtod(v->str_val.c_str(), &end);
-    if(end == v->str_val.c_str())
-    {
-        throw SysalError(ErrorKind::DeserializationError,
-                         "field '" + std::string(key) + "' is not a valid number");
-    }
-    return result;
-}
-
-/// @brief 从 JsonVal 读取可选 uint64 字段
-[[nodiscard]] std::optional<std::uint64_t> opt_u64(const detail::JsonVal& obj, std::string_view key)
-{
-    const auto* v = obj.get(key);
-    if(!v)
-    {
-        return std::nullopt;
-    }
-    return v->as_u64();
-}
-
-/// @brief 获取必需的子对象
-[[nodiscard]] const detail::JsonVal& req_obj(const detail::JsonVal& parent, std::string_view key)
-{
-    const auto* v = parent.get(key);
-    if(!v || v->type != detail::JsonVal::Type::Obj)
-    {
-        throw SysalError(ErrorKind::DeserializationError,
-                         "missing or invalid object field: " + std::string(key));
-    }
-    return *v;
-}
-
-/// @brief 获取必需的子数组
-[[nodiscard]] const detail::JsonVal& req_arr(const detail::JsonVal& parent, std::string_view key)
-{
-    const auto* v = parent.get(key);
-    if(!v || v->type != detail::JsonVal::Type::Arr)
-    {
-        throw SysalError(ErrorKind::DeserializationError,
-                         "missing or invalid array field: " + std::string(key));
-    }
-    return *v;
-}
-
-/// @brief 从 JSON 数组读取字符串列表
-[[nodiscard]] std::vector<std::string> str_array_from_json(const detail::JsonVal& arr)
-{
-    std::vector<std::string> result;
-    for(const auto& elem : arr.arr_val)
-    {
-        if(elem.type != detail::JsonVal::Type::Str)
-        {
-            throw SysalError(ErrorKind::DeserializationError, "expected string in array");
-        }
-        result.push_back(elem.str_val);
-    }
-    return result;
-}
-
-// ──────────────────────── PciAddress 序列化 ────────────────────────────────
-
-[[nodiscard]] std::string pci_address_to_json(const PciAddress& addr, bool pretty, int indent)
-{
-    detail::JsonObj obj;
-    obj.add("domain", json_u64(addr.domain));
-    obj.add("bus", json_u64(addr.bus));
-    obj.add("device", json_u64(addr.device));
-    obj.add("function", json_u64(addr.function));
-    return obj.build(pretty, indent);
-}
-
-[[nodiscard]] PciAddress pci_address_from_json(const detail::JsonVal& obj)
-{
-    PciAddress addr;
-    addr.domain = static_cast<std::uint16_t>(req_u64(obj, "domain"));
-    addr.bus = static_cast<std::uint8_t>(req_u64(obj, "bus"));
-    addr.device = static_cast<std::uint8_t>(req_u64(obj, "device"));
-    addr.function = static_cast<std::uint8_t>(req_u64(obj, "function"));
-    return addr;
-}
-
-// ──────────────────────── Platform 序列化 ──────────────────────────────────
-
-[[nodiscard]] std::string host_to_json(const Host& h, bool pretty, int indent)
-{
-    detail::JsonObj obj;
-    obj.add("hostname", json_str(h.hostname));
-    obj.add("machine_id", json_str(h.machine_id));
-    obj.add("product_name", json_str(h.product_name));
-    obj.add("vendor", json_str(h.vendor.value));
-    obj.add("serial", json_str(h.serial));
-    return obj.build(pretty, indent);
-}
-
-[[nodiscard]] Host host_from_json(const detail::JsonVal& obj)
-{
-    Host h;
-    h.hostname = req_str(obj, "hostname");
-    h.machine_id = req_str(obj, "machine_id");
-    h.product_name = req_str(obj, "product_name");
-    h.vendor.value = req_str(obj, "vendor");
-    h.serial = req_str(obj, "serial");
-    return h;
-}
-
-[[nodiscard]] std::string os_to_json(const Os& o, bool pretty, int indent)
-{
-    detail::JsonObj obj;
-    obj.add("name", json_str(o.name));
-    obj.add("version", json_str(o.version));
-    obj.add("distribution", json_str(o.distribution));
-    obj.add("distribution_version", json_str(o.distribution_version));
-    obj.add("codename", json_str(o.codename));
-    return obj.build(pretty, indent);
-}
-
-[[nodiscard]] Os os_from_json(const detail::JsonVal& obj)
-{
-    Os o;
-    o.name = req_str(obj, "name");
-    o.version = req_str(obj, "version");
-    o.distribution = req_str(obj, "distribution");
-    o.distribution_version = req_str(obj, "distribution_version");
-    o.codename = req_str(obj, "codename");
-    return o;
-}
-
-[[nodiscard]] std::string kernel_to_json(const Kernel& k, bool pretty, int indent)
-{
-    detail::JsonObj obj;
-    obj.add("release", json_str(k.release));
-    obj.add("version", json_str(k.version));
-    obj.add("compiled_at", json_str(k.compiled_at));
-    obj.add("architecture", json_str(k.architecture));
-    return obj.build(pretty, indent);
-}
-
-[[nodiscard]] Kernel kernel_from_json(const detail::JsonVal& obj)
-{
-    Kernel k;
-    k.release = req_str(obj, "release");
-    k.version = req_str(obj, "version");
-    k.compiled_at = req_str(obj, "compiled_at");
-    k.architecture = req_str(obj, "architecture");
-    return k;
-}
-
-[[nodiscard]] std::string arch_to_json(const Architecture& a, bool pretty, int indent)
-{
-    detail::JsonObj obj;
-    obj.add("name", json_str(a.name));
-    obj.add("bits", json_u32(a.bits));
-    obj.add("byte_order", json_str(a.byte_order));
-    return obj.build(pretty, indent);
-}
-
-[[nodiscard]] Architecture arch_from_json(const detail::JsonVal& obj)
-{
-    Architecture a;
-    a.name = req_str(obj, "name");
-    a.bits = static_cast<std::uint32_t>(req_u64(obj, "bits"));
-    a.byte_order = req_str(obj, "byte_order");
-    return a;
-}
-
-[[nodiscard]] std::string firmware_to_json(const Firmware& f, bool pretty, int indent)
-{
-    detail::JsonObj obj;
-    obj.add("bios_vendor", json_str(f.bios_vendor));
-    obj.add("bios_version", json_str(f.bios_version));
-    obj.add("bios_date", json_str(f.bios_date));
-    obj.add("uefi", json_bool(f.uefi));
-    return obj.build(pretty, indent);
-}
-
-[[nodiscard]] Firmware firmware_from_json(const detail::JsonVal& obj)
-{
-    Firmware f;
-    f.bios_vendor = req_str(obj, "bios_vendor");
-    f.bios_version = req_str(obj, "bios_version");
-    f.bios_date = req_str(obj, "bios_date");
-    f.uefi = req_bool(obj, "uefi");
-    return f;
-}
-
-[[nodiscard]] std::string virt_to_json(const Virtualization& v, bool pretty, int indent)
-{
-    detail::JsonObj obj;
-    obj.add("kind", json_u32(static_cast<std::uint32_t>(v.kind)));
-    obj.add("hypervisor", json_str(v.hypervisor));
-    obj.add("container", json_bool(v.container));
-    return obj.build(pretty, indent);
-}
-
-[[nodiscard]] Virtualization virt_from_json(const detail::JsonVal& obj)
-{
-    Virtualization v;
-    v.kind = static_cast<VirtualizationKind>(req_u64(obj, "kind"));
-    v.hypervisor = req_str(obj, "hypervisor");
-    v.container = req_bool(obj, "container");
-    return v;
-}
-
-[[nodiscard]] std::string platform_to_json(const Platform& p, bool pretty, int indent)
-{
-    detail::JsonObj obj;
-    obj.add("host", host_to_json(p.host, pretty, indent + 1));
-    obj.add("os", os_to_json(p.os, pretty, indent + 1));
-    obj.add("kernel", kernel_to_json(p.kernel, pretty, indent + 1));
-    obj.add("architecture", arch_to_json(p.architecture, pretty, indent + 1));
-    if(p.firmware)
-    {
-        obj.add("firmware", firmware_to_json(*p.firmware, pretty, indent + 1));
-    }
-    if(p.virtualization)
-    {
-        obj.add("virtualization", virt_to_json(*p.virtualization, pretty, indent + 1));
-    }
-    return obj.build(pretty, indent);
-}
-
-[[nodiscard]] Platform platform_from_json(const detail::JsonVal& obj)
-{
-    Platform p;
-    p.host = host_from_json(req_obj(obj, "host"));
-    p.os = os_from_json(req_obj(obj, "os"));
-    p.kernel = kernel_from_json(req_obj(obj, "kernel"));
-    p.architecture = arch_from_json(req_obj(obj, "architecture"));
-    if(const auto* v = obj.get("firmware"))
-    {
-        if(v->type == detail::JsonVal::Type::Obj)
-        {
-            p.firmware = firmware_from_json(*v);
-        }
-    }
-    if(const auto* v = obj.get("virtualization"))
-    {
-        if(v->type == detail::JsonVal::Type::Obj)
-        {
-            p.virtualization = virt_from_json(*v);
-        }
-    }
-    return p;
-}
-
-// ──────────────────────── Cpu 序列化 ───────────────────────────────────────
-
-[[nodiscard]] std::string cpu_package_to_json(const CpuPackage& pkg, bool pretty, int indent)
-{
-    detail::JsonObj obj;
-    obj.add("id", json_u32(pkg.id.value()));
-    obj.add("vendor", json_str(pkg.vendor.value));
-    obj.add("model_name", json_str(pkg.model_name.value));
-    obj.add("physical_cores", json_u32(pkg.physical_cores));
-    obj.add("logical_threads", json_u32(pkg.logical_threads));
-    if(pkg.base_frequency)
-    {
-        obj.add("base_frequency", json_u64(pkg.base_frequency->value));
-    }
-    if(pkg.max_frequency)
-    {
-        obj.add("max_frequency", json_u64(pkg.max_frequency->value));
-    }
-    return obj.build(pretty, indent);
-}
-
-[[nodiscard]] CpuPackage cpu_package_from_json(const detail::JsonVal& obj)
-{
-    CpuPackage pkg;
-    pkg.id = CpuPackageId(static_cast<std::uint32_t>(req_u64(obj, "id")));
-    pkg.vendor.value = req_str(obj, "vendor");
-    pkg.model_name.value = req_str(obj, "model_name");
-    pkg.physical_cores = static_cast<std::uint32_t>(req_u64(obj, "physical_cores"));
-    pkg.logical_threads = static_cast<std::uint32_t>(req_u64(obj, "logical_threads"));
-    if(auto v = opt_u64(obj, "base_frequency"))
-    {
-        pkg.base_frequency = Frequency{*v};
-    }
-    if(auto v = opt_u64(obj, "max_frequency"))
-    {
-        pkg.max_frequency = Frequency{*v};
-    }
-    return pkg;
-}
-
-[[nodiscard]] std::string cpu_core_to_json(const CpuCore& c, bool pretty, int indent)
-{
-    detail::JsonObj obj;
-    obj.add("id", json_u32(c.id.value()));
-    obj.add("package_id", json_u32(c.package_id.value()));
-    obj.add("logical_threads", json_u32(c.logical_threads));
-    if(c.numa_node)
-    {
-        obj.add("numa_node", json_u32(c.numa_node->value()));
-    }
-    return obj.build(pretty, indent);
-}
-
-[[nodiscard]] CpuCore cpu_core_from_json(const detail::JsonVal& obj)
-{
-    CpuCore c;
-    c.id = CpuCoreId(static_cast<std::uint32_t>(req_u64(obj, "id")));
-    c.package_id = CpuPackageId(static_cast<std::uint32_t>(req_u64(obj, "package_id")));
-    c.logical_threads = static_cast<std::uint32_t>(req_u64(obj, "logical_threads"));
-    if(auto v = opt_u64(obj, "numa_node"))
-    {
-        c.numa_node = NumaNodeId(static_cast<std::uint32_t>(*v));
-    }
-    return c;
-}
-
-[[nodiscard]] std::string logical_cpu_to_json(const LogicalCpu& lc, bool pretty, int indent)
-{
-    detail::JsonObj obj;
-    obj.add("id", json_u32(lc.id.value()));
-    obj.add("core_id", json_u32(lc.core_id.value()));
-    obj.add("package_id", json_u32(lc.package_id.value()));
-    if(lc.numa_node)
-    {
-        obj.add("numa_node", json_u32(lc.numa_node->value()));
-    }
-    obj.add("visible_to_current_process", json_bool(lc.visible_to_current_process));
-    return obj.build(pretty, indent);
-}
-
-[[nodiscard]] LogicalCpu logical_cpu_from_json(const detail::JsonVal& obj)
-{
-    LogicalCpu lc;
-    lc.id = LogicalCpuId(static_cast<std::uint32_t>(req_u64(obj, "id")));
-    lc.core_id = CpuCoreId(static_cast<std::uint32_t>(req_u64(obj, "core_id")));
-    lc.package_id = CpuPackageId(static_cast<std::uint32_t>(req_u64(obj, "package_id")));
-    if(auto v = opt_u64(obj, "numa_node"))
-    {
-        lc.numa_node = NumaNodeId(static_cast<std::uint32_t>(*v));
-    }
-    lc.visible_to_current_process = req_bool(obj, "visible_to_current_process");
-    return lc;
-}
-
-[[nodiscard]] std::string numa_node_to_json(const NumaNode& n, bool pretty, int indent)
-{
-    detail::JsonObj obj;
-    obj.add("id", json_u32(n.id.value()));
-    detail::JsonArr arr;
-    for(const auto& cpu_id : n.cpus)
-    {
-        arr.add(json_u32(cpu_id.value()));
-    }
-    obj.add("cpus", arr.build(pretty, indent + 1));
-    return obj.build(pretty, indent);
-}
-
-[[nodiscard]] NumaNode numa_node_from_json(const detail::JsonVal& obj)
-{
-    NumaNode n;
-    n.id = NumaNodeId(static_cast<std::uint32_t>(req_u64(obj, "id")));
-    const auto& cpus_arr = req_arr(obj, "cpus");
-    for(const auto& elem : cpus_arr.arr_val)
-    {
-        auto v = elem.as_u64();
-        if(!v)
-        {
-            throw SysalError(ErrorKind::DeserializationError, "NUMA node cpus must be integers");
-        }
-        n.cpus.push_back(LogicalCpuId(static_cast<std::uint32_t>(*v)));
-    }
-    return n;
-}
-
-[[nodiscard]] std::string cpu_to_json(const Cpu& c, bool pretty, int indent)
-{
-    detail::JsonObj obj;
-    obj.add("arch", json_u32(static_cast<std::uint32_t>(c.arch)));
-
-    detail::JsonArr pkg_arr;
-    for(const auto& pkg : c.packages)
-    {
-        pkg_arr.add(cpu_package_to_json(pkg, pretty, indent + 2));
-    }
-    obj.add("packages", pkg_arr.build(pretty, indent + 1));
-
-    detail::JsonArr core_arr;
-    for(const auto& core : c.cores)
-    {
-        core_arr.add(cpu_core_to_json(core, pretty, indent + 2));
-    }
-    obj.add("cores", core_arr.build(pretty, indent + 1));
-
-    detail::JsonArr lc_arr;
-    for(const auto& lc : c.logical_cpus)
-    {
-        lc_arr.add(logical_cpu_to_json(lc, pretty, indent + 2));
-    }
-    obj.add("logical_cpus", lc_arr.build(pretty, indent + 1));
-
-    detail::JsonArr numa_arr;
-    for(const auto& n : c.numa_nodes)
-    {
-        numa_arr.add(numa_node_to_json(n, pretty, indent + 2));
-    }
-    obj.add("numa_nodes", numa_arr.build(pretty, indent + 1));
-
-    detail::JsonArr isa_arr;
-    for(const auto& ext : c.isa_extensions)
-    {
-        isa_arr.add(json_u32(static_cast<std::uint32_t>(ext)));
-    }
-    obj.add("isa_extensions", isa_arr.build(pretty, indent + 1));
-
-    return obj.build(pretty, indent);
-}
-
-[[nodiscard]] Cpu cpu_from_json(const detail::JsonVal& obj)
-{
-    Cpu c;
-    c.arch = static_cast<Arch>(req_u64(obj, "arch"));
-
-    const auto& pkg_arr = req_arr(obj, "packages");
-    for(const auto& elem : pkg_arr.arr_val)
-    {
-        if(elem.type != detail::JsonVal::Type::Obj)
-        {
-            throw SysalError(ErrorKind::DeserializationError, "CPU package must be an object");
-        }
-        c.packages.push_back(cpu_package_from_json(elem));
-    }
-
-    const auto& core_arr = req_arr(obj, "cores");
-    for(const auto& elem : core_arr.arr_val)
-    {
-        if(elem.type != detail::JsonVal::Type::Obj)
-        {
-            throw SysalError(ErrorKind::DeserializationError, "CPU core must be an object");
-        }
-        c.cores.push_back(cpu_core_from_json(elem));
-    }
-
-    const auto& lc_arr = req_arr(obj, "logical_cpus");
-    for(const auto& elem : lc_arr.arr_val)
-    {
-        if(elem.type != detail::JsonVal::Type::Obj)
-        {
-            throw SysalError(ErrorKind::DeserializationError, "logical CPU must be an object");
-        }
-        c.logical_cpus.push_back(logical_cpu_from_json(elem));
-    }
-
-    const auto& numa_arr = req_arr(obj, "numa_nodes");
-    for(const auto& elem : numa_arr.arr_val)
-    {
-        if(elem.type != detail::JsonVal::Type::Obj)
-        {
-            throw SysalError(ErrorKind::DeserializationError, "NUMA node must be an object");
-        }
-        c.numa_nodes.push_back(numa_node_from_json(elem));
-    }
-
-    const auto& isa_arr = req_arr(obj, "isa_extensions");
-    for(const auto& elem : isa_arr.arr_val)
-    {
-        auto v = elem.as_u64();
-        if(!v)
-        {
-            throw SysalError(ErrorKind::DeserializationError, "ISA extension must be an integer");
-        }
-        c.isa_extensions.push_back(static_cast<IsaExtension>(*v));
-    }
-
-    return c;
-}
-
-// ──────────────────────── Memory 序列化 ────────────────────────────────────
-
-[[nodiscard]] std::string numa_memory_to_json(const NumaMemory& nm, bool pretty, int indent)
-{
-    detail::JsonObj obj;
-    obj.add("node", json_u32(nm.node.value()));
-    obj.add("total", json_u64(nm.total.value));
-    if(nm.available)
-    {
-        obj.add("available", json_u64(nm.available->value));
-    }
-    return obj.build(pretty, indent);
-}
-
-[[nodiscard]] NumaMemory numa_memory_from_json(const detail::JsonVal& obj)
-{
-    NumaMemory nm;
-    nm.node = NumaNodeId(static_cast<std::uint32_t>(req_u64(obj, "node")));
-    nm.total = MemorySize{req_u64(obj, "total")};
-    if(auto v = opt_u64(obj, "available"))
-    {
-        nm.available = MemorySize{*v};
-    }
-    return nm;
-}
-
-[[nodiscard]] std::string memory_to_json(const Memory& m, bool pretty, int indent)
-{
-    detail::JsonObj obj;
-    obj.add("total_memory", json_u64(m.total_memory.value));
-    if(m.available_memory)
-    {
-        obj.add("available_memory", json_u64(m.available_memory->value));
-    }
-    detail::JsonArr arr;
-    for(const auto& nm : m.numa_memory)
-    {
-        arr.add(numa_memory_to_json(nm, pretty, indent + 2));
-    }
-    obj.add("numa_memory", arr.build(pretty, indent + 1));
-    return obj.build(pretty, indent);
-}
-
-[[nodiscard]] Memory memory_from_json(const detail::JsonVal& obj)
-{
-    Memory m;
-    m.total_memory = MemorySize{req_u64(obj, "total_memory")};
-    if(auto v = opt_u64(obj, "available_memory"))
-    {
-        m.available_memory = MemorySize{*v};
-    }
-    const auto* numa_val = obj.get("numa_memory");
-    if(numa_val && numa_val->type == detail::JsonVal::Type::Arr)
-    {
-        for(const auto& elem : numa_val->arr_val)
-        {
-            if(elem.type != detail::JsonVal::Type::Obj)
-            {
-                throw SysalError(ErrorKind::DeserializationError,
-                                 "NUMA memory entry must be an object");
-            }
-            m.numa_memory.push_back(numa_memory_from_json(elem));
-        }
-    }
-    return m;
-}
-
-// ──────────────────────── Accelerator 序列化 ───────────────────────────────
-
-[[nodiscard]] std::string accel_device_to_json(const AcceleratorDevice& d, bool pretty, int indent)
-{
-    detail::JsonObj obj;
-    obj.add("id", json_u32(d.id.value()));
-    obj.add("kind", json_u32(static_cast<std::uint32_t>(d.kind)));
-    obj.add("vendor", json_str(d.vendor.value));
-    obj.add("name", json_str(d.name.value));
-    if(d.pci_address)
-    {
-        obj.add("pci_address", pci_address_to_json(*d.pci_address, pretty, indent + 1));
-    }
-    if(d.nearest_numa_node)
-    {
-        obj.add("nearest_numa_node", json_u32(d.nearest_numa_node->value()));
-    }
-    if(d.memory_size)
-    {
-        obj.add("memory_size", json_u64(d.memory_size->value));
-    }
-    if(d.driver)
-    {
-        obj.add("driver", json_u32(d.driver->value()));
-    }
-    obj.add("visible_to_current_process", json_bool(d.visible_to_current_process));
-    return obj.build(pretty, indent);
-}
-
-[[nodiscard]] AcceleratorDevice accel_device_from_json(const detail::JsonVal& obj)
-{
-    AcceleratorDevice d;
-    d.id = AcceleratorId(static_cast<std::uint32_t>(req_u64(obj, "id")));
-    d.kind = static_cast<AcceleratorKind>(req_u64(obj, "kind"));
-    d.vendor.value = req_str(obj, "vendor");
-    d.name.value = req_str(obj, "name");
-    if(const auto* v = obj.get("pci_address"))
-    {
-        if(v->type == detail::JsonVal::Type::Obj)
-        {
-            d.pci_address = pci_address_from_json(*v);
-        }
-    }
-    if(auto v = opt_u64(obj, "nearest_numa_node"))
-    {
-        d.nearest_numa_node = NumaNodeId(static_cast<std::uint32_t>(*v));
-    }
-    if(auto v = opt_u64(obj, "memory_size"))
-    {
-        d.memory_size = MemorySize{*v};
-    }
-    if(auto v = opt_u64(obj, "driver"))
-    {
-        d.driver = DriverId(static_cast<std::uint32_t>(*v));
-    }
-    d.visible_to_current_process = req_bool(obj, "visible_to_current_process");
-    return d;
-}
-
-[[nodiscard]] std::string accelerators_to_json(const Accelerators& a, bool pretty, int indent)
-{
-    detail::JsonArr arr;
-    for(const auto& dev : a.devices)
-    {
-        arr.add(accel_device_to_json(dev, pretty, indent + 2));
-    }
-    detail::JsonObj obj;
-    obj.add("devices", arr.build(pretty, indent + 1));
-    return obj.build(pretty, indent);
-}
-
-[[nodiscard]] Accelerators accelerators_from_json(const detail::JsonVal& obj)
-{
-    Accelerators a;
-    const auto& dev_arr = req_arr(obj, "devices");
-    for(const auto& elem : dev_arr.arr_val)
-    {
-        if(elem.type != detail::JsonVal::Type::Obj)
-        {
-            throw SysalError(ErrorKind::DeserializationError,
-                             "accelerator device must be an object");
-        }
-        a.devices.push_back(accel_device_from_json(elem));
-    }
-    return a;
-}
-
-// ──────────────────────── Network 序列化 ───────────────────────────────────
-
-[[nodiscard]] std::string net_iface_to_json(const NetworkInterface& ni, bool pretty, int indent)
-{
-    detail::JsonObj obj;
-    obj.add("name", json_str(ni.name.value));
-    obj.add("mac", json_str(ni.mac.value));
-    obj.add("state", json_u32(static_cast<std::uint32_t>(ni.state)));
-    if(ni.speed)
-    {
-        obj.add("speed", json_u64(ni.speed->value));
-    }
-    detail::JsonArr addr_arr;
-    for(const auto& addr : ni.addresses)
-    {
-        addr_arr.add(json_str(addr.value));
-    }
-    obj.add("addresses", addr_arr.build(pretty, indent + 1));
-    if(ni.pci_address)
-    {
-        obj.add("pci_address", pci_address_to_json(*ni.pci_address, pretty, indent + 1));
-    }
-    obj.add("visible_to_current_process", json_bool(ni.visible_to_current_process));
-    return obj.build(pretty, indent);
-}
-
-[[nodiscard]] NetworkInterface net_iface_from_json(const detail::JsonVal& obj)
-{
-    NetworkInterface ni;
-    ni.name.value = req_str(obj, "name");
-    ni.mac.value = req_str(obj, "mac");
-    ni.state = static_cast<InterfaceState>(req_u64(obj, "state"));
-    if(auto v = opt_u64(obj, "speed"))
-    {
-        ni.speed = Bandwidth{*v};
-    }
-    const auto* addr_val = obj.get("addresses");
-    if(addr_val && addr_val->type == detail::JsonVal::Type::Arr)
-    {
-        for(const auto& elem : addr_val->arr_val)
-        {
-            if(elem.type == detail::JsonVal::Type::Str)
-            {
-                IpAddress ip;
-                ip.value = elem.str_val;
-                ni.addresses.push_back(std::move(ip));
-            }
-        }
-    }
-    if(const auto* v = obj.get("pci_address"))
-    {
-        if(v->type == detail::JsonVal::Type::Obj)
-        {
-            ni.pci_address = pci_address_from_json(*v);
-        }
-    }
-    ni.visible_to_current_process = req_bool(obj, "visible_to_current_process");
-    return ni;
-}
-
-[[nodiscard]] std::string network_to_json(const Network& n, bool pretty, int indent)
-{
-    detail::JsonArr arr;
-    for(const auto& iface : n.interfaces)
-    {
-        arr.add(net_iface_to_json(iface, pretty, indent + 2));
-    }
-    detail::JsonObj obj;
-    obj.add("interfaces", arr.build(pretty, indent + 1));
-    return obj.build(pretty, indent);
-}
-
-[[nodiscard]] Network network_from_json(const detail::JsonVal& obj)
-{
-    Network n;
-    const auto& if_arr = req_arr(obj, "interfaces");
-    for(const auto& elem : if_arr.arr_val)
-    {
-        if(elem.type != detail::JsonVal::Type::Obj)
-        {
-            throw SysalError(ErrorKind::DeserializationError,
-                             "network interface must be an object");
-        }
-        n.interfaces.push_back(net_iface_from_json(elem));
-    }
-    return n;
-}
-
-// ──────────────────────── Storage 序列化 ───────────────────────────────────
-
-[[nodiscard]] std::string storage_dev_to_json(const StorageDevice& sd, bool pretty, int indent)
-{
-    detail::JsonObj obj;
-    obj.add("id", json_u32(sd.id.value()));
-    obj.add("name", json_str(sd.name.value));
-    if(sd.capacity)
-    {
-        obj.add("capacity", json_u64(sd.capacity->value));
-    }
-    if(sd.pci_address)
-    {
-        obj.add("pci_address", pci_address_to_json(*sd.pci_address, pretty, indent + 1));
-    }
-    obj.add("kind", json_u32(static_cast<std::uint32_t>(sd.kind)));
-    return obj.build(pretty, indent);
-}
-
-[[nodiscard]] StorageDevice storage_dev_from_json(const detail::JsonVal& obj)
-{
-    StorageDevice sd;
-    sd.id = StorageId(static_cast<std::uint32_t>(req_u64(obj, "id")));
-    sd.name.value = req_str(obj, "name");
-    if(auto v = opt_u64(obj, "capacity"))
-    {
-        sd.capacity = MemorySize{*v};
-    }
-    if(const auto* v = obj.get("pci_address"))
-    {
-        if(v->type == detail::JsonVal::Type::Obj)
-        {
-            sd.pci_address = pci_address_from_json(*v);
-        }
-    }
-    sd.kind = static_cast<StorageKind>(req_u64(obj, "kind"));
-    return sd;
-}
-
-[[nodiscard]] std::string storage_to_json(const Storage& s, bool pretty, int indent)
-{
-    detail::JsonArr arr;
-    for(const auto& dev : s.devices)
-    {
-        arr.add(storage_dev_to_json(dev, pretty, indent + 2));
-    }
-    detail::JsonObj obj;
-    obj.add("devices", arr.build(pretty, indent + 1));
-    return obj.build(pretty, indent);
-}
-
-[[nodiscard]] Storage storage_from_json(const detail::JsonVal& obj)
-{
-    Storage s;
-    const auto& dev_arr = req_arr(obj, "devices");
-    for(const auto& elem : dev_arr.arr_val)
-    {
-        if(elem.type != detail::JsonVal::Type::Obj)
-        {
-            throw SysalError(ErrorKind::DeserializationError, "storage device must be an object");
-        }
-        s.devices.push_back(storage_dev_from_json(elem));
-    }
-    return s;
-}
-
-// ──────────────────────── Pci 序列化 ───────────────────────────────────────
-
-[[nodiscard]] std::string pci_device_to_json(const PciDevice& pd, bool pretty, int indent)
-{
-    detail::JsonObj obj;
-    obj.add("address", pci_address_to_json(pd.address, pretty, indent + 1));
-    obj.add("vendor", json_str(pd.vendor.value));
-    obj.add("device_name", json_str(pd.device_name.value));
-    obj.add("device_class", json_str(pd.device_class.value));
-    if(pd.numa_node)
-    {
-        obj.add("numa_node", json_u32(pd.numa_node->value()));
-    }
-    return obj.build(pretty, indent);
-}
-
-[[nodiscard]] PciDevice pci_device_from_json(const detail::JsonVal& obj)
-{
-    PciDevice pd;
-    pd.address = pci_address_from_json(req_obj(obj, "address"));
-    pd.vendor.value = req_str(obj, "vendor");
-    pd.device_name.value = req_str(obj, "device_name");
-    pd.device_class.value = req_str(obj, "device_class");
-    if(auto v = opt_u64(obj, "numa_node"))
-    {
-        pd.numa_node = NumaNodeId(static_cast<std::uint32_t>(*v));
-    }
-    return pd;
-}
-
-[[nodiscard]] std::string pci_to_json(const Pci& p, bool pretty, int indent)
-{
-    detail::JsonArr arr;
-    for(const auto& dev : p.devices)
-    {
-        arr.add(pci_device_to_json(dev, pretty, indent + 2));
-    }
-    detail::JsonObj obj;
-    obj.add("devices", arr.build(pretty, indent + 1));
-    return obj.build(pretty, indent);
-}
-
-[[nodiscard]] Pci pci_from_json(const detail::JsonVal& obj)
-{
-    Pci p;
-    const auto& dev_arr = req_arr(obj, "devices");
-    for(const auto& elem : dev_arr.arr_val)
-    {
-        if(elem.type != detail::JsonVal::Type::Obj)
-        {
-            throw SysalError(ErrorKind::DeserializationError, "PCI device must be an object");
-        }
-        p.devices.push_back(pci_device_from_json(elem));
-    }
-    return p;
-}
-
-// ──────────────────────── Software 序列化 ──────────────────────────────────
-
-[[nodiscard]] std::string driver_to_json(const Driver& d, bool pretty, int indent)
-{
-    detail::JsonObj obj;
-    obj.add("id", json_u32(d.id.value()));
-    obj.add("name", json_str(d.name));
-    obj.add("version", json_str(d.version));
-    obj.add("loaded", json_bool(d.loaded));
-    obj.add("path", json_str(d.path));
-    return obj.build(pretty, indent);
-}
-
-[[nodiscard]] Driver driver_from_json(const detail::JsonVal& obj)
-{
-    Driver d;
-    d.id = DriverId(static_cast<std::uint32_t>(req_u64(obj, "id")));
-    d.name = req_str(obj, "name");
-    d.version = req_str(obj, "version");
-    d.loaded = req_bool(obj, "loaded");
-    d.path = req_str(obj, "path");
-    return d;
-}
-
-[[nodiscard]] std::string runtime_to_json(const Runtime& r, bool pretty, int indent)
-{
-    detail::JsonObj obj;
-    obj.add("name", json_str(r.name));
-    obj.add("version", json_str(r.version));
-    obj.add("path", json_str(r.path));
-    obj.add("env_var", json_str(r.env_var));
-    return obj.build(pretty, indent);
-}
-
-[[nodiscard]] Runtime runtime_from_json(const detail::JsonVal& obj)
-{
-    Runtime r;
-    r.name = req_str(obj, "name");
-    r.version = req_str(obj, "version");
-    r.path = req_str(obj, "path");
-    r.env_var = req_str(obj, "env_var");
-    return r;
-}
-
-[[nodiscard]] std::string compiler_to_json(const Compiler& c, bool pretty, int indent)
-{
-    detail::JsonObj obj;
-    obj.add("name", json_str(c.name));
-    obj.add("version", json_str(c.version));
-    obj.add("path", json_str(c.path));
-    obj.add("target", json_str(c.target));
-    return obj.build(pretty, indent);
-}
-
-[[nodiscard]] Compiler compiler_from_json(const detail::JsonVal& obj)
-{
-    Compiler c;
-    c.name = req_str(obj, "name");
-    c.version = req_str(obj, "version");
-    c.path = req_str(obj, "path");
-    c.target = req_str(obj, "target");
-    return c;
-}
-
-[[nodiscard]] std::string library_to_json(const Library& l, bool pretty, int indent)
-{
-    detail::JsonObj obj;
-    obj.add("name", json_str(l.name));
-    obj.add("version", json_str(l.version));
-    obj.add("path", json_str(l.path));
-    obj.add("kind", json_str(l.kind));
-    return obj.build(pretty, indent);
-}
-
-[[nodiscard]] Library library_from_json(const detail::JsonVal& obj)
-{
-    Library l;
-    l.name = req_str(obj, "name");
-    l.version = req_str(obj, "version");
-    l.path = req_str(obj, "path");
-    l.kind = req_str(obj, "kind");
-    return l;
-}
-
-[[nodiscard]] std::string cuda_to_json(const Cuda& c, bool pretty, int indent)
-{
-    detail::JsonObj obj;
-    obj.add("version", json_str(c.version));
-    obj.add("driver_version", json_str(c.driver_version));
-    obj.add("nvcc_path", json_str(c.nvcc_path));
-    obj.add("home", json_str(c.home));
-    return obj.build(pretty, indent);
-}
-
-[[nodiscard]] Cuda cuda_from_json(const detail::JsonVal& obj)
-{
-    Cuda c;
-    c.version = req_str(obj, "version");
-    c.driver_version = req_str(obj, "driver_version");
-    c.nvcc_path = req_str(obj, "nvcc_path");
-    c.home = req_str(obj, "home");
-    return c;
-}
-
-[[nodiscard]] std::string rocm_to_json(const Rocm& r, bool pretty, int indent)
-{
-    detail::JsonObj obj;
-    obj.add("version", json_str(r.version));
-    obj.add("hip_path", json_str(r.hip_path));
-    obj.add("rocm_path", json_str(r.rocm_path));
-    return obj.build(pretty, indent);
-}
-
-[[nodiscard]] Rocm rocm_from_json(const detail::JsonVal& obj)
-{
-    Rocm r;
-    r.version = req_str(obj, "version");
-    r.hip_path = req_str(obj, "hip_path");
-    r.rocm_path = req_str(obj, "rocm_path");
-    return r;
-}
-
-[[nodiscard]] std::string level_zero_to_json(const LevelZero& lz, bool pretty, int indent)
-{
-    detail::JsonObj obj;
-    obj.add("version", json_str(lz.version));
-    obj.add("loader_path", json_str(lz.loader_path));
-    return obj.build(pretty, indent);
-}
-
-[[nodiscard]] LevelZero level_zero_from_json(const detail::JsonVal& obj)
-{
-    LevelZero lz;
-    lz.version = req_str(obj, "version");
-    lz.loader_path = req_str(obj, "loader_path");
-    return lz;
-}
-
-[[nodiscard]] std::string mpi_to_json(const Mpi& m, bool pretty, int indent)
-{
-    detail::JsonObj obj;
-    obj.add("implementation", json_str(m.implementation));
-    obj.add("version", json_str(m.version));
-    obj.add("path", json_str(m.path));
-    return obj.build(pretty, indent);
-}
-
-[[nodiscard]] Mpi mpi_from_json(const detail::JsonVal& obj)
-{
-    Mpi m;
-    m.implementation = req_str(obj, "implementation");
-    m.version = req_str(obj, "version");
-    m.path = req_str(obj, "path");
-    return m;
-}
-
-[[nodiscard]] std::string rdma_to_json(const RdmaStack& r, bool pretty, int indent)
-{
-    detail::JsonObj obj;
-    obj.add("rdma_core_version", json_str(r.rdma_core_version));
-    obj.add("ibverbs_path", json_str(r.ibverbs_path));
-    obj.add("ucx_version", json_str(r.ucx_version));
-    return obj.build(pretty, indent);
-}
-
-[[nodiscard]] RdmaStack rdma_from_json(const detail::JsonVal& obj)
-{
-    RdmaStack r;
-    r.rdma_core_version = req_str(obj, "rdma_core_version");
-    r.ibverbs_path = req_str(obj, "ibverbs_path");
-    r.ucx_version = req_str(obj, "ucx_version");
-    return r;
-}
-
-[[nodiscard]] std::string software_to_json(const SoftwareStack& sw, bool pretty, int indent)
-{
-    detail::JsonObj obj;
-
-    detail::JsonArr drv_arr;
-    for(const auto& d : sw.drivers)
-    {
-        drv_arr.add(driver_to_json(d, pretty, indent + 2));
-    }
-    obj.add("drivers", drv_arr.build(pretty, indent + 1));
-
-    detail::JsonArr rt_arr;
-    for(const auto& r : sw.runtimes)
-    {
-        rt_arr.add(runtime_to_json(r, pretty, indent + 2));
-    }
-    obj.add("runtimes", rt_arr.build(pretty, indent + 1));
-
-    detail::JsonArr cc_arr;
-    for(const auto& c : sw.compilers)
-    {
-        cc_arr.add(compiler_to_json(c, pretty, indent + 2));
-    }
-    obj.add("compilers", cc_arr.build(pretty, indent + 1));
-
-    detail::JsonArr lib_arr;
-    for(const auto& l : sw.libraries)
-    {
-        lib_arr.add(library_to_json(l, pretty, indent + 2));
-    }
-    obj.add("libraries", lib_arr.build(pretty, indent + 1));
-
-    if(sw.cuda)
-    {
-        obj.add("cuda", cuda_to_json(*sw.cuda, pretty, indent + 1));
-    }
-    if(sw.rocm)
-    {
-        obj.add("rocm", rocm_to_json(*sw.rocm, pretty, indent + 1));
-    }
-    if(sw.level_zero)
-    {
-        obj.add("level_zero", level_zero_to_json(*sw.level_zero, pretty, indent + 1));
-    }
-    if(sw.mpi)
-    {
-        obj.add("mpi", mpi_to_json(*sw.mpi, pretty, indent + 1));
-    }
-    if(sw.rdma)
-    {
-        obj.add("rdma", rdma_to_json(*sw.rdma, pretty, indent + 1));
-    }
-
-    return obj.build(pretty, indent);
-}
-
-[[nodiscard]] SoftwareStack software_from_json(const detail::JsonVal& obj)
-{
-    SoftwareStack sw;
-
-    const auto& drv_arr = req_arr(obj, "drivers");
-    for(const auto& elem : drv_arr.arr_val)
-    {
-        if(elem.type != detail::JsonVal::Type::Obj)
-        {
-            throw SysalError(ErrorKind::DeserializationError, "driver must be an object");
-        }
-        sw.drivers.push_back(driver_from_json(elem));
-    }
-
-    const auto& rt_arr = req_arr(obj, "runtimes");
-    for(const auto& elem : rt_arr.arr_val)
-    {
-        if(elem.type != detail::JsonVal::Type::Obj)
-        {
-            throw SysalError(ErrorKind::DeserializationError, "runtime must be an object");
-        }
-        sw.runtimes.push_back(runtime_from_json(elem));
-    }
-
-    const auto& cc_arr = req_arr(obj, "compilers");
-    for(const auto& elem : cc_arr.arr_val)
-    {
-        if(elem.type != detail::JsonVal::Type::Obj)
-        {
-            throw SysalError(ErrorKind::DeserializationError, "compiler must be an object");
-        }
-        sw.compilers.push_back(compiler_from_json(elem));
-    }
-
-    const auto& lib_arr = req_arr(obj, "libraries");
-    for(const auto& elem : lib_arr.arr_val)
-    {
-        if(elem.type != detail::JsonVal::Type::Obj)
-        {
-            throw SysalError(ErrorKind::DeserializationError, "library must be an object");
-        }
-        sw.libraries.push_back(library_from_json(elem));
-    }
-
-    if(const auto* v = obj.get("cuda"))
-    {
-        if(v->type == detail::JsonVal::Type::Obj)
-        {
-            sw.cuda = cuda_from_json(*v);
-        }
-    }
-    if(const auto* v = obj.get("rocm"))
-    {
-        if(v->type == detail::JsonVal::Type::Obj)
-        {
-            sw.rocm = rocm_from_json(*v);
-        }
-    }
-    if(const auto* v = obj.get("level_zero"))
-    {
-        if(v->type == detail::JsonVal::Type::Obj)
-        {
-            sw.level_zero = level_zero_from_json(*v);
-        }
-    }
-    if(const auto* v = obj.get("mpi"))
-    {
-        if(v->type == detail::JsonVal::Type::Obj)
-        {
-            sw.mpi = mpi_from_json(*v);
-        }
-    }
-    if(const auto* v = obj.get("rdma"))
-    {
-        if(v->type == detail::JsonVal::Type::Obj)
-        {
-            sw.rdma = rdma_from_json(*v);
-        }
-    }
-
-    return sw;
-}
-
-// ──────────────────────── Execution 序列化 ─────────────────────────────────
-
-[[nodiscard]] std::string process_to_json(const Process& p, bool pretty, int indent)
-{
-    detail::JsonObj obj;
-    obj.add("pid", json_i32(p.pid));
-    obj.add("ppid", json_i32(p.ppid));
-    obj.add("uid", json_u32(p.uid));
-    obj.add("gid", json_u32(p.gid));
-    obj.add("comm", json_str(p.comm));
-    obj.add("exe", json_str(p.exe));
-    obj.add("cwd", json_str(p.cwd));
-    return obj.build(pretty, indent);
-}
-
-[[nodiscard]] Process process_from_json(const detail::JsonVal& obj)
-{
-    Process p;
-    p.pid = static_cast<std::int32_t>(req_i64(obj, "pid"));
-    p.ppid = static_cast<std::int32_t>(req_i64(obj, "ppid"));
-    p.uid = static_cast<std::uint32_t>(req_u64(obj, "uid"));
-    p.gid = static_cast<std::uint32_t>(req_u64(obj, "gid"));
-    p.comm = req_str(obj, "comm");
-    p.exe = req_str(obj, "exe");
-    p.cwd = req_str(obj, "cwd");
-    return p;
-}
-
-[[nodiscard]] std::string environment_to_json(const Environment& e, bool pretty, int indent)
-{
-    detail::JsonArr arr;
-    for(const auto& [k, v] : e.entries)
-    {
-        detail::JsonObj pair_obj;
-        pair_obj.add("key", json_str(k));
-        pair_obj.add("value", json_str(v));
-        arr.add(pair_obj.build(pretty, indent + 2));
-    }
-    detail::JsonObj obj;
-    obj.add("entries", arr.build(pretty, indent + 1));
-    return obj.build(pretty, indent);
-}
-
-[[nodiscard]] Environment environment_from_json(const detail::JsonVal& obj)
-{
-    Environment e;
-    const auto& arr = req_arr(obj, "entries");
-    for(const auto& elem : arr.arr_val)
-    {
-        if(elem.type != detail::JsonVal::Type::Obj)
-        {
-            throw SysalError(ErrorKind::DeserializationError,
-                             "environment entry must be an object");
-        }
-        auto key = req_str(elem, "key");
-        auto val = req_str(elem, "value");
-        e.entries.emplace_back(std::move(key), std::move(val));
-    }
-    return e;
-}
-
-[[nodiscard]] std::string cgroup_to_json(const Cgroup& c, bool pretty, int indent)
-{
-    detail::JsonObj obj;
-    obj.add("version", json_u32(static_cast<std::uint32_t>(c.version)));
-    obj.add("path", json_str(c.path));
-    detail::JsonArr arr;
-    for(const auto& ctrl : c.controllers)
-    {
-        arr.add(json_str(ctrl));
-    }
-    obj.add("controllers", arr.build(pretty, indent + 1));
-    return obj.build(pretty, indent);
-}
-
-[[nodiscard]] Cgroup cgroup_from_json(const detail::JsonVal& obj)
-{
-    Cgroup c;
-    c.version = static_cast<CgroupVersion>(req_u64(obj, "version"));
-    c.path = req_str(obj, "path");
-    const auto* ctrl_val = obj.get("controllers");
-    if(ctrl_val && ctrl_val->type == detail::JsonVal::Type::Arr)
-    {
-        c.controllers = str_array_from_json(*ctrl_val);
-    }
-    return c;
-}
-
-[[nodiscard]] std::string cpuset_to_json(const Cpuset& cs, bool pretty, int indent)
-{
-    detail::JsonObj obj;
-    obj.add("cpus", json_str(cs.cpus));
-    obj.add("mems", json_str(cs.mems));
-    obj.add("cpus_effective", json_str(cs.cpus_effective));
-    obj.add("mems_effective", json_str(cs.mems_effective));
-    return obj.build(pretty, indent);
-}
-
-[[nodiscard]] Cpuset cpuset_from_json(const detail::JsonVal& obj)
-{
-    Cpuset cs;
-    cs.cpus = req_str(obj, "cpus");
-    cs.mems = req_str(obj, "mems");
-    cs.cpus_effective = req_str(obj, "cpus_effective");
-    cs.mems_effective = req_str(obj, "mems_effective");
-    return cs;
-}
-
-[[nodiscard]] std::string permission_to_json(const Permission& p, bool pretty, int indent)
-{
-    detail::JsonObj obj;
-    obj.add("euid", json_u32(p.euid));
-    obj.add("egid", json_u32(p.egid));
-    detail::JsonArr arr;
-    for(const auto& cap : p.capabilities)
-    {
-        arr.add(json_str(cap));
-    }
-    obj.add("capabilities", arr.build(pretty, indent + 1));
-    obj.add("is_root", json_bool(p.is_root));
-    return obj.build(pretty, indent);
-}
-
-[[nodiscard]] Permission permission_from_json(const detail::JsonVal& obj)
-{
-    Permission p;
-    p.euid = static_cast<std::uint32_t>(req_u64(obj, "euid"));
-    p.egid = static_cast<std::uint32_t>(req_u64(obj, "egid"));
-    const auto* cap_val = obj.get("capabilities");
-    if(cap_val && cap_val->type == detail::JsonVal::Type::Arr)
-    {
-        p.capabilities = str_array_from_json(*cap_val);
-    }
-    p.is_root = req_bool(obj, "is_root");
-    return p;
-}
-
-[[nodiscard]] std::string container_to_json(const Container& c, bool pretty, int indent)
-{
-    detail::JsonObj obj;
-    obj.add("kind", json_u32(static_cast<std::uint32_t>(c.kind)));
-    obj.add("id", json_str(c.id));
-    obj.add("runtime", json_str(c.runtime));
-    return obj.build(pretty, indent);
-}
-
-[[nodiscard]] Container container_from_json(const detail::JsonVal& obj)
-{
-    Container c;
-    c.kind = static_cast<ContainerKind>(req_u64(obj, "kind"));
-    c.id = req_str(obj, "id");
-    c.runtime = req_str(obj, "runtime");
-    return c;
-}
-
-[[nodiscard]] std::string execution_to_json(const ExecutionContext& e, bool pretty, int indent)
-{
-    detail::JsonObj obj;
-    obj.add("process", process_to_json(e.process, pretty, indent + 1));
-    obj.add("environment", environment_to_json(e.environment, pretty, indent + 1));
-    obj.add("cgroup", cgroup_to_json(e.cgroup, pretty, indent + 1));
-    obj.add("cpuset", cpuset_to_json(e.cpuset, pretty, indent + 1));
-    obj.add("permission", permission_to_json(e.permission, pretty, indent + 1));
-    if(e.container)
-    {
-        obj.add("container", container_to_json(*e.container, pretty, indent + 1));
-    }
-
-    detail::JsonArr vcpu_arr;
-    for(const auto& id : e.visible_logical_cpu_ids)
-    {
-        vcpu_arr.add(json_u32(id.value()));
-    }
-    obj.add("visible_logical_cpu_ids", vcpu_arr.build(pretty, indent + 1));
-
-    detail::JsonArr vacc_arr;
-    for(const auto& id : e.visible_accelerator_ids)
-    {
-        vacc_arr.add(json_u32(id.value()));
-    }
-    obj.add("visible_accelerator_ids", vacc_arr.build(pretty, indent + 1));
-
-    detail::JsonArr vnet_arr;
-    for(const auto& name : e.visible_network_interface_names)
-    {
-        vnet_arr.add(json_str(name.value));
-    }
-    obj.add("visible_network_interface_names", vnet_arr.build(pretty, indent + 1));
-
-    return obj.build(pretty, indent);
-}
-
-[[nodiscard]] ExecutionContext execution_from_json(const detail::JsonVal& obj)
-{
-    ExecutionContext e;
-    e.process = process_from_json(req_obj(obj, "process"));
-    e.environment = environment_from_json(req_obj(obj, "environment"));
-    e.cgroup = cgroup_from_json(req_obj(obj, "cgroup"));
-    e.cpuset = cpuset_from_json(req_obj(obj, "cpuset"));
-    e.permission = permission_from_json(req_obj(obj, "permission"));
-
-    if(const auto* v = obj.get("container"))
-    {
-        if(v->type == detail::JsonVal::Type::Obj)
-        {
-            e.container = container_from_json(*v);
-        }
-    }
-
-    const auto& vcpu_arr = req_arr(obj, "visible_logical_cpu_ids");
-    for(const auto& elem : vcpu_arr.arr_val)
-    {
-        auto v = elem.as_u64();
-        if(!v)
-        {
-            throw SysalError(ErrorKind::DeserializationError,
-                             "visible_logical_cpu_ids must be integers");
-        }
-        e.visible_logical_cpu_ids.push_back(LogicalCpuId(static_cast<std::uint32_t>(*v)));
-    }
-
-    const auto& vacc_arr = req_arr(obj, "visible_accelerator_ids");
-    for(const auto& elem : vacc_arr.arr_val)
-    {
-        auto v = elem.as_u64();
-        if(!v)
-        {
-            throw SysalError(ErrorKind::DeserializationError,
-                             "visible_accelerator_ids must be integers");
-        }
-        e.visible_accelerator_ids.push_back(AcceleratorId(static_cast<std::uint32_t>(*v)));
-    }
-
-    const auto& vnet_arr = req_arr(obj, "visible_network_interface_names");
-    for(const auto& elem : vnet_arr.arr_val)
-    {
-        if(elem.type != detail::JsonVal::Type::Str)
-        {
-            throw SysalError(ErrorKind::DeserializationError,
-                             "visible_network_interface_names must be strings");
-        }
-        InterfaceName in;
-        in.value = elem.str_val;
-        e.visible_network_interface_names.push_back(std::move(in));
-    }
-
-    return e;
-}
-
-// ──────────────────────── SystemInfo 序列化 ────────────────────────────────
-
-[[nodiscard]] std::string system_info_to_json(const SystemInfo& info, bool pretty, int indent)
-{
-    detail::JsonObj obj;
-    obj.add("platform", platform_to_json(info.platform, pretty, indent + 1));
-    obj.add("cpu", cpu_to_json(info.cpu, pretty, indent + 1));
-    obj.add("memory", memory_to_json(info.memory, pretty, indent + 1));
-    obj.add("accelerators", accelerators_to_json(info.accelerators, pretty, indent + 1));
-    obj.add("network", network_to_json(info.network, pretty, indent + 1));
-    obj.add("storage", storage_to_json(info.storage, pretty, indent + 1));
-    obj.add("pci", pci_to_json(info.pci, pretty, indent + 1));
-    obj.add("software", software_to_json(info.software, pretty, indent + 1));
-    obj.add("execution", execution_to_json(info.execution, pretty, indent + 1));
-    return obj.build(pretty, indent);
-}
-
-[[nodiscard]] SystemInfo system_info_from_json(const detail::JsonVal& obj)
-{
-    SystemInfo info;
-    info.platform = platform_from_json(req_obj(obj, "platform"));
-    info.cpu = cpu_from_json(req_obj(obj, "cpu"));
-    info.memory = memory_from_json(req_obj(obj, "memory"));
-    info.accelerators = accelerators_from_json(req_obj(obj, "accelerators"));
-    info.network = network_from_json(req_obj(obj, "network"));
-    info.storage = storage_from_json(req_obj(obj, "storage"));
-    info.pci = pci_from_json(req_obj(obj, "pci"));
-    info.software = software_from_json(req_obj(obj, "software"));
-    info.execution = execution_from_json(req_obj(obj, "execution"));
-    return info;
-}
-
-// ──────────────────────── SnapshotMeta 序列化 ──────────────────────────────
-
-[[nodiscard]] std::string meta_to_json(const SnapshotMeta& m, bool pretty, int indent)
-{
-    detail::JsonObj obj;
-    obj.add("collect_time", detail::time_point_to_ms(m.collect_time));
-    obj.add("sysal_version", json_str(m.sysal_version));
-    obj.add("collect_duration", json_double(m.collect_duration.count()));
-    obj.add("requested_flags", json_u32(static_cast<std::uint32_t>(m.requested_flags)));
-
-    detail::JsonArr succ_arr;
-    for(const auto& s : m.succeeded_collectors)
-    {
-        succ_arr.add(json_str(s));
-    }
-    obj.add("succeeded_collectors", succ_arr.build(pretty, indent + 1));
-
-    detail::JsonArr fail_arr;
-    for(const auto& f : m.failed_collectors)
-    {
-        fail_arr.add(json_str(f));
-    }
-    obj.add("failed_collectors", fail_arr.build(pretty, indent + 1));
-
-    return obj.build(pretty, indent);
-}
-
-[[nodiscard]] SnapshotMeta meta_from_json(const detail::JsonVal& obj)
-{
-    SnapshotMeta m;
-    auto time_ms = req_i64(obj, "collect_time");
-    m.collect_time = detail::ms_to_time_point(time_ms);
-    m.sysal_version = req_str(obj, "sysal_version");
-    m.collect_duration = std::chrono::duration<double>(req_double(obj, "collect_duration"));
-    m.requested_flags = static_cast<Collect>(req_u64(obj, "requested_flags"));
-
-    const auto& succ_arr = req_arr(obj, "succeeded_collectors");
-    m.succeeded_collectors = str_array_from_json(succ_arr);
-
-    const auto& fail_arr = req_arr(obj, "failed_collectors");
-    m.failed_collectors = str_array_from_json(fail_arr);
-
-    return m;
-}
-
-// ──────────────────────── RawStore (System 级) 序列化 ──────────────────────
-
-[[nodiscard]] std::string raw_store_to_system_json(const RawStore& store, bool pretty, int indent)
-{
-    detail::JsonArr arr;
-    for(const auto& rec : store.records)
-    {
-        detail::JsonObj obj;
-        obj.add("source", std::to_string(static_cast<std::uint64_t>(rec.source)));
-        obj.add("path_or_command", detail::escape_string(rec.path_or_command));
-        obj.add("payload", detail::escape_string(rec.payload));
-        obj.add("status", std::to_string(static_cast<std::uint64_t>(rec.status)));
-        obj.add("collected_at", detail::time_point_to_ms(rec.collected_at));
-        arr.add(obj.build(pretty, indent + 2));
-    }
-    detail::JsonObj root;
-    root.add("records", arr.build(pretty, indent + 1));
-    return root.build(pretty, indent);
-}
-
-[[nodiscard]] RawRecord sys_raw_record_from_json(const detail::JsonVal& obj)
-{
-    RawRecord rec;
-    rec.source = static_cast<RawSource>(req_u64(obj, "source"));
-    rec.path_or_command = req_str(obj, "path_or_command");
-    rec.payload = req_str(obj, "payload");
-    rec.status = static_cast<CollectStatus>(req_u64(obj, "status"));
-    rec.collected_at = detail::ms_to_time_point(req_i64(obj, "collected_at"));
-    return rec;
-}
-
-[[nodiscard]] RawStore sys_raw_store_from_json(const detail::JsonVal& root)
-{
-    const auto& records_arr = req_arr(root, "records");
-    RawStore store;
-    for(const auto& elem : records_arr.arr_val)
-    {
-        if(elem.type != detail::JsonVal::Type::Obj)
-        {
-            throw SysalError(ErrorKind::DeserializationError,
-                             "each element in 'records' must be a JSON object");
-        }
-        store.records.push_back(sys_raw_record_from_json(elem));
-    }
-    return store;
-}
-
-} // namespace
-
-// ══════════════════════════════════════════════════════════════════════════
-// 公共接口
+// 公共接口：sysal
 // ══════════════════════════════════════════════════════════════════════════
 
 std::string to_json(const System& sys, const SerializationOptions& opts)
 {
-    const bool pretty = opts.pretty_print;
-
-    detail::JsonObj root;
-    root.add("info", system_info_to_json(sys.info, pretty, 1));
+    json root;
+    root["info"] = system_info_to_json(sys.info);
 
     if(opts.include_meta)
     {
-        root.add("meta", meta_to_json(sys.meta, pretty, 1));
+        root["meta"] = meta_to_json(sys.meta);
     }
 
-    // warnings
-    detail::JsonArr warn_arr;
+    json warnings = json::array();
     for(const auto& w : sys.warnings)
     {
-        warn_arr.add(json_str(w));
+        warnings.push_back(w);
     }
-    root.add("warnings", warn_arr.build(pretty, 1));
+    root["warnings"] = std::move(warnings);
 
-    // raw：仅当 System::raw 有值且 include_raw 为 true 时输出
     if(opts.include_raw && sys.raw)
     {
-        root.add("raw", raw_store_to_system_json(*sys.raw, pretty, 1));
+        root["raw"] = raw_store_to_json(*sys.raw);
     }
 
-    return root.build(pretty, 0);
+    return root.dump(opts.pretty_print ? 4 : -1);
 }
 
-System from_json(std::string_view json)
+System from_json(std::string_view json_str)
 {
-    detail::JsonVal root;
     try
     {
-        root = detail::parse_json(json);
+        auto root = json::parse(json_str);
+        if(!root.is_object())
+        {
+            throw SysalError(ErrorKind::DeserializationError, "JSON root must be an object");
+        }
+
+        // 版本兼容性检查
+        if(root.contains("meta") && root.at("meta").is_object())
+        {
+            const auto& meta = root.at("meta");
+            if(meta.contains("sysal_version") && meta.at("sysal_version").is_string())
+            {
+                auto ver = meta.at("sysal_version").get<std::string>();
+                auto prefix =
+                    std::to_string(VERSION_MAJOR) + "." + std::to_string(VERSION_MINOR) + ".";
+                if(!ver.starts_with(prefix))
+                {
+                    throw SysalError(ErrorKind::DeserializationError,
+                                     "incompatible version: " + ver);
+                }
+            }
+        }
+
+        System sys;
+        sys.info = system_info_from_json(root.at("info"));
+
+        if(root.contains("meta") && root.at("meta").is_object())
+        {
+            sys.meta = meta_from_json(root.at("meta"));
+        }
+
+        if(root.contains("warnings") && root.at("warnings").is_array())
+        {
+            sys.warnings = str_array_from_json(root.at("warnings"));
+        }
+
+        if(root.contains("raw") && root.at("raw").is_object())
+        {
+            sys.raw = raw_store_from_json(root.at("raw"));
+        }
+
+        return sys;
     }
-    catch(const detail::JsonError& e)
+    catch(const json::exception& e)
     {
         throw SysalError(ErrorKind::DeserializationError, e.what());
     }
-
-    if(root.type != detail::JsonVal::Type::Obj)
-    {
-        throw SysalError(ErrorKind::DeserializationError, "JSON root must be an object");
-    }
-
-    // 版本兼容性检查
-    const auto* meta_val = root.get("meta");
-    if(meta_val && meta_val->type == detail::JsonVal::Type::Obj)
-    {
-        const auto* ver_val = meta_val->get("sysal_version");
-        if(ver_val && ver_val->type == detail::JsonVal::Type::Str)
-        {
-            if(!ver_val->str_val.starts_with(std::to_string(sysal::VERSION_MAJOR) + "." +
-                                             std::to_string(sysal::VERSION_MINOR) + "."))
-            {
-                throw SysalError(ErrorKind::DeserializationError,
-                                 "incompatible version: " + ver_val->str_val);
-            }
-        }
-    }
-
-    System sys;
-
-    // info
-    sys.info = system_info_from_json(req_obj(root, "info"));
-
-    // meta
-    if(meta_val && meta_val->type == detail::JsonVal::Type::Obj)
-    {
-        sys.meta = meta_from_json(*meta_val);
-    }
-
-    // warnings
-    const auto* warn_val = root.get("warnings");
-    if(warn_val && warn_val->type == detail::JsonVal::Type::Arr)
-    {
-        sys.warnings = str_array_from_json(*warn_val);
-    }
-
-    // raw
-    const auto* raw_val = root.get("raw");
-    if(raw_val && raw_val->type == detail::JsonVal::Type::Obj)
-    {
-        sys.raw = sys_raw_store_from_json(*raw_val);
-    }
-
-    return sys;
 }
 
 } // namespace sysal

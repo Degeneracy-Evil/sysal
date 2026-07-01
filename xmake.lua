@@ -15,6 +15,7 @@ add_cxxflags("-Wall", "-Wextra", "-Werror", "-stdlib=libc++", {force = true})
 add_ldflags("-stdlib=libc++", "-fuse-ld=lld", "-rtlib=compiler-rt", "-unwindlib=libunwind",
             {force = true})
 add_includedirs("include")
+add_includedirs("third_party")
 
 -- 源文件列表（共享给静态库和动态库）
 local SYSAL_SOURCES = {
@@ -67,7 +68,6 @@ end
 local unit_tests = {
     "test_types",
     "test_model",
-    "test_json",
     "test_parse_utils",
     "test_raw_store_io",
     "test_reader",
