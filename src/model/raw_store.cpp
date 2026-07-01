@@ -43,6 +43,14 @@ bool RawStore::has(RawSource source) const
                                [source](const RawRecord& r) { return r.source == source; });
 }
 
+bool RawStore::has_success(RawSource source) const
+{
+    return std::ranges::any_of(records,
+                               [source](const RawRecord& r) {
+                                   return r.source == source && r.status == CollectStatus::Success;
+                               });
+}
+
 std::size_t RawStore::count(RawSource source) const
 {
     return static_cast<std::size_t>(std::ranges::count_if(records, [source](const RawRecord& r)

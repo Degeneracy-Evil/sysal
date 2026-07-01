@@ -207,6 +207,8 @@ const char* raw_source_str(sysal::RawSource s)
         return "ProcSelfStatus";
     case sysal::RawSource::ProcOneCgroup:
         return "ProcOneCgroup";
+    case sysal::RawSource::ProcHostname:
+        return "ProcHostname";
     case sysal::RawSource::SysfsCpu:
         return "SysfsCpu";
     case sysal::RawSource::SysfsNuma:

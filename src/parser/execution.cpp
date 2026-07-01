@@ -250,8 +250,8 @@ void parse_environment(std::string_view payload, ExecutionContext& ctx)
 /// @return 容器信息（若检测到容器环境）
 std::optional<Container> detect_container(const RawStore& raw, const ExecutionContext& ctx)
 {
-    // 1. /.dockerenv 存在 → Docker
-    if(raw.has(RawSource::RootDockerenv))
+    // 1. /.dockerenv 存在（Success 状态）→ Docker
+    if(raw.has_success(RawSource::RootDockerenv))
     {
         return Container{ContainerKind::Docker, "", ""};
     }

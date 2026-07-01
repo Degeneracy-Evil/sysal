@@ -42,8 +42,10 @@ inline std::optional<std::string> read_file(const std::string& path)
 /// @return 命令标准输出；失败返回 nullopt
 inline std::optional<std::string> read_command(const std::string& cmd)
 {
+    // 重定向 stderr 到 /dev/null，避免命令不存在时错误信息泄漏到终端
+    std::string full_cmd = cmd + " 2>/dev/null";
     // NOLINTNEXTLINE(cert-env33-c) — 采集层需要执行外部命令
-    auto* pipe = popen(cmd.c_str(), "r");
+    auto* pipe = popen(full_cmd.c_str(), "r");
     if(!pipe)
     {
         return std::nullopt;

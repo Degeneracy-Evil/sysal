@@ -88,7 +88,9 @@ enum class RawSource
                     // 外部库后端（未来支持）
     Nvml,           ///< NVML 库
     Ibverbs,        ///< ibverbs 库
-    HwinfoOutput    ///< hwinfo 命令输出
+    HwinfoOutput,   ///< hwinfo 命令输出
+                    // 新增来源（追加在末尾以保持枚举值稳定性）
+    ProcHostname    ///< /proc/sys/kernel/hostname
 };
 
 /// @brief 单个原始记录的采集状态

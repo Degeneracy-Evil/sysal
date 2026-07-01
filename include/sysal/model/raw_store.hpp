@@ -48,6 +48,11 @@ struct RawStore
     /// @return 存在则返回 true
     bool has(RawSource source) const;
 
+    /// @brief 检查是否存在指定来源的成功采集记录
+    /// @param source 原始数据来源
+    /// @return 存在 Success 状态记录返回 true
+    bool has_success(RawSource source) const;
+
     /// @brief 统计指定来源的记录数
     /// @param source 原始数据来源
     /// @return 记录数

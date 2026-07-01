@@ -1,5 +1,40 @@
 # 开发记录
 
+### 2026-07-01 修复 4 个库 Bug（R1a/R1c/R1d/R1e）
+
+- **变更类型**: src / fix
+- **涉及文件**: src/parser/accelerator.cpp, src/reader/linux/file_utils.hpp, src/parser/platform.cpp, src/reader/linux/procfs.cpp, include/sysal/types/enums.hpp, tests/testbench.cpp, docs/devlog.md
+- **变更内容**:
+  1. R1a: `accelerator.cpp` — nvidia-smi CSV 字段 2/3 顺序修正：field[2] 为 memory.total，field[3] 为 pci.bus_id（原代码反了）
+  2. R1c: `file_utils.hpp` — `read_command()` 追加 `2>/dev/null` 重定向 stderr，避免命令不存在时错误信息泄漏到终端
+  3. R1d: `platform.cpp` — `kernel.version` 从 `/proc/version` 中提取 `#` 开头的构建版本标签（如 `#101-Ubuntu`），而非复制 `kernel.release`
+  4. R1e: `enums.hpp` 新增 `ProcHostname` 枚举值；`procfs.cpp` 采集 `/proc/sys/kernel/hostname`；`platform.cpp` 解析 hostname 替换原警告占位
+  5. `testbench.cpp` — switch 补充 `ProcHostname` 分支（-Wswitch 要求完整覆盖）
+- **原因**: 4 个独立 Bug 修复，详见任务描述
+- **验证**: `xmake -r` 构建通过，零 warning
+
+### 2026-07-01 修复 R1 测试回归 + ProcHostname 枚举顺序
+
+- **变更类型**: tests / fix
+- **涉及文件**: tests/test_parse_accelerator.cpp, tests/test_parse_platform.cpp, include/sysal/types/enums.hpp, docs/devlog.md
+- **变更内容**:
+  1. `test_parse_accelerator.cpp` — 3 个测试 fixture 的 CSV 列顺序更新为 nvidia-smi 实际输出顺序 `index,name,memory.total,pci.bus_id,driver_version`
+  2. `test_parse_platform.cpp` — `kernel.version` 断言从 `"5.15.0-91-generic"` 改为 `"#101-Ubuntu"`
+  3. `enums.hpp` — `ProcHostname` 从 `ProcOneCgroup` 后移到枚举末尾，避免插入中间导致后续枚举值数字偏移、破坏已有 JSON fixture 的序列化兼容性
+- **原因**: R1a/R1d 修复改变了行为，测试断言需同步更新；ProcHostname 插入中间导致 dev_machine.json fixture 中所有 source 数字偏移
+- **验证**: 全部 20 个测试通过
+
+### 2026-07-01 修复容器检测误报（bare metal 上报 Docker）
+
+- **变更类型**: src / fix
+- **涉及文件**: include/sysal/model/raw_store.hpp, src/model/raw_store.cpp, src/parser/execution.cpp, docs/devlog.md
+- **变更内容**:
+  1. `raw_store.hpp`：新增 `has_success(RawSource)` 声明，仅当记录状态为 `CollectStatus::Success` 时返回 true
+  2. `raw_store.cpp`：实现 `has_success()`，使用 `std::ranges::any_of` 过滤 `source` 和 `status == Success`
+  3. `execution.cpp`：`detect_container()` 中 `raw.has(RawSource::RootDockerenv)` 改为 `raw.has_success(RawSource::RootDockerenv)`
+- **原因**: `has()` 不检查 `CollectStatus`，当 `/.dockerenv` 不存在时 reader 插入 `NotCollected` 记录，`has()` 仍返回 true，导致 bare metal 机器误报 Docker 容器
+- **验证**: `xmake -r` 构建成功，零 warning
+
 ### 2026-07-01 集中版本管理 + GitHub Release v0.0.1
 
 - **变更类型**: src / tests / build

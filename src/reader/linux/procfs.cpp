@@ -90,6 +90,7 @@ void read_procfs(RawStore& raw, Collect flags)
         read_proc_file(raw, RawSource::ProcVersion, "/proc/version");
         read_proc_file(raw, RawSource::EtcOsRelease, "/etc/os-release");
         read_cmd(raw, RawSource::Uname, "uname -m");
+        read_proc_file(raw, RawSource::ProcHostname, "/proc/sys/kernel/hostname");
 
         // /.dockerenv 容器标记文件
         if(file_exists("/.dockerenv"))

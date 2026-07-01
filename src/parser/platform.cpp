@@ -108,7 +108,24 @@ Kernel parse_proc_version(std::string_view payload, std::vector<std::string>& wa
         }
     }
 
-    kernel.version = kernel.release; // version 与 release 相同
+    // kernel.version: 从 # 开始的构建版本字符串（如 "#101-Ubuntu"）
+    if(hash_pos != std::string_view::npos)
+    {
+        auto after_hash = trimmed.substr(hash_pos);
+        auto smp_pos = after_hash.find(" SMP");
+        if(smp_pos != std::string_view::npos)
+        {
+            kernel.version = std::string(after_hash.substr(0, smp_pos));
+        }
+        else
+        {
+            kernel.version = std::string(after_hash);
+        }
+    }
+    else
+    {
+        kernel.version = kernel.release;
+    }
     return kernel;
 }
 
@@ -279,10 +296,11 @@ std::optional<Platform> parse_platform(const RawStore& raw, std::vector<std::str
     // 解析 DMI → Firmware + Host
     parse_dmi(raw, platform, warnings);
 
-    // hostname：当前 Reader 未单独采集，留空并记录警告
-    if(platform.host.hostname.empty())
+    // 解析主机名
+    auto hostname_records = raw.get_all(RawSource::ProcHostname);
+    if(!hostname_records.empty() && !hostname_records[0]->payload.empty())
     {
-        warnings.push_back("parse_platform: hostname 不可用（Reader 未采集）");
+        platform.host.hostname = trim(hostname_records[0]->payload);
     }
 
     // 检测虚拟化

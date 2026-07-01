@@ -23,10 +23,11 @@ int main()
     // ---- 测试 1: 2 块 NVIDIA H20 GPU ----
     {
         RawStore raw;
-        raw.records.push_back(make_record(RawSource::NvidiaSmi, "nvidia-smi",
-                                          "index, name, pci.bus_id, memory.total\n"
-                                          "0, NVIDIA H20 96GB, 00000000:41:00.0, 97536 MiB\n"
-                                          "1, NVIDIA H20 96GB, 00000000:42:00.0, 97536 MiB\n"));
+        raw.records.push_back(
+            make_record(RawSource::NvidiaSmi, "nvidia-smi",
+                        "index, name, memory.total, pci.bus_id, driver_version\n"
+                        "0, NVIDIA H20 96GB, 97536 MiB, 00000000:41:00.0, 535.129.03\n"
+                        "1, NVIDIA H20 96GB, 97536 MiB, 00000000:42:00.0, 535.129.03\n"));
 
         std::vector<std::string> warnings;
         auto result = parse_accelerator(raw, warnings);
@@ -63,9 +64,10 @@ int main()
     // ---- 测试 2: NUMA 节点查找（D-4 修正） ----
     {
         RawStore raw;
-        raw.records.push_back(make_record(RawSource::NvidiaSmi, "nvidia-smi",
-                                          "index, name, pci.bus_id, memory.total\n"
-                                          "0, NVIDIA H20 96GB, 00000000:41:00.0, 97536 MiB\n"));
+        raw.records.push_back(
+            make_record(RawSource::NvidiaSmi, "nvidia-smi",
+                        "index, name, memory.total, pci.bus_id, driver_version\n"
+                        "0, NVIDIA H20 96GB, 97536 MiB, 00000000:41:00.0, 535.129.03\n"));
         raw.records.push_back(
             make_record(RawSource::SysfsPci, "/sys/bus/pci/devices/0000:41:00.0/numa_node", "0\n"));
 
@@ -90,9 +92,10 @@ int main()
     // ---- 测试 4: GiB 单位解析 ----
     {
         RawStore raw;
-        raw.records.push_back(make_record(RawSource::NvidiaSmi, "nvidia-smi",
-                                          "index, name, pci.bus_id, memory.total\n"
-                                          "0, NVIDIA A100 80GB, 00000000:3b:00.0, 80 GiB\n"));
+        raw.records.push_back(
+            make_record(RawSource::NvidiaSmi, "nvidia-smi",
+                        "index, name, memory.total, pci.bus_id, driver_version\n"
+                        "0, NVIDIA A100 80GB, 80 GiB, 00000000:3b:00.0, 535.129.03\n"));
 
         std::vector<std::string> warnings;
         auto result = parse_accelerator(raw, warnings);

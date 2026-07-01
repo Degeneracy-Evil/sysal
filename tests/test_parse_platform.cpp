@@ -63,7 +63,7 @@ int main()
 
         // Kernel
         assert(p.kernel.release == "5.15.0-91-generic");
-        assert(p.kernel.version == "5.15.0-91-generic");
+        assert(p.kernel.version == "#101-Ubuntu");
         assert(p.kernel.compiled_at.find("Mon Nov 13") != std::string::npos);
         assert(p.kernel.architecture == "x86_64");
 

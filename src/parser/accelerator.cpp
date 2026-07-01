@@ -15,7 +15,7 @@ namespace
 {
 
 /// @brief 解析 nvidia-smi CSV 输出中的单行
-/// @param line CSV 行内容（格式: index, name, pci.bus_id, memory.total）
+/// @param line CSV 行内容（格式: index, name, memory.total, pci.bus_id, driver_version）
 /// @param warnings 警告列表
 /// @return 解析成功返回 AcceleratorDevice，否则返回 nullopt
 std::optional<AcceleratorDevice> parse_nvidia_smi_row(std::string_view line,
@@ -45,20 +45,9 @@ std::optional<AcceleratorDevice> parse_nvidia_smi_row(std::string_view line,
     // 字段 1: name
     dev.name = DeviceName{trim(fields[1])};
 
-    // 字段 2: pci.bus_id
-    auto pci = parse_pci_address(trim(fields[2]));
-    if(pci.has_value())
+    // 字段 2: memory.total（格式: "97536 MiB"）
     {
-        dev.pci_address = *pci;
-    }
-    else
-    {
-        warnings.push_back("parse_accelerator: nvidia-smi pci.bus_id 解析失败: " + trim(fields[2]));
-    }
-
-    // 字段 3: memory.total（格式: "97536 MiB"）
-    {
-        auto mem_str = trim(fields[3]);
+        auto mem_str = trim(fields[2]);
         // 提取数字部分和单位部分
         auto parts = split(mem_str, ' ');
         if(!parts.empty())
@@ -108,6 +97,17 @@ std::optional<AcceleratorDevice> parse_nvidia_smi_row(std::string_view line,
                                    trim(parts[0]));
             }
         }
+    }
+
+    // 字段 3: pci.bus_id
+    auto pci = parse_pci_address(trim(fields[3]));
+    if(pci.has_value())
+    {
+        dev.pci_address = *pci;
+    }
+    else
+    {
+        warnings.push_back("parse_accelerator: nvidia-smi pci.bus_id 解析失败: " + trim(fields[3]));
     }
 
     return dev;
