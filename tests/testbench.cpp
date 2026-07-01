@@ -44,6 +44,26 @@ std::string format_memory(std::uint64_t bytes)
     return std::to_string(bytes) + " B";
 }
 
+/// @brief 格式化频率为人类可读字符串，按量级自动选择 GHz/MHz/kHz/Hz
+/// @param hz 频率（赫兹）
+/// @return 格式化字符串（如 "2 GHz"、"2200 MHz"）
+std::string format_frequency(std::uint64_t hz)
+{
+    if(hz >= 1'000'000'000)
+    {
+        return std::to_string(hz / 1'000'000'000) + " GHz";
+    }
+    if(hz >= 1'000'000)
+    {
+        return std::to_string(hz / 1'000'000) + " MHz";
+    }
+    if(hz >= 1'000)
+    {
+        return std::to_string(hz / 1'000) + " kHz";
+    }
+    return std::to_string(hz) + " Hz";
+}
+
 /// @brief 格式化 PCI 地址为十六进制零填充
 /// @param addr PCI 地址
 /// @return 格式化字符串（如 "0000:65:00.0"）
@@ -300,8 +320,8 @@ int main()
     assert(sys.meta.sysal_version == sysal::VERSION_STRING);
     assert(sys.meta.collect_duration.count() >= 0.0);
 
-    label("Collect duration (s)",
-          std::to_string(static_cast<long>(sys.meta.collect_duration.count() * 1000)) + " ms");
+    label("Collect duration (ms)",
+          std::to_string(static_cast<long>(sys.meta.collect_duration.count() * 1000.0)));
     label("Succeeded collectors", sys.meta.succeeded_collectors.size());
     label("Failed collectors", sys.meta.failed_collectors.size());
     std::cout << "  Succeeded:";
@@ -351,7 +371,6 @@ int main()
     {
         label("Virt kind", virt_kind_str(sys.info.platform.virtualization->kind));
         label("Hypervisor", sys.info.platform.virtualization->hypervisor);
-        label("Container", sys.info.platform.virtualization->container ? "yes" : "no");
     }
 
     // ── 3. CPU ──────────────────────────────────────────────────────────
@@ -370,11 +389,11 @@ int main()
         label("  Logical threads", pkg.logical_threads);
         if(pkg.base_frequency.has_value())
         {
-            label("  Base freq (MHz)", pkg.base_frequency->value / 1000);
+            label("  Base freq", format_frequency(pkg.base_frequency->value));
         }
         if(pkg.max_frequency.has_value())
         {
-            label("  Max freq (MHz)", pkg.max_frequency->value / 1000);
+            label("  Max freq", format_frequency(pkg.max_frequency->value));
         }
     }
 
@@ -398,35 +417,6 @@ int main()
         std::cout << "\n";
     }
 
-    // CPU query methods
-    {
-        const auto& pkg0 = sys.info.cpu.packages.front();
-        assert(sys.info.cpu.find_package(pkg0.id) != nullptr);
-        label("find_package(" + std::to_string(pkg0.id.value()) + ")", "OK");
-
-        const auto& core0 = sys.info.cpu.cores.front();
-        assert(sys.info.cpu.find_core(core0.id) != nullptr);
-        label("find_core(" + std::to_string(core0.id.value()) + ")", "OK");
-
-        const auto& lcpu0 = sys.info.cpu.logical_cpus.front();
-        assert(sys.info.cpu.find_logical_cpu(lcpu0.id) != nullptr);
-        label("find_logical_cpu(" + std::to_string(lcpu0.id.value()) + ")", "OK");
-
-        auto lcpus_pkg = sys.info.cpu.logical_cpus_of_package(pkg0.id);
-        assert(!lcpus_pkg.empty());
-        label("logical_cpus_of_package(" + std::to_string(pkg0.id.value()) + ")",
-              std::to_string(lcpus_pkg.size()));
-
-        auto cores_pkg = sys.info.cpu.cores_of_package(pkg0.id);
-        assert(!cores_pkg.empty());
-        label("cores_of_package(" + std::to_string(pkg0.id.value()) + ")",
-              std::to_string(cores_pkg.size()));
-
-        auto vis = sys.info.cpu.visible_logical_cpus();
-        assert(!vis.empty());
-        label("visible_logical_cpus()", std::to_string(vis.size()));
-    }
-
     // ── 4. Memory ───────────────────────────────────────────────────────
     section("4. Memory");
     label("Total", format_memory(sys.info.memory.total_memory.value));
@@ -434,17 +424,13 @@ int main()
     {
         label("Available", format_memory(sys.info.memory.available_memory->value));
     }
-    if(!sys.info.memory.numa_memory.empty())
+    for(const auto& nm : sys.info.memory.numa_memory)
     {
-        for(const auto& nm : sys.info.memory.numa_memory)
+        label("NUMA " + std::to_string(nm.node.value()) + " total", format_memory(nm.total.value));
+        if(nm.available.has_value())
         {
-            label("NUMA " + std::to_string(nm.node.value()) + " total",
-                  format_memory(nm.total.value));
-            if(nm.available.has_value())
-            {
-                label("NUMA " + std::to_string(nm.node.value()) + " available",
-                      format_memory(nm.available->value));
-            }
+            label("NUMA " + std::to_string(nm.node.value()) + " available",
+                  format_memory(nm.available->value));
         }
     }
 
@@ -481,13 +467,6 @@ int main()
 
         auto vis = sys.info.accelerators.visible();
         label("Visible accelerators", vis.size());
-
-        if(!sys.info.accelerators.devices.empty())
-        {
-            const auto& dev0 = sys.info.accelerators.devices.front();
-            assert(sys.info.accelerators.find(dev0.id) != nullptr);
-            label("find(" + std::to_string(dev0.id.value()) + ")", "OK");
-        }
     }
 
     // ── 6. Network ──────────────────────────────────────────────────────
@@ -495,7 +474,8 @@ int main()
     label("Interfaces", sys.info.network.interfaces.size());
     for(const auto& iface : sys.info.network.interfaces)
     {
-        std::cout << "  " << iface.name.value << " (" << state_str(iface.state) << ")\n";
+        label("Name", iface.name.value);
+        label("State", state_str(iface.state));
         if(!iface.mac.value.empty())
         {
             label("  MAC", iface.mac.value);
@@ -526,13 +506,6 @@ int main()
     {
         auto vis = sys.info.network.visible();
         label("Visible interfaces", vis.size());
-
-        if(!sys.info.network.interfaces.empty())
-        {
-            const auto& if0 = sys.info.network.interfaces.front();
-            assert(sys.info.network.find(if0.name) != nullptr);
-            label("find(" + if0.name.value + ")", "OK");
-        }
     }
 
     // ── 7. Storage ──────────────────────────────────────────────────────
@@ -558,23 +531,24 @@ int main()
         std::size_t shown = 0;
         for(const auto& dev : sys.info.pci.devices)
         {
-            if(shown >= 10)
+            if(shown >= 5)
             {
                 break;
             }
-            label(format_pci(dev.address), dev.vendor.value + " | " + dev.device_name.value +
-                                               " | " + dev.device_class.value);
+            const auto addr = format_pci(dev.address);
+            const std::string desc = dev.device_name.value.empty()
+                                         ? (dev.vendor.value + " | " + dev.device_class.value)
+                                         : (dev.device_name.value + " [" + dev.vendor.value + "]");
+            label(addr, desc);
             if(dev.numa_node.has_value())
             {
                 label("  NUMA node", std::to_string(dev.numa_node->value()));
             }
             ++shown;
         }
-        if(!sys.info.pci.devices.empty())
+        if(sys.info.pci.devices.size() > 5)
         {
-            const auto& pci0 = sys.info.pci.devices.front();
-            assert(sys.info.pci.find(pci0.address) != nullptr);
-            label("find(" + format_pci(pci0.address) + ")", "OK");
+            label("... and more", sys.info.pci.devices.size() - 5);
         }
     }
 
@@ -688,36 +662,9 @@ int main()
 
     // ── 11. Visibility ──────────────────────────────────────────────────
     section("11. Visibility");
-    {
-        auto vis_cpus = sys.info.cpu.visible_logical_cpus();
-        label("Visible logical CPUs", vis_cpus.size());
-        for(const auto* cpu : vis_cpus)
-        {
-            std::cout << "    CPU " << cpu->id << " core=" << cpu->core_id
-                      << " pkg=" << cpu->package_id;
-            if(cpu->numa_node.has_value())
-            {
-                std::cout << " numa=" << *cpu->numa_node;
-            }
-            std::cout << "\n";
-        }
-    }
-    {
-        auto vis_acc = sys.info.accelerators.visible();
-        label("Visible accelerators", vis_acc.size());
-        for(const auto* acc : vis_acc)
-        {
-            std::cout << "    [" << acc->id << "] " << acc->name.value << "\n";
-        }
-    }
-    {
-        auto vis_if = sys.info.network.visible();
-        label("Visible interfaces", vis_if.size());
-        for(const auto* iface : vis_if)
-        {
-            std::cout << "    " << iface->name.value << "\n";
-        }
-    }
+    label("Visible logical CPUs", sys.info.cpu.visible_logical_cpus().size());
+    label("Visible accelerators", sys.info.accelerators.visible().size());
+    label("Visible interfaces", sys.info.network.visible().size());
 
     // ── 12. Raw Store ───────────────────────────────────────────────────
     section("12. Raw Store");
@@ -726,7 +673,6 @@ int main()
         const auto& raw = *sys.raw;
         label("Total records", raw.records.size());
 
-        // Breakdown by source
         std::cout << "  Sources breakdown:\n";
         for(int i = 0; i <= static_cast<int>(sysal::RawSource::HwinfoOutput); ++i)
         {
@@ -739,7 +685,6 @@ int main()
             }
         }
 
-        // First few record paths
         std::cout << "  First records:\n";
         std::size_t shown = 0;
         for(const auto& rec : raw.records)
@@ -766,11 +711,7 @@ int main()
         std::cout << "    " << w << "\n";
     }
     label("sysal_version", sys.meta.sysal_version);
-    label("collect_duration (ms)",
-          std::to_string(static_cast<long>(sys.meta.collect_duration.count() * 1000.0)));
     label("requested_flags", std::to_string(static_cast<unsigned>(sys.meta.requested_flags)));
-    label("succeeded_collectors", sys.meta.succeeded_collectors.size());
-    label("failed_collectors", sys.meta.failed_collectors.size());
 
     // ── 14. JSON Serialization Round-trip ───────────────────────────────
     section("14. JSON Serialization Round-trip");
@@ -796,13 +737,12 @@ int main()
         auto partial = sysal::System::collect(sysal::Collect::Cpu | sysal::Collect::Memory);
         assert(!partial.info.cpu.logical_cpus.empty());
         assert(partial.info.memory.total_memory.value > 0);
-        label("CPU logical CPUs", partial.info.cpu.logical_cpus.size());
-        label("Memory total", format_memory(partial.info.memory.total_memory.value));
-        label("Platform hostname", partial.info.platform.host.hostname.empty()
-                                       ? "(empty)"
-                                       : partial.info.platform.host.hostname);
-        label("Network interfaces", partial.info.network.interfaces.size());
-        std::cout << "  Unrequested domains are default-constructed\n";
+        label("Requested: CPU logical CPUs", partial.info.cpu.logical_cpus.size());
+        label("Requested: Memory total", format_memory(partial.info.memory.total_memory.value));
+        label("Unrequested: Platform hostname", partial.info.platform.host.hostname.empty()
+                                                    ? "(empty)"
+                                                    : partial.info.platform.host.hostname);
+        label("Unrequested: Network interfaces", partial.info.network.interfaces.size());
     }
 
     // ── 16. Refresh ─────────────────────────────────────────────────────

@@ -100,28 +100,42 @@ sys.refresh();
 ## 构建
 
 ```bash
-xmake          # 构建
+xmake          # 构建（静态库 + 动态库 + 全部测试）
 xmake -r       # 重新构建
 ```
 
-`compile_commands.json` 在构建后自动生成到 `build/`（供 clang-tidy / clangd 使用）。
+构建产物：
+- `libsysal.a` — 静态库（在 `build/.../static/` 子目录）
+- `libsysal.so` — 动态库
+
+`compile_commands.json` 通过 `xmake project -k compile_commands build` 生成（`utils/check.sh` 会自动调用）。
+
+## 运行 testbench
+
+```bash
+xmake testbench    # 编译并运行 testbench，终端输出全部采集结果
+```
 
 ## 测试
 
 ```bash
 xmake run test_replay    # raw replay 测试
-xmake run testbench      # 全量 API 演示
+xmake run testbench      # 运行 testbench（输出被抑制，仅看退出码）
 ```
 
 ## CI
 
 push 到 `main` 或 PR 时，GitHub Actions 自动运行 `utils/check.sh` 全量检查（clang-format + clang-tidy + build + tests）。
 
+## 版本
+
+当前版本 v0.0.1，版本号集中定义在 `include/sysal/version.hpp`。
+
 ## v0.0.1 范围
 
-**实现**：公共 API（`System::collect` / `refresh` / `Collect` 位掩码）、全部数据模型、Linux 支持（procfs / sysfs / PCI）、NVML 可选后端、raw replay 测试。
+**实现**：公共 API（`System::collect` / `refresh` / `Collect` 位掩码）、全部数据模型、Linux 支持（procfs / sysfs / PCI）、nvidia-smi 命令输出采集、raw replay 测试、JSON 序列化。
 
-**不实现**：性能评分、基准测试、算子选择、调度策略、守护进程、数据库存储、Web API、完整跨平台、拓扑信息（已有 hwloc）。
+**不实现**：性能评分、基准测试、算子选择、调度策略、守护进程、数据库存储、Web API、完整跨平台、拓扑信息（已有 hwloc）、NVML/ibverbs 库链接。
 
 ## 与其他项目的关系
 

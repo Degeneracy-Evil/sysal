@@ -1,5 +1,33 @@
 # 开发记录
 
+### 2026-07-01 更新 README.md 和 AGENTS.md
+
+- **变更类型**: docs
+- **涉及文件**: README.md, AGENTS.md, docs/devlog.md
+- **变更内容**:
+  1. README.md: 修复 compile_commands.json 生成方式描述（不再自动生成，改为 `xmake project -k compile_commands`）；添加 `xmake testbench` 运行方式；添加构建产物说明（libsysal.a/so）；添加版本管理说明；修正 v0.0.1 范围描述（NVML→nvidia-smi 命令输出）
+  2. AGENTS.md: 修复 compile_commands.json 描述；添加 `xmake testbench` 命令
+- **原因**: 文档与实际构建配置脱节，compile_commands 生成方式已变更但文档未更新
+- **验证**: 文审
+
+### 2026-07-01 重写 testbench.cpp 消除冗余并修正输出格式
+
+- **变更类型**: tests / refactor
+- **涉及文件**: tests/testbench.cpp, docs/devlog.md
+- **变更内容**:
+  1. 新增 `format_frequency()` 辅助函数，按量级自动选择 GHz/MHz/kHz/Hz；CPU 频率输出从 "2200000 MHz" 修正为 "2 GHz"
+  2. Section 2 移除 `Container: yes/no` 行（容器信息仅在 Section 10 展示）
+  3. Section 3 移除 `find_package`/`find_core`/`find_logical_cpu`/`logical_cpus_of_package`/`cores_of_package`/`visible_logical_cpus` 的无意义断言与输出
+  4. Section 5/6/8 移除 `find()` 断言与输出（已在单元测试覆盖）
+  5. Section 6 网卡接口名与状态分两行输出（`Name:` / `State:`），替代单行 `eth0 (UP)`
+  6. Section 8 PCI 仅展示前 5 个设备 + 剩余计数，优先显示 `device_name`（非空时）
+  7. Section 11 可见性改为仅输出计数摘要，不再逐项罗列 52 个 CPU/接口
+  8. Section 13 移除与 Section 1 重复的 `collect_duration`/`succeeded_collectors`/`failed_collectors` 字段，仅保留 Section 1 未展示的 `sysal_version`/`requested_flags`/`warnings`
+  9. Section 15 标注请求域与非请求域，突出 partial 语义差异
+  10. 文件从 844 行缩减至 784 行
+- **原因**: 评审发现 13 处冗余/格式问题——跨节重复数据、无意义断言、频率单位错误、PCI 设备过多、可见性节刷屏
+- **验证**: `xmake -r` 构建成功零 warning；`xmake testbench` 运行通过全部断言；clang-tidy 零告警；LSP 无诊断
+
 ### 2026-07-01 R2a: if-has(flags) 链重构为表驱动分派
 
 - **变更类型**: src / refactor
