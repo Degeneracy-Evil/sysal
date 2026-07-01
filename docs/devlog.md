@@ -1,5 +1,30 @@
 # 开发记录
 
+### 2026-07-01 R2a: if-has(flags) 链重构为表驱动分派
+
+- **变更类型**: src / refactor
+- **涉及文件**: src/pipeline/pipeline.cpp, src/reader/linux/sysfs.cpp, src/reader/linux/procfs.cpp, docs/devlog.md
+- **变更内容**:
+  1. `pipeline.cpp`：9 个 `if(has(flags, Collect::Xxx))` 块替换为 `ParserDispatch` 表 + 循环。每个条目含 `Collect flag` 和函数指针（无捕获 lambda 通过 `+` 运算符转换为 `void(*)(ParseResult&, const RawStore&, vector<string>&)`），避免 `std::function` 开销
+  2. `sysfs.cpp`：6 个 `if(has(flags, Collect::Xxx))` 块替换为 `ReaderDispatch` 表 + 循环。所有读取函数签名统一为 `void(*)(RawStore&)`，直接使用函数指针
+  3. `procfs.cpp`：保留显式 if-has 块，添加注释说明原因——Cpu→Platform、Pci→Network、Software→Accelerator 三个跨域依赖使扁平表驱动分派不可行
+- **原因**: 消除重复的 if-has 模式，提升可读性和可维护性；新增域只需在分发表添加一行
+- **验证**: `xmake -r` 构建成功零 warning；`xmake run test_collect` 和 `xmake run test_replay` 全部通过
+
+### 2026-07-01 抽象 resource.cpp 重复代码为模板辅助函数
+
+- **变更类型**: src / refactor
+- **涉及文件**: src/model/resource.cpp, docs/devlog.md
+- **变更内容**:
+  1. 新增匿名命名空间内两个模板辅助函数：`find_by_member`（按成员指针查找）和 `filter_by`（按谓词过滤）
+  2. 将 6 个 `find_by_id` 模式函数（`Cpu::find_package`、`Cpu::find_core`、`Cpu::find_logical_cpu`、`Accelerators::find`、`Network::find`、`Pci::find`）替换为 `find_by_member` 单行调用
+  3. 将 6 个 `filter_by_predicate` 模式函数（`Cpu::logical_cpus_of_package`、`Cpu::logical_cpus_of_core`、`Cpu::cores_of_package`、`Cpu::visible_logical_cpus`、`Accelerators::visible`、`Network::visible`）替换为 `filter_by` 单行调用
+  4. 保留 `Accelerators::by_kind`/`gpus`/`npus`/`fpgas` 不变（已为委托链）
+  5. 新增 `#include <type_traits>` 用于 `std::remove_reference_t`
+  6. 文件从 200 行缩减至 144 行
+- **原因**: resource.cpp ~80% 为重复的线性扫描模式，模板化消除冗余、提升可维护性
+- **验证**: `xmake -r` 构建通过零 warning，`xmake run test_model` 全部通过，clang-tidy 零告警
+
 ### 2026-07-01 修复 4 个库 Bug（R1a/R1c/R1d/R1e）
 
 - **变更类型**: src / fix

@@ -83,6 +83,12 @@ void read_env_vars(RawStore& raw, const char* const names[], std::size_t count)
 
 void read_procfs(RawStore& raw, Collect flags)
 {
+    // 三个域存在跨域依赖，无法扁平化为表驱动分派：
+    //   Cpu → Platform（共享 ProcCpuInfo）
+    //   Pci → Network（共享 Lspci）
+    //   Software → Accelerator（共享 NvidiaSmi/Nvcc）
+    // 依赖域在自身请求而依赖域未请求时，须单独补充采集共享数据。
+
     // ---- Platform 域 ----
     if(has(flags, Collect::Platform))
     {

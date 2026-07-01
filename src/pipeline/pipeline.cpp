@@ -80,6 +80,34 @@ void record_collector_status(const ParseResult& result, std::vector<std::string>
     check("execution", result.execution);
 }
 
+struct ParserDispatch
+{
+    Collect flag;
+    void (*parse)(ParseResult&, const RawStore&, std::vector<std::string>&);
+};
+
+// + 运算符将无捕获 lambda 转换为函数指针，避免 std::function 开销
+static const ParserDispatch parser_dispatch[] = {
+    {Collect::Platform, +[](ParseResult& r, const RawStore& raw, std::vector<std::string>& w)
+                        { r.platform = parse_platform(raw, w); }},
+    {Collect::Cpu, +[](ParseResult& r, const RawStore& raw, std::vector<std::string>& w)
+                   { r.cpu = parse_cpu(raw, w); }},
+    {Collect::Memory, +[](ParseResult& r, const RawStore& raw, std::vector<std::string>& w)
+                      { r.memory = parse_memory(raw, w); }},
+    {Collect::Pci, +[](ParseResult& r, const RawStore& raw, std::vector<std::string>& w)
+                   { r.pci = parse_pci(raw, w); }},
+    {Collect::Network, +[](ParseResult& r, const RawStore& raw, std::vector<std::string>& w)
+                       { r.network = parse_network(raw, w); }},
+    {Collect::Accelerator, +[](ParseResult& r, const RawStore& raw, std::vector<std::string>& w)
+                           { r.accelerators = parse_accelerator(raw, w); }},
+    {Collect::Storage, +[](ParseResult& r, const RawStore& raw, std::vector<std::string>& w)
+                       { r.storage = parse_storage(raw, w); }},
+    {Collect::Software, +[](ParseResult& r, const RawStore& raw, std::vector<std::string>& w)
+                        { r.software = parse_software(raw, w); }},
+    {Collect::Execution, +[](ParseResult& r, const RawStore& raw, std::vector<std::string>& w)
+                         { r.execution = parse_execution(raw, w); }},
+};
+
 } // namespace
 
 System run_replay(const RawStore& raw, Collect flags, std::vector<std::string>& warnings)
@@ -91,42 +119,13 @@ System run_replay(const RawStore& raw, Collect flags, std::vector<std::string>& 
 
     ParseResult result;
 
-    // 按域调用解析器：仅解析 flags 中请求的域
-    if(has(flags, Collect::Platform))
+    // 按域调用解析器：仅解析 flags 中请求的域（表驱动分派）
+    for(const auto& entry : parser_dispatch)
     {
-        result.platform = parse_platform(raw, warnings);
-    }
-    if(has(flags, Collect::Cpu))
-    {
-        result.cpu = parse_cpu(raw, warnings);
-    }
-    if(has(flags, Collect::Memory))
-    {
-        result.memory = parse_memory(raw, warnings);
-    }
-    if(has(flags, Collect::Pci))
-    {
-        result.pci = parse_pci(raw, warnings);
-    }
-    if(has(flags, Collect::Network))
-    {
-        result.network = parse_network(raw, warnings);
-    }
-    if(has(flags, Collect::Accelerator))
-    {
-        result.accelerators = parse_accelerator(raw, warnings);
-    }
-    if(has(flags, Collect::Storage))
-    {
-        result.storage = parse_storage(raw, warnings);
-    }
-    if(has(flags, Collect::Software))
-    {
-        result.software = parse_software(raw, warnings);
-    }
-    if(has(flags, Collect::Execution))
-    {
-        result.execution = parse_execution(raw, warnings);
+        if(has(flags, entry.flag))
+        {
+            entry.parse(result, raw, warnings);
+        }
     }
 
     // 记录成功/失败的采集器（在 resolve 移动之前）

@@ -273,40 +273,24 @@ void read_dmi_sysfs(RawStore& raw)
 
 void read_sysfs(RawStore& raw, Collect flags)
 {
-    // ---- Cpu 域 ----
-    if(has(flags, Collect::Cpu))
+    struct ReaderDispatch
     {
-        read_cpu_sysfs(raw);
-    }
+        Collect flag;
+        void (*read)(RawStore&);
+    };
 
-    // ---- Memory 域（NUMA 节点） ----
-    if(has(flags, Collect::Memory))
-    {
-        read_numa_sysfs(raw);
-    }
+    static const ReaderDispatch reader_dispatch[] = {
+        {Collect::Cpu, read_cpu_sysfs},       {Collect::Memory, read_numa_sysfs},
+        {Collect::Network, read_net_sysfs},   {Collect::Pci, read_pci_sysfs},
+        {Collect::Storage, read_block_sysfs}, {Collect::Platform, read_dmi_sysfs},
+    };
 
-    // ---- Network 域 ----
-    if(has(flags, Collect::Network))
+    for(const auto& entry : reader_dispatch)
     {
-        read_net_sysfs(raw);
-    }
-
-    // ---- Pci 域 ----
-    if(has(flags, Collect::Pci))
-    {
-        read_pci_sysfs(raw);
-    }
-
-    // ---- Storage 域 ----
-    if(has(flags, Collect::Storage))
-    {
-        read_block_sysfs(raw);
-    }
-
-    // ---- Platform 域（DMI/BIOS 信息） ----
-    if(has(flags, Collect::Platform))
-    {
-        read_dmi_sysfs(raw);
+        if(has(flags, entry.flag))
+        {
+            entry.read(raw);
+        }
     }
 }
 
