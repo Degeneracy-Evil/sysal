@@ -77,29 +77,34 @@ enum class RawSource
     ProcSelfCgroup, ///< /proc/self/cgroup
     ProcSelfStatus, ///< /proc/self/status
     ProcOneCgroup,  ///< /proc/1/cgroup
-                    // Linux sysfs
-    SysfsCpu,       ///< /sys/devices/system/cpu
-    SysfsNuma,      ///< /sys/devices/system/node
-    SysfsNet,       ///< /sys/class/net
-    SysfsPci,       ///< /sys/bus/pci/devices
-    SysfsBlock,     ///< /sys/block
-    SysfsDmi,       ///< /sys/class/dmi/id
-                    // Linux 文件 / 命令
-    EtcOsRelease,   ///< /etc/os-release
-    RootDockerenv,  ///< /.dockerenv
-    Uname,          ///< uname -m
-    Lspci,          ///< lspci 命令输出
-    NvidiaSmi,      ///< nvidia-smi 命令输出
-    Nvcc,           ///< nvcc --version 命令输出
-    Lsblk,          ///< lsblk 命令输出
-                    // 环境变量
-    Environment,    ///< 进程环境变量
-                    // 外部库后端（未来支持）
-    Nvml,           ///< NVML 库
-    Ibverbs,        ///< ibverbs 库
-    HwinfoOutput,   ///< hwinfo 命令输出
-                    // 新增来源（追加在末尾以保持枚举值稳定性）
-    ProcHostname    ///< /proc/sys/kernel/hostname
+
+    // Linux sysfs
+    SysfsCpu,   ///< /sys/devices/system/cpu
+    SysfsNuma,  ///< /sys/devices/system/node
+    SysfsNet,   ///< /sys/class/net
+    SysfsPci,   ///< /sys/bus/pci/devices
+    SysfsBlock, ///< /sys/block
+    SysfsDmi,   ///< /sys/class/dmi/id
+
+    // Linux 文件 / 命令
+    EtcOsRelease,  ///< /etc/os-release
+    RootDockerenv, ///< /.dockerenv
+    Uname,         ///< uname -m
+    Lspci,         ///< lspci 命令输出
+    NvidiaSmi,     ///< nvidia-smi 命令输出
+    Nvcc,          ///< nvcc --version 命令输出
+    Lsblk,         ///< lsblk 命令输出
+
+    // 环境变量
+    Environment, ///< 进程环境变量
+
+    // 外部库后端（未来支持）
+    Nvml,         ///< NVML 库
+    Ibverbs,      ///< ibverbs 库
+    HwinfoOutput, ///< hwinfo 命令输出
+
+    // 新增来源（追加在末尾以保持枚举值稳定性）
+    ProcHostname ///< /proc/sys/kernel/hostname
 };
 
 /// @brief 单个原始记录的采集状态
