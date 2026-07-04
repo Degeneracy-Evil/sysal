@@ -834,3 +834,24 @@ sysal v0.0.1 重写完成。10 个阶段的核心变更：
   4. roadmap.md：v0.0.1 范围改为 System::collect/refresh + Collect bitmask、Core model 移除 Topology 与 Diagnostics（改为 warnings）、内部管线 ParseResult、移除 hwloc 后端、非目标添加"拓扑信息（已有 hwloc 等成熟库）"、未来扩展说明缓存已内置（System 对象即缓存）、拓扑作为独立可选模块
 - **原因**: API 重构（移除 collect/collect_or_throw 双入口、Expected、CollectSpec builder，引入 System 类 + Collect bitmask）、移除 hwloc 拓扑后端、ParsedFacts 重命名为 ParseResult、Diagnostics 简化为 warnings，设计文档需同步反映
 - **验证**: 逐文件确认无 CollectSpec / collect() / collect_or_throw() / Expected / TopologyInfo / hwloc 残留描述；代码块 C++ 语法正确；专有名词与类型名保持英文
+
+### 2026-07-02 迁移 nlohmann/json 从 vendor 到 xrepo 包管理
+
+- **变更类型**: build / chore
+- **涉及文件**: xmake.lua, utils/check.sh, .gitignore, docs/design/testing/serialization.md, third_party/nlohmann/（删除）
+- **变更内容**:
+  1. xmake.lua：移除 `add_includedirs("third_party")`，改为 `add_requires("nlohmann_json")` + `add_packages("nlohmann_json")`，通过 xrepo 管理依赖（版本 v3.12.0）
+  2. 删除 `third_party/nlohmann/` 整个目录（之前手动 vendor 的 v3.11.2 源码）
+  3. utils/check.sh：移除 pre-commit hook 中对 `third_party/*` 路径的排除过滤（不再需要）
+  4. .gitignore：添加 `.xrepo/` 排除规则
+  5. docs/design/testing/serialization.md：更新 JSON 库描述从 "vendored 在 third_party/nlohmann/" 改为 "通过 xmake add_requires 从 xrepo 管理依赖"
+- **原因**: 手动 vendor 第三方库不可持续——版本更新靠手动拷贝、仓库体积膨胀、无锁定机制。改用 xmake 原生包管理器 xrepo，版本声明在 xmake.lua 中，构建时自动拉取缓存
+- **验证**: `xmake -r` 构建成功（0 errors 0 warnings）；全部 18 个测试通过（528 assertions）；`grep -r third_party` 确认代码中无残留引用
+
+### 2026-07-05 移动 sysal.hpp 到顶层 include 目录
+
+- **变更类型**: refactor
+- **涉及文件**: include/sysal/core/sysal.hpp → include/sysal/sysal.hpp, examples/sysal_info.cpp
+- **变更内容**: 将 `include/sysal/core/sysal.hpp` 移动到 `include/sysal/sysal.hpp`，同步更新 `examples/sysal_info.cpp` 中的 include 路径
+- **原因**: `sysal.hpp` 是库的入口头文件，应放在 `include/sysal/` 顶层而非 `core/` 子目录，使 include 路径更直观（`#include "sysal/sysal.hpp"`）
+- **验证**: `xmake -r` 构建成功；`xmake run sysal_info` 正常输出

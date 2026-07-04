@@ -3,8 +3,8 @@
 /// @details 演示 sysal 库的所有公共 API：完整采集、按域采集、模型查询、
 ///          JSON 序列化往返、原始证据、刷新、可见性筛选和错误处理。
 
-#include "sysal/core/sysal.hpp"
 #include "sysal/serialization/serialization.hpp"
+#include "sysal/sysal.hpp"
 #include "sysal/test/replay.hpp"
 #include "sysal/version.hpp"
 
