@@ -8,14 +8,15 @@
 set_languages("c++23")
 set_toolchains("clang")
 set_rundir(".")
-set_version("0.0.1")
+set_version("0.0.3")
 
 -- 全局编译/链接选项，所有 target 共享
 add_cxxflags("-Wall", "-Wextra", "-Werror", "-stdlib=libc++", {force = true})
 add_ldflags("-stdlib=libc++", "-fuse-ld=lld", "-rtlib=compiler-rt", "-unwindlib=libunwind",
             {force = true})
 add_includedirs("include")
-add_includedirs("third_party")
+add_requires("nlohmann_json")
+add_packages("nlohmann_json")
 
 -- 源文件列表（共享给静态库和动态库）
 local SYSAL_SOURCES = {

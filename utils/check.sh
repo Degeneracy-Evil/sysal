@@ -53,21 +53,8 @@ if [ "$HOOK_MODE" = true ]; then
     has_staged_changes() { ! git diff --cached --quiet -- "$1"; }
     is_partially_staged() { has_staged_changes "$1" && has_unstaged_changes "$1"; }
 
-    # Exclude vendored third-party code from all checks
-    mapfile -d '' STAGED_FILES < <(
-        git diff --cached --name-only -z --diff-filter=ACM |
-        while IFS= read -r -d '' f; do
-            case "$f" in third_party/*) continue ;; esac
-            printf '%s\0' "$f"
-        done
-    )
-    mapfile -d '' STAGED_CPP_FILES < <(
-        git diff --cached --name-only -z --diff-filter=ACM -- "${CPP_PATTERNS[@]}" |
-        while IFS= read -r -d '' f; do
-            case "$f" in third_party/*) continue ;; esac
-            printf '%s\0' "$f"
-        done
-    )
+    mapfile -d '' STAGED_FILES < <(git diff --cached --name-only -z --diff-filter=ACM)
+    mapfile -d '' STAGED_CPP_FILES < <(git diff --cached --name-only -z --diff-filter=ACM -- "${CPP_PATTERNS[@]}")
 
     # 避免把未暂存改动一起 git add 进去
     for file in "${STAGED_FILES[@]}"; do

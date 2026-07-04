@@ -63,7 +63,7 @@ System from_json(std::string_view json);
 2. **独立头文件**：`#include <sysal/serialization/serialization.hpp>` 按需引入，不强制依赖。
 3. **`from_json` 的用途**：主要用于 raw replay 测试——从 JSON 还原 `System`，提取 `raw` 后走 `collect_from_raw` 回放管线。
 4. **版本兼容**：`SnapshotMeta::sysal_version` 写入 JSON；`from_json` 检查版本兼容性，不兼容时抛出 `SysalError`。
-5. **JSON 库**：序列化引擎使用 nlohmann/json 库（vendored 在 `third_party/nlohmann/`），序列化实现位于 `src/serialization/serialize.cpp`。
+5. **JSON 库**：序列化引擎使用 nlohmann/json 库（通过 xmake `add_requires("nlohmann_json")` 从 xrepo 管理依赖），序列化实现位于 `src/serialization/serialize.cpp`。
 
 ## 错误处理
 
