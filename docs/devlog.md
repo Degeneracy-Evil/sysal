@@ -1,5 +1,13 @@
 # 开发记录
 
+### 2026-07-05 v0.0.5 代码质量评审
+
+- **变更类型**: docs
+- **涉及文件**: docs/quality_reports/v005_review.md, docs/devlog.md
+- **变更内容**: v0.0.5 代码质量评审报告（9 维度，5 Oracle agent，加权总分 8/10）。7 项 P1 + 9 项 P2 问题记录
+- **原因**: v0.0.5 版本冻结前评审
+- **验证**: 评审报告完成，P1 问题包括 Xen HVM 检测 gap、KVM/QEMU 排序、detect_virtualization 零警告、Parallels 未测试、virtualization 未 round-trip、strong_typing.md 缺 3 类型、serialization.md storage kind 示例不一致
+
 ### 2026-07-05 v0.0.5 文档冻结：README + 兼容性信息
 
 - **变更类型**: docs
