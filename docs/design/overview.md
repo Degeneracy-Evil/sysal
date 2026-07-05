@@ -32,7 +32,7 @@ Reader → RawStore → Parser → ParseResult → Resolver → System
 
 | 阶段 | 职责 |
 |------|------|
-| Reader | 从 /proc、/sys、命令输出等来源采集原始数据，存入 `RawStore` |
+| Reader | 从 /proc、/sys、POSIX syscall（`getifaddrs()`、`uname()`、`gethostname()`、`readlink()`）、命令输出（`lspci`、`nvidia-smi`、`df -Th`、`udevadm`）、EDAC sysfs 等来源采集原始数据，存入 `RawStore` |
 | Parser | 从 `RawStore` 中按域解析出结构化事实（`ParseResult`），各域独立，无跨域引用 |
 | Resolver | 合并各域事实，解决来源冲突，计算进程可见性，组装最终的 `System` 对象 |
 

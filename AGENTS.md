@@ -38,7 +38,7 @@ output/           输出文件 (gitignore)
 - `compile_commands.json` 由 `after_build` 钩子自动生成，`xmake -r` 后也会重新生成
 - 行尾统一 LF（`.gitattributes` 控制）
 - pre-commit hook 通过 `.githooks/pre-commit` 转发到 `utils/check.sh --hook`；首次 `xmake build` 自动配置 `core.hooksPath`
-- 命名规则参见 `docs/命名规则.md`
+- 命名规则参见 `docs/design/rules/strong_typing.md`
 
 ## 开发记录规则
 

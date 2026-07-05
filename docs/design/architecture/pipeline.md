@@ -6,7 +6,10 @@
 Reader → RawStore → Parser → ParseResult → Resolver → System
 ```
 
-- **Reader**：将原始信息收集到 `RawStore`。
+- **Reader**：将原始信息收集到 `RawStore`。数据来源包括 procfs（`/proc`）、
+  sysfs（`/sys`）、POSIX syscall（`getifaddrs()`、`uname()`、`gethostname()`、
+  `readlink()`）、命令执行（`lspci`、`nvidia-smi`、`df -Th`、`udevadm`）、
+  以及 EDAC sysfs（`/sys/devices/system/edac`）。
 - **Parser**：将 `RawStore` 转换为按域划分的 `ParseResult`（无跨域引用，直接使用公共类型）。
 - **Resolver**：合并 `ParseResult`，解决冲突，计算可见性，组装 `System` 对象。
 
@@ -41,8 +44,8 @@ struct ParseResult
 ```txt
 sysal/
 ├── include/sysal/
+│   ├── sysal.hpp                    # 总入口（顶层，不在 core/ 下）
 │   ├── core/                        # 库核心
-│   │   ├── sysal.hpp                # 总入口
 │   │   ├── system.hpp               # System 类 + SystemInfo
 │   │   ├── collect.hpp              # Collect 位掩码枚举
 │   │   └── error.hpp                # SysalError
@@ -109,14 +112,15 @@ sysal/
 
 | 目录 | 职责 |
 |---|---|
-| `include/sysal/core/` | 库入口、`System` 类、`Collect` 枚举、错误类型 |
+| `include/sysal/`（顶层） | `sysal.hpp` 总入口 |
+| `include/sysal/core/` | `System` 类、`Collect` 枚举、错误类型 |
 | `include/sysal/model/` | 各子系统的数据模型定义 |
 | `include/sysal/types/` | 基础类型（枚举、强类型 ID、单位、值包装） |
 | `include/sysal/serialization/` | 可选的 JSON 序列化头 |
 | `include/sysal/test/` | 测试工具 |
 | `src/api/` | `System::collect()` / `refresh()` 实现 |
 | `src/model/` | `RawStore` 等数据模型的方法实现 |
-| `reader/linux/` | 平台相关的原始数据采集（procfs / sysfs） |
+| `reader/linux/` | 平台相关的原始数据采集（procfs / sysfs / syscall / 命令执行） |
 | `parser/` | 从 `RawStore` 解析出 `ParseResult`（按域独立） |
 | `resolver/` | 从 `ParseResult` 组装 `System`（可见性、冲突解决） |
 | `serialization/` | JSON 序列化引擎与 `System` 的序列化实现 |
@@ -124,3 +128,8 @@ sysal/
 
 平台相关的 reader 位于 `src/reader/<platform>/` 下。
 xmake 在构建时选择平台目录。
+
+### 外部依赖
+
+- **nlohmann/json**：JSON 序列化依赖，通过 xmake `add_requires("nlohmann_json")`
+  从 xrepo 管理。v0.0.4 之前为 vendor 方式管理，v0.0.4 迁移至 xrepo。

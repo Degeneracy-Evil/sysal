@@ -25,7 +25,8 @@ docs/design/
 │   └── warnings.md
 ├── architecture/                 ← 内部架构
 │   ├── pipeline.md
-│   └── backend_strategy.md
+│   ├── backend_strategy.md
+│   └── data_source_guideline.md
 ├── rules/                        ← 设计规则与约束
 │   ├── strong_typing.md
 │   ├── conflict_resolution.md
@@ -73,6 +74,7 @@ docs/design/
 |---|---|
 | [architecture/pipeline.md](architecture/pipeline.md) | 内部管线 Reader→RawStore→Parser→ParseResult→Resolver→System、源码布局（api/model/reader/parser/resolver/serialization/pipeline） |
 | [architecture/backend_strategy.md](architecture/backend_strategy.md) | 后端选择策略：NVML / procfs / sysfs |
+| [architecture/data_source_guideline.md](architecture/data_source_guideline.md) | 数据源选择原则：syscall > 文件读取 > 命令执行，决策表与检查清单 |
 
 ### 设计规则层
 
@@ -93,7 +95,7 @@ docs/design/
 
 | 文件 | 职能 |
 |---|---|
-| [roadmap.md](roadmap.md) | v0.0.3 实现范围、非目标、未来扩展（缓存内置 / 跨平台 / 拓扑模块） |
+| [roadmap.md](roadmap.md) | v0.0.3 / v0.0.4 实现范围、非目标、未来扩展（缓存内置 / 跨平台 / 拓扑模块） |
 
 ## 阅读顺序
 
@@ -105,4 +107,4 @@ docs/design/
 4. [data_model/cpu.md](data_model/cpu.md) — 理解 CPU 模型（最重要）
 5. [architecture/pipeline.md](architecture/pipeline.md) — 理解内部管线和模块结构
 6. [rules/strong_typing.md](rules/strong_typing.md) — 理解类型系统
-7. [roadmap.md](roadmap.md) — 理解 v0.0.3 范围
+7. [roadmap.md](roadmap.md) — 理解 v0.0.3 / v0.0.4 范围

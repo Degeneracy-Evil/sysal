@@ -33,10 +33,48 @@ System from_json(std::string_view json);
   "info": {
     "platform": { ... },
     "cpu": { ... },
-    "memory": { ... },
+    "memory": {
+      "total_memory": 34359738368,
+      "available_memory": 21474836480,
+      "numa_memory": [
+        { "node": 0, "total": 17179869184, "available": 10737418240 },
+        { "node": 1, "total": 17179869184, "available": 10737418240 }
+      ],
+      "dimms": [
+        {
+          "locator": "CPU0_C0D0",
+          "bank_locator": "NODE 0",
+          "size": 17179869184,
+          "type": "DDR4",
+          "speed_mts": 3200,
+          "configured_speed_mts": 2933,
+          "manufacturer": "Samsung",
+          "part_number": "M393A2K43DB3-CWE",
+          "rank": 2,
+          "total_width": 72,
+          "data_width": 64,
+          "form_factor": "DIMM",
+          "present": true
+        }
+      ],
+      "dimm_count": 16,
+      "populated_dimms": 4
+    },
     "accelerators": { ... },
     "network": { ... },
-    "storage": { ... },
+    "storage": {
+      "devices": [
+        {
+          "id": "nvme0n1",
+          "name": "nvme0n1",
+          "capacity": 1024209543168,
+          "pci_address": "0000:01:00.0",
+          "kind": "Nvme",
+          "mount_point": "/",
+          "fs_type": "ext4"
+        }
+      ]
+    },
     "pci": { ... },
     "software": { ... },
     "execution": { ... }

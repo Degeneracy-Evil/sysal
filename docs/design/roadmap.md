@@ -101,6 +101,18 @@ Reader → RawStore → Parser → ParseResult → Resolver → System
 | capabilities 解码 | PCI capabilities 解析 |
 | 设计文档对齐 | 全部设计文档与实际代码保持一致 |
 
+## v0.0.4 实现范围
+
+| 组件 | 说明 |
+|------|------|
+| 网络 IP 地址采集 | 通过 `getifaddrs()` syscall 采集网络接口 IP 地址 |
+| 网络 PCI 地址 | 通过设备 sysfs 符号链接解析网络接口的 PCI 地址 |
+| 存储挂载点与文件系统类型 | 通过 `df -Th` 命令采集挂载点和文件系统类型 |
+| 内存 DIMM 详情 | 通过 `udevadm info -e`（主）和 EDAC sysfs（备）双源采集 DIMM 信息 |
+| Syscall 优化 | `uname()` 替代 `/proc/version`，`gethostname()` 替代 `/proc/sys/kernel/hostname` |
+| nlohmann/json 迁移 | 从 vendor 方式迁移至 xrepo `add_requires("nlohmann_json")` |
+| sysal.hpp 位置调整 | 总入口头文件移至 `include/sysal/` 顶层，不再位于 `core/` 子目录 |
+
 ## 未来扩展
 
 ### 缓存

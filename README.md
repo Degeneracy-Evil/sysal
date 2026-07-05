@@ -96,6 +96,7 @@ sys.refresh();
 | libc++ | — | C++ 标准库（随 clang 发布） |
 | clang-format | — | 代码格式化（随 clang 发布） |
 | clang-tidy | — | 静态分析（随 clang 发布） |
+| nlohmann_json | — | JSON 序列化（通过 xmake `add_requires` 从 xrepo 管理） |
 
 ## 构建
 
@@ -136,6 +137,14 @@ push 到 `main` 或 PR 时，GitHub Actions 自动运行 `utils/check.sh` 全量
 **实现**：公共 API（`System::collect` / `refresh` / `Collect` 位掩码）、全部数据模型、Linux 支持（procfs / sysfs / PCI）、nvidia-smi 命令输出采集、lspci 设备名解析、Storage HDD/SSD 检测、ISA 扩展（SSE/AVX/AVX-512/AES/FMA 等 17 项）、容器检测（Docker/Podman/LXC/K8s）、nlohmann/json 序列化、raw replay 测试。
 
 **不实现**：性能评分、基准测试、算子选择、调度策略、守护进程、数据库存储、Web API、完整跨平台、拓扑信息（已有 hwloc）、NVML/ibverbs 库链接。
+
+## v0.0.4 范围（即将发布）
+
+**新增采集**：网络 IP 地址（`getifaddrs()`）、网络 PCI 地址（设备 sysfs 符号链接）、存储挂载点和文件系统类型（`df -Th`）、内存 DIMM 详情（`udevadm` + EDAC sysfs 双源策略）。
+
+**优化**：syscall 优化（`uname()` 替代 `/proc/version`，`gethostname()` 替代 `/proc/sys/kernel/hostname`）、nlohmann/json 从 vendor 迁移至 xrepo 管理、`sysal.hpp` 移至 `include/sysal/` 顶层。
+
+**不实现**：与 v0.0.3 相同（性能评分、基准测试、算子选择、调度策略、守护进程、数据库存储、Web API、完整跨平台、拓扑信息、NVML/ibverbs 库链接）。
 
 ## 与其他项目的关系
 

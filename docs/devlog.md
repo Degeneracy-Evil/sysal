@@ -1,5 +1,16 @@
 # 开发记录
 
+### 2026-07-05 procfs/platform 改用系统调用替代文件与命令采集
+
+- **变更类型**: src / tests
+- **涉及文件**: src/reader/linux/procfs.cpp, src/parser/platform.cpp, tests/unit/test_parse_platform.cpp
+- **变更内容**:
+  1. `procfs.cpp`: 新增 `read_uname()` 辅助函数，一次 `uname()` 调用同时填充 `RawSource::Uname`（payload=`buf.machine`）与 `RawSource::ProcVersion`（payload=`"release\nversion"`）两条记录；新增 `read_hostname()` 调用 `gethostname()` 填充 `RawSource::ProcHostname`；Platform 域中原 `read_proc_file(/proc/version)`、`read_cmd("uname -m")`、`read_proc_file(/proc/sys/kernel/hostname)` 三行替换为 `read_uname()` + `read_hostname()` 两次调用；新增 `<sys/utsname.h>`、`<unistd.h>` 头文件
+  2. `platform.cpp`: `parse_proc_version()` 重写为解析新的两行格式（行1=release→kernel.release，截取首个 `-` 前为 kernel.version；行2=version→kernel.compiled_at 完整字符串）；移除原 `Linux version` 前缀解析与 `#` 后星期几时间戳提取逻辑；移除不再使用的 `<algorithm>`、`<array>` 头文件
+  3. `test_parse_platform.cpp`: 全部 ProcVersion 测试载荷从旧 free-form `/proc/version` 字符串改为 `"release\nversion"` 两行格式，path_or_command 从 `/proc/version` 改为 `uname`；Uname 记录 path_or_command 从 `uname -m` 改为 `uname`；测试 1 的 compiled_at 期望值更新为完整 version 字符串（含 `#101-Ubuntu SMP ` 前缀）
+- **原因**: 审计发现 procfs 采集层存在 3 处可通过系统调用替代的文件/命令读取（`popen("uname -m")`、`read_file("/proc/sys/kernel/hostname")`、`read_file("/proc/version")`）；系统调用比 fork+exec 或文件读取更轻量、更可靠，且一次 `uname()` 可同时提供架构与内核信息
+- **验证**: `xmake -r` build ok 0 warnings；`xmake run test_parse_platform` 34 passed 0 failed；`xmake run test_reader` 26 passed 0 failed；`xmake run test_replay` 16 passed 0 failed；`xmake run sysal_info` 正确显示 hostname=head、kernel release=6.8.0-111-generic、version=6.8.0、arch=x86_64
+
 ### 2026-07-05 内存 DIMM 详细信息采集
 
 - **变更类型**: src / tests
@@ -893,3 +904,23 @@ sysal v0.0.1 重写完成。10 个阶段的核心变更：
   4. **Memory DIMM**: enums.hpp 新增 `Udevadm` 和 `SysfsEdac` RawSource；procfs.cpp 执行 `udevadm info -e`；sysfs.cpp 读取 `/sys/devices/system/edac/mc/mcN/dimmM/`；memory.hpp 新增 `DimmInfo` 结构体（13 字段）+ Memory 加 `dimms`/`dimm_count`/`populated_dimms`；memory.cpp 以 udevadm 为主解析 `MEMORY_DEVICE_N_FIELD` 条目，EDAC 为辅 fallback；序列化和 sysal_info 同步更新
 - **原因**: Network 缺 IP 和 PCI 地址、Storage 缺挂载点和文件系统类型、Memory 缺 DIMM 级别硬件信息（频率/代数/厂商/型号）
 - **验证**: `xmake -r` 构建成功（0 warnings）；全部 18 个测试通过（678 assertions）；sysal_info 正确显示 27 DIMM 槽位/11 已用、Samsung DDR4-3200 32GiB、网络 IP 和 PCI 地址、存储挂载点和文件系统类型
+
+### 2026-07-05 修复设计文档缺口 + 新增数据源选择原则文档
+
+- **变更类型**: docs
+- **涉及文件**: docs/design/data_model/raw_store.md, docs/design/data_model/storage.md, docs/design/data_model/memory.md, docs/design/architecture/pipeline.md, docs/design/roadmap.md, docs/design/overview.md, docs/design/testing/serialization.md, docs/design/index.md, docs/design/architecture/data_source_guideline.md (新增), docs/naming_rules.md (删除), README.md, AGENTS.md, docs/devlog.md
+- **变更内容**:
+  1. `raw_store.md`: RawSource 枚举补充 IfAddrs、DfTh、Udevadm、SysfsEdac 四个新值，按来源分组排列
+  2. `storage.md`: StorageDevice 结构体补充 mount_point 和 fs_type 字段；设计说明更新为 v0.0.4 新增 df -Th 采集
+  3. `memory.md`: 新增完整 DimmInfo 结构体（13 字段）；Memory 结构体补充 dimms、dimm_count、populated_dimms 字段；设计说明增加双源策略（udevadm 主 + EDAC sysfs 备）
+  4. `pipeline.md`: 源码布局中 sysal.hpp 移至顶层（不在 core/ 下）；Reader 描述补充 getifaddrs、udevadm、df -Th、EDAC sysfs；新增外部依赖小节说明 nlohmann/json 通过 xrepo 管理
+  5. `roadmap.md`: 新增 v0.0.4 实现范围章节（网络 IP/PCI 地址、存储挂载点、DIMM 详情、syscall 优化、nlohmann/json 迁移、sysal.hpp 位置调整）
+  6. `README.md`: 新增 v0.0.4 范围章节；开发环境表格补充 nlohmann_json 依赖说明
+  7. `overview.md`: Reader 描述扩展为包含 syscall、命令执行、EDAC sysfs 等数据来源
+  8. `serialization.md`: JSON 结构示例补充 memory.dimms、storage.devices[].mount_point/fs_type 字段
+  9. `data_source_guideline.md` (新增): 数据源选择原则文档，覆盖核心原则（syscall > 文件读取 > 命令执行）、理由、决策表、例外规则、新增数据源检查清单
+  10. `index.md`: 目录结构和文档索引表新增 data_source_guideline.md 引用；roadmap 描述更新为 v0.0.3/v0.0.4
+  11. `naming_rules.md` (删除): 文件内容来自 blas_benchmark 项目，与 sysal 无关
+  12. `AGENTS.md`: 命名规则引用从 `docs/命名规则.md` 更新为 `docs/design/rules/strong_typing.md`
+- **原因**: 7 个 commit 新增功能后设计文档未同步更新；缺少数据源选择原则的正式文档；naming_rules.md 包含错误项目内容
+- **验证**: 文档审查，确认所有设计文档与当前代码状态一致；`docs/naming_rules.md` 已删除；`data_source_guideline.md` 格式与现有设计文档一致

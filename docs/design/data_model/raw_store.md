@@ -27,12 +27,17 @@ enum class RawSource
     NvidiaSmi,
     Nvcc,
     Lsblk,
+    IfAddrs,        ///< getifaddrs() 网络接口地址
+    DfTh,           ///< df -Th 文件系统挂载信息
+    Udevadm,        ///< udevadm info -e 硬件数据库
     // 环境变量（v0.0.1）
     Environment,
     // 外部库后端（未来支持）
     Nvml,
     Ibverbs,
     HwinfoOutput,
+    // Linux sysfs（v0.0.4）
+    SysfsEdac,      ///< /sys/devices/system/edac 内存 DIMM 信息
     // Windows / macOS — 未来支持
     ProcHostname,   ///< /proc/sys/kernel/hostname
 };
