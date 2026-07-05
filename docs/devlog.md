@@ -1,5 +1,31 @@
 # 开发记录
 
+### 2026-07-05 内存 DIMM 详细信息采集
+
+- **变更类型**: src / tests
+- **涉及文件**: include/sysal/model/memory.hpp, src/reader/linux/sysfs.cpp, src/parser/memory.cpp, src/serialization/serialize.cpp, examples/sysal_info.cpp, tests/unit/test_parse_memory.cpp
+- **变更内容**:
+  1. `memory.hpp`: 新增 `DimmInfo` 结构体（locator/bank_locator/size/type/speed_mts/configured_speed_mts/manufacturer/part_number/rank/total_width/data_width/form_factor/present）；`Memory` 新增 `dimms`、`dimm_count`、`populated_dimms` 字段
+  2. `sysfs.cpp`: 新增 `read_edac_sysfs()`，遍历 `/sys/devices/system/edac/mc/mcN/dimmM/` 读取 dimm_mem_type/size/dimm_label/dimm_location/dimm_dev_type/dimm_edac_mode，存为 `RawSource::SysfsEdac`；无 EDAC 目录时静默跳过；在 `Collect::Memory` 下分派
+  3. `memory.cpp`: 新增 `parse_udevadm_dimms()` 解析 udevadm `MEMORY_DEVICE_N_FIELD=value` 条目，按 N 分组构建 DimmInfo；PRESENT 字段缺失时按 SIZE>0 推断 present；新增 `parse_edac_dimms()` 作为 udevadm 无结果时的回退，按 sysfs 路径分组，size 从 MB 转字节；`parse_memory()` 中 udevadm 优先、EDAC 回退，并计算 dimm_count/populated_dimms
+  4. `serialize.cpp`: 新增 `dimm_info_to_json`/`dimm_info_from_json`，`memory_to_json`/`memory_from_json` 增加 dimms/dimm_count/populated_dimms 字段
+  5. `sysal_info.cpp`: section "4. Memory" 增加 DIMM 插槽总数、已安装数及逐条 DIMM 详情输出
+  6. `test_parse_memory.cpp`: 新增 3 个测试用例（udevadm 2 DIMM 一空一满、EDAC 回退 2 DIMM、无数据时 dimms 为空不崩溃）
+- **原因**: Memory 模型此前仅有总量与 NUMA 分布，缺少 DIMM 级别详情；reader 层 procfs 已采集 udevadm，sysfs 需补充 EDAC 读取作为回退
+- **验证**: `xmake -r` build ok；`xmake run test_parse_memory` 67 passed 0 failed；`xmake run test_serialization` 37 passed 0 failed；全部 18 个测试套件通过；sysal_info 正确显示 27 DIMM 插槽 / 11 已安装
+
+### 2026-07-05 网络接口 IP 地址与 PCI 地址解析
+
+- **变更类型**: src / tests
+- **涉及文件**: src/reader/linux/sysfs.cpp, src/parser/network.cpp, tests/unit/test_parse_network.cpp
+- **变更内容**:
+  1. `sysfs.cpp` `read_net_sysfs()`: 读取 `/sys/class/net/<ifname>/device` 符号链接目标，存为 SysfsNet 记录（payload 为符号链接目标字符串）；虚拟接口无此链接时静默跳过
+  2. `network.cpp` `parse_network()`: 解析 IfAddrs 记录（payload 格式 "ifname ip\n"），按接口名分组填充 `NetworkInterface.addresses`
+  3. `network.cpp` `parse_network()`: 处理 SysfsNet 中 filename=="device" 的记录，提取符号链接目标末尾路径分量，经 `parse_pci_address()` 解析后填充 `NetworkInterface.pci_address`
+  4. `test_parse_network.cpp`: 新增 4 个测试用例（IfAddrs IPv4/IPv6 填充、device 符号链接 PCI 地址填充、无 IfAddrs 时空 addresses、虚拟接口无 PCI 地址）
+- **原因**: NetworkInterface 模型已有 addresses 与 pci_address 字段但 parser 未填充；reader 层 procfs 已采集 getifaddrs 数据，sysfs 需补充 device 符号链接读取
+- **验证**: `xmake -r` build ok；`xmake run test_parse_network` 44 passed 0 failed；`xmake run test_reader` 26 passed 0 failed；test_replay/test_collect/test_serialization 均通过
+
 ### 2026-07-02 消除 sysal_info 全部 warnings
 
 - **变更类型**: src / fix / tests
@@ -855,3 +881,15 @@ sysal v0.0.1 重写完成。10 个阶段的核心变更：
 - **变更内容**: 将 `include/sysal/core/sysal.hpp` 移动到 `include/sysal/sysal.hpp`，同步更新 `examples/sysal_info.cpp` 中的 include 路径
 - **原因**: `sysal.hpp` 是库的入口头文件，应放在 `include/sysal/` 顶层而非 `core/` 子目录，使 include 路径更直观（`#include "sysal/sysal.hpp"`）
 - **验证**: `xmake -r` 构建成功；`xmake run sysal_info` 正常输出
+
+### 2026-07-05 Network IP 地址 + PCI 地址 + Storage df -Th + Memory DIMM 详情
+
+- **变更类型**: feat / src
+- **涉及文件**: include/sysal/types/enums.hpp, include/sysal/model/storage.hpp, include/sysal/model/memory.hpp, src/reader/linux/procfs.cpp, src/reader/linux/sysfs.cpp, src/parser/network.cpp, src/parser/storage.cpp, src/parser/memory.cpp, src/serialization/serialize.cpp, examples/sysal_info.cpp, tests/unit/test_parse_network.cpp, tests/unit/test_parse_storage.cpp, tests/unit/test_parse_memory.cpp
+- **变更内容**:
+  1. **Network IP 地址**: procfs.cpp 新增 `read_ifaddrs()` 使用 `getifaddrs()` 采集接口 IP（IPv4+IPv6），序列化为 `IfAddrs` RawSource；network.cpp 解析填充 `NetworkInterface.addresses`
+  2. **Network PCI 地址**: sysfs.cpp 新增 `read_symlink()` 读取 `/sys/class/net/<ifname>/device` 符号链接目标；network.cpp 提取最后一PathComponent 用 `parse_pci_address()` 解析填入 `NetworkInterface.pci_address`
+  3. **Storage df -Th**: procfs.cpp 将 `lsblk` 替换为 `df -Th`；storage.hpp 新增 `mount_point` 和 `fs_type` 字段；storage.cpp 解析 df 输出按设备名与 sysfs 合并（精确匹配 + 分区前缀匹配）
+  4. **Memory DIMM**: enums.hpp 新增 `Udevadm` 和 `SysfsEdac` RawSource；procfs.cpp 执行 `udevadm info -e`；sysfs.cpp 读取 `/sys/devices/system/edac/mc/mcN/dimmM/`；memory.hpp 新增 `DimmInfo` 结构体（13 字段）+ Memory 加 `dimms`/`dimm_count`/`populated_dimms`；memory.cpp 以 udevadm 为主解析 `MEMORY_DEVICE_N_FIELD` 条目，EDAC 为辅 fallback；序列化和 sysal_info 同步更新
+- **原因**: Network 缺 IP 和 PCI 地址、Storage 缺挂载点和文件系统类型、Memory 缺 DIMM 级别硬件信息（频率/代数/厂商/型号）
+- **验证**: `xmake -r` 构建成功（0 warnings）；全部 18 个测试通过（678 assertions）；sysal_info 正确显示 27 DIMM 槽位/11 已用、Samsung DDR4-3200 32GiB、网络 IP 和 PCI 地址、存储挂载点和文件系统类型

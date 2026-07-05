@@ -294,6 +294,14 @@ const char* raw_source_str(sysal::RawSource s)
         return "Ibverbs";
     case sysal::RawSource::HwinfoOutput:
         return "HwinfoOutput";
+    case sysal::RawSource::IfAddrs:
+        return "IfAddrs";
+    case sysal::RawSource::DfTh:
+        return "DfTh";
+    case sysal::RawSource::Udevadm:
+        return "Udevadm";
+    case sysal::RawSource::SysfsEdac:
+        return "SysfsEdac";
     }
     return "?";
 }
@@ -464,6 +472,64 @@ int main()
                   format_memory(nm.available->value));
         }
     }
+    if(sys.info.memory.dimm_count.has_value())
+    {
+        label("DIMM slots", *sys.info.memory.dimm_count);
+    }
+    if(sys.info.memory.populated_dimms.has_value())
+    {
+        label("Populated DIMMs", *sys.info.memory.populated_dimms);
+    }
+    for(std::size_t i = 0; i < sys.info.memory.dimms.size(); ++i)
+    {
+        const auto& d = sys.info.memory.dimms[i];
+        std::cout << "  DIMM " << i << ": " << d.locator;
+        if(!d.bank_locator.empty())
+        {
+            std::cout << " (" << d.bank_locator << ")";
+        }
+        std::cout << (d.present ? " [present]" : " [empty]") << "\n";
+        if(!d.type.empty())
+        {
+            label("  Type", d.type);
+        }
+        if(d.size.value > 0)
+        {
+            label("  Size", format_memory(d.size.value));
+        }
+        if(d.speed_mts.has_value())
+        {
+            label("  Speed (MT/s)", *d.speed_mts);
+        }
+        if(d.configured_speed_mts.has_value())
+        {
+            label("  Configured speed (MT/s)", *d.configured_speed_mts);
+        }
+        if(d.manufacturer.has_value())
+        {
+            label("  Manufacturer", *d.manufacturer);
+        }
+        if(d.part_number.has_value())
+        {
+            label("  Part number", *d.part_number);
+        }
+        if(d.rank.has_value())
+        {
+            label("  Rank", *d.rank);
+        }
+        if(d.total_width.has_value())
+        {
+            label("  Total width", *d.total_width);
+        }
+        if(d.data_width.has_value())
+        {
+            label("  Data width", *d.data_width);
+        }
+        if(d.form_factor.has_value())
+        {
+            label("  Form factor", *d.form_factor);
+        }
+    }
 
     // ── 5. Accelerators ─────────────────────────────────────────────────
     section("5. Accelerators");
@@ -553,6 +619,14 @@ int main()
         {
             label("  PCI", format_pci(*dev.pci_address));
         }
+        if(dev.fs_type.has_value())
+        {
+            label("  FS Type", *dev.fs_type);
+        }
+        if(dev.mount_point.has_value())
+        {
+            label("  Mount", *dev.mount_point);
+        }
     }
 
     // ── 8. PCI ──────────────────────────────────────────────────────────
@@ -607,8 +681,8 @@ int main()
     }
     if(sys.info.software.cuda.has_value())
     {
-        label("CUDA version", sys.info.software.cuda->version);
-        label("CUDA driver", sys.info.software.cuda->driver_version);
+        label("NVIDIA Driver", sys.info.software.cuda->driver_version);
+        label("CUDA Toolkit (nvcc)", sys.info.software.cuda->version);
         label("nvcc path", sys.info.software.cuda->nvcc_path);
         label("CUDA_HOME", sys.info.software.cuda->home);
     }

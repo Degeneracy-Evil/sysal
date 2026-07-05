@@ -100,5 +100,145 @@ int main()
         CHECK(!result.has_value());
     }
 
+    // ---- 测试 6: udevadm 解析 DIMM（一个已安装、一个空槽）----
+    {
+        RawStore raw;
+        raw.records.push_back(make_record(RawSource::ProcMemInfo, "/proc/meminfo",
+                                          "MemTotal:       34359738368 kB\n"
+                                          "MemAvailable:   30000000000 kB\n"));
+        raw.records.push_back(make_record(RawSource::Udevadm, "udevadm info -e",
+                                          "P: /devices/virtual/dmi/id\n"
+                                          "E: ID_VENDOR=Supermicro\n"
+                                          "E: MEMORY_DEVICE_0_TYPE=DDR4\n"
+                                          "E: MEMORY_DEVICE_0_SPEED_MTS=3200\n"
+                                          "E: MEMORY_DEVICE_0_CONFIGURED_SPEED_MTS=2933\n"
+                                          "E: MEMORY_DEVICE_0_SIZE=34359738368\n"
+                                          "E: MEMORY_DEVICE_0_MANUFACTURER=Samsung\n"
+                                          "E: MEMORY_DEVICE_0_PART_NUMBER=M393A4K40EB3-CWE\n"
+                                          "E: MEMORY_DEVICE_0_SERIAL=T0HA00014848D5609A\n"
+                                          "E: MEMORY_DEVICE_0_LOCATOR=CPU0_C0D0\n"
+                                          "E: MEMORY_DEVICE_0_BANK_LOCATOR=NODE 0\n"
+                                          "E: MEMORY_DEVICE_0_RANK=2\n"
+                                          "E: MEMORY_DEVICE_0_TOTAL_WIDTH=72\n"
+                                          "E: MEMORY_DEVICE_0_DATA_WIDTH=64\n"
+                                          "E: MEMORY_DEVICE_0_FORM_FACTOR=DIMM\n"
+                                          "E: MEMORY_DEVICE_0_PRESENT=1\n"
+                                          "E: MEMORY_DEVICE_1_PRESENT=0\n"
+                                          "E: MEMORY_DEVICE_1_LOCATOR=CPU0_C0D1\n"
+                                          "E: MEMORY_DEVICE_1_BANK_LOCATOR=NODE 0\n"));
+
+        std::vector<std::string> warnings;
+        auto result = parse_memory(raw, warnings);
+        CHECK(result.has_value());
+
+        const auto& mem = *result;
+        CHECK(mem.dimms.size() == 2);
+        CHECK(mem.dimm_count.has_value());
+        CHECK(*mem.dimm_count == 2);
+        CHECK(mem.populated_dimms.has_value());
+        CHECK(*mem.populated_dimms == 1);
+
+        const auto& d0 = mem.dimms[0];
+        CHECK(d0.present);
+        CHECK(d0.type == "DDR4");
+        CHECK(d0.locator == "CPU0_C0D0");
+        CHECK(d0.bank_locator == "NODE 0");
+        CHECK(d0.size.value == 34359738368ULL);
+        CHECK(d0.speed_mts.has_value());
+        CHECK(*d0.speed_mts == 3200);
+        CHECK(d0.configured_speed_mts.has_value());
+        CHECK(*d0.configured_speed_mts == 2933);
+        CHECK(d0.manufacturer.has_value());
+        CHECK(*d0.manufacturer == "Samsung");
+        CHECK(d0.part_number.has_value());
+        CHECK(*d0.part_number == "M393A4K40EB3-CWE");
+        CHECK(d0.rank.has_value());
+        CHECK(*d0.rank == 2);
+        CHECK(d0.total_width.has_value());
+        CHECK(*d0.total_width == 72);
+        CHECK(d0.data_width.has_value());
+        CHECK(*d0.data_width == 64);
+        CHECK(d0.form_factor.has_value());
+        CHECK(*d0.form_factor == "DIMM");
+
+        const auto& d1 = mem.dimms[1];
+        CHECK(!d1.present);
+        CHECK(d1.locator == "CPU0_C0D1");
+        CHECK(d1.bank_locator == "NODE 0");
+        CHECK(d1.size.value == 0);
+        CHECK(d1.type.empty());
+    }
+
+    // ---- 测试 7: EDAC 回退解析 DIMM ----
+    {
+        RawStore raw;
+        raw.records.push_back(make_record(RawSource::ProcMemInfo, "/proc/meminfo",
+                                          "MemTotal:       32768000 kB\n"
+                                          "MemAvailable:   30000000 kB\n"));
+        raw.records.push_back(make_record(RawSource::SysfsEdac,
+                                          "/sys/devices/system/edac/mc/mc0/dimm0/dimm_mem_type",
+                                          "Unbuffered-DDR4\n"));
+        raw.records.push_back(make_record(RawSource::SysfsEdac,
+                                          "/sys/devices/system/edac/mc/mc0/dimm0/size", "32768\n"));
+        raw.records.push_back(make_record(RawSource::SysfsEdac,
+                                          "/sys/devices/system/edac/mc/mc0/dimm0/dimm_label",
+                                          "CPU_SrcID#0_MC#0_Chan#0_DIMM#0\n"));
+        raw.records.push_back(make_record(RawSource::SysfsEdac,
+                                          "/sys/devices/system/edac/mc/mc0/dimm0/dimm_location",
+                                          "channel 0 slot 0\n"));
+        raw.records.push_back(make_record(RawSource::SysfsEdac,
+                                          "/sys/devices/system/edac/mc/mc0/dimm1/dimm_mem_type",
+                                          "Unbuffered-DDR4\n"));
+        raw.records.push_back(make_record(RawSource::SysfsEdac,
+                                          "/sys/devices/system/edac/mc/mc0/dimm1/size", "32768\n"));
+        raw.records.push_back(make_record(RawSource::SysfsEdac,
+                                          "/sys/devices/system/edac/mc/mc0/dimm1/dimm_label",
+                                          "CPU_SrcID#0_MC#0_Chan#1_DIMM#0\n"));
+        raw.records.push_back(make_record(RawSource::SysfsEdac,
+                                          "/sys/devices/system/edac/mc/mc0/dimm1/dimm_location",
+                                          "channel 1 slot 0\n"));
+
+        std::vector<std::string> warnings;
+        auto result = parse_memory(raw, warnings);
+        CHECK(result.has_value());
+
+        const auto& mem = *result;
+        CHECK(mem.dimms.size() == 2);
+        CHECK(mem.dimm_count.has_value());
+        CHECK(*mem.dimm_count == 2);
+        CHECK(mem.populated_dimms.has_value());
+        CHECK(*mem.populated_dimms == 2);
+
+        const auto& d0 = mem.dimms[0];
+        CHECK(d0.present);
+        CHECK(d0.type == "Unbuffered-DDR4");
+        CHECK(d0.size.value == 32768ULL * 1024 * 1024);
+        CHECK(d0.locator == "CPU_SrcID#0_MC#0_Chan#0_DIMM#0");
+        CHECK(d0.bank_locator == "channel 0 slot 0");
+
+        const auto& d1 = mem.dimms[1];
+        CHECK(d1.present);
+        CHECK(d1.type == "Unbuffered-DDR4");
+        CHECK(d1.size.value == 32768ULL * 1024 * 1024);
+        CHECK(d1.locator == "CPU_SrcID#0_MC#0_Chan#1_DIMM#0");
+    }
+
+    // ---- 测试 8: 无 udevadm 无 EDAC，dimms 为空 ----
+    {
+        RawStore raw;
+        raw.records.push_back(make_record(RawSource::ProcMemInfo, "/proc/meminfo",
+                                          "MemTotal:       16777216 kB\n"
+                                          "MemAvailable:   15000000 kB\n"));
+
+        std::vector<std::string> warnings;
+        auto result = parse_memory(raw, warnings);
+        CHECK(result.has_value());
+
+        const auto& mem = *result;
+        CHECK(mem.dimms.empty());
+        CHECK(!mem.dimm_count.has_value());
+        CHECK(!mem.populated_dimms.has_value());
+    }
+
     TEST_SUMMARY();
 }
