@@ -1,5 +1,15 @@
 # 开发记录
 
+### 2026-07-05 v0.0.5 文档冻结：README + 兼容性信息
+
+- **变更类型**: docs
+- **涉及文件**: README.md, docs/devlog.md
+- **变更内容**:
+  1. README.md: Memory 描述更新为"总量、内存类型、配置速率、NUMA、DIMM 拓扑"；新增"兼容性"小节说明 glibc 2.17+ 支持和 CentOS 7 构建方法
+  2. devlog: 记录本次文档冻结
+- **原因**: v0.0.5 即将冻结版本并进入评审，需确保所有面向用户的文档反映最新功能
+- **验证**: 文档审查，README 内容与代码和 AGENTS.md 一致
+
 ### 2026-07-05 CentOS 7 兼容性构建 + xmake.lua 工具链自适应
 
 - **变更类型**: build / refactor

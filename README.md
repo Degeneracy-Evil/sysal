@@ -35,7 +35,7 @@ sysal::System partial = sysal::System::collect(
 |------|------|------|
 | platform | Platform | 主机、OS、内核、架构、固件、虚拟化 |
 | cpu | Cpu | packages、cores、逻辑 CPU、ISA 扩展 |
-| memory | Memory | 总量、NUMA 分布、DIMM 详情 |
+| memory | Memory | 总量、内存类型、配置速率、NUMA、DIMM 拓扑 |
 | accelerators | Accelerators | GPU、NPU、FPGA |
 | network | Network | 网卡、链路状态、IP、PCI 地址 |
 | storage | Storage | 块设备、容量、类型、挂载点 |
@@ -62,6 +62,14 @@ xmake run test_replay   # 运行 replay 测试
 ```
 
 CI 在 push 或 PR 时自动运行 clang-format + clang-tidy + build + tests。
+
+### 兼容性
+
+预编译产物兼容 glibc 2.17+（CentOS 7 / RHEL 7 及所有主流 Linux 发行版）。
+
+```bash
+bash docker/centos7-build/build.sh   # 在 CentOS 7 容器中编译，产出兼容的 .so/.a
+```
 
 ## 项目边界
 
