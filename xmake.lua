@@ -34,7 +34,6 @@ local SYSAL_SOURCES = {
 target("sysal_static")
     set_kind("static")
     set_basename("sysal")
-    -- 静态库放到 static/ 子目录，避免链接器在同目录下优先选择 .so
     set_targetdir("$(builddir)/$(plat)/$(arch)/$(mode)/static")
     add_files(SYSAL_SOURCES)
     add_includedirs("src")

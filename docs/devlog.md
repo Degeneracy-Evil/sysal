@@ -1,5 +1,13 @@
 # 开发记录
 
+### 2026-07-06 修复 test_replay 环境绑定
+
+- **变更类型**: test / fix
+- **涉及文件**: tests/integration/test_replay.cpp, docs/devlog.md
+- **变更内容**: test_replay.cpp 移除 lines 91-95 的 live comparison（`System::collect()` 采集本机数据与 fixture 比较 CPU 数量和内存大小），该断言绑定本机环境，在 CI 上必然失败
+- **原因**: test_replay 的 live comparison 是定时炸弹——fixture 在开发机上生成，在 CI 机器上 CPU 数量和内存大小不同会导致断言失败
+- **验证**: `xmake -r` 构建成功；test_replay 13/13 通过
+
 ### 2026-07-05 修复 v0.0.5 评审 P1 问题 + CI 添加 sysal_info
 
 - **变更类型**: fix / test / docs / chore

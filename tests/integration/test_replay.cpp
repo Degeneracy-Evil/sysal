@@ -88,12 +88,6 @@ int main()
     CHECK(!sys.meta.succeeded_collectors.empty());
     CHECK(!sys.meta.sysal_version.empty());
 
-    // 5. 与实时采集对比关键指标
-    std::cout << "\nStep 5: Comparing replay vs live collection...\n";
-    auto live = sysal::System::collect();
-    CHECK(sys.info.cpu.logical_cpus.size() == live.info.cpu.logical_cpus.size());
-    CHECK(sys.info.memory.total_memory.value == live.info.memory.total_memory.value);
-
     std::cout << "\n=== test_replay: ALL PASSED ===\n";
     TEST_SUMMARY();
 }
