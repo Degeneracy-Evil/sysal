@@ -512,16 +512,14 @@ Enum validate_enum(std::uint32_t val, Enum max_val, std::string_view field_name)
 [[nodiscard]] json dimm_info_to_json(const DimmInfo& d)
 {
     json j = {
-        {"locator", d.locator}, {"bank_locator", d.bank_locator}, {"size", d.size.value},
-        {"type", d.type},       {"present", d.present},
+        {"locator", d.locator},
+        {"bank_locator", d.bank_locator},
+        {"size", d.size.value},
+        {"present", d.present},
     };
     if(d.speed_mts)
     {
         j["speed_mts"] = d.speed_mts->value;
-    }
-    if(d.configured_speed_mts)
-    {
-        j["configured_speed_mts"] = d.configured_speed_mts->value;
     }
     if(d.manufacturer)
     {
@@ -556,15 +554,10 @@ Enum validate_enum(std::uint32_t val, Enum max_val, std::string_view field_name)
     j.at("locator").get_to(d.locator);
     j.at("bank_locator").get_to(d.bank_locator);
     d.size = MemorySize{j.at("size").get<std::uint64_t>()};
-    j.at("type").get_to(d.type);
     d.present = j.at("present").get<bool>();
     if(j.contains("speed_mts"))
     {
         d.speed_mts = TransferRate{j.at("speed_mts").get<std::uint64_t>()};
-    }
-    if(j.contains("configured_speed_mts"))
-    {
-        d.configured_speed_mts = TransferRate{j.at("configured_speed_mts").get<std::uint64_t>()};
     }
     if(j.contains("manufacturer"))
     {
@@ -600,6 +593,14 @@ Enum validate_enum(std::uint32_t val, Enum max_val, std::string_view field_name)
     {
         j["available_memory"] = m.available_memory->value;
     }
+    if(!m.memory_type.empty())
+    {
+        j["memory_type"] = m.memory_type;
+    }
+    if(m.configured_speed_mts)
+    {
+        j["configured_speed_mts"] = m.configured_speed_mts->value;
+    }
     json arr = json::array();
     for(const auto& nm : m.numa_memory)
     {
@@ -630,6 +631,14 @@ Enum validate_enum(std::uint32_t val, Enum max_val, std::string_view field_name)
     if(j.contains("available_memory"))
     {
         m.available_memory = MemorySize{j.at("available_memory").get<std::uint64_t>()};
+    }
+    if(j.contains("memory_type"))
+    {
+        m.memory_type = j.at("memory_type").get<std::string>();
+    }
+    if(j.contains("configured_speed_mts"))
+    {
+        m.configured_speed_mts = TransferRate{j.at("configured_speed_mts").get<std::uint64_t>()};
     }
     if(j.contains("numa_memory"))
     {

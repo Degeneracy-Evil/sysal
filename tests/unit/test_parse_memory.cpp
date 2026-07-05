@@ -140,14 +140,14 @@ int main()
 
         const auto& d0 = mem.dimms[0];
         CHECK(d0.present);
-        CHECK(d0.type == "DDR4");
+        CHECK(mem.memory_type == "DDR4");
         CHECK(d0.locator == "CPU0_C0D0");
         CHECK(d0.bank_locator == "NODE 0");
         CHECK(d0.size.value == 34359738368ULL);
         CHECK(d0.speed_mts.has_value());
         CHECK(d0.speed_mts->value == 3200);
-        CHECK(d0.configured_speed_mts.has_value());
-        CHECK(d0.configured_speed_mts->value == 2933);
+        CHECK(mem.configured_speed_mts.has_value());
+        CHECK(mem.configured_speed_mts->value == 2933);
         CHECK(d0.manufacturer.has_value());
         CHECK(d0.manufacturer->value == "Samsung");
         CHECK(d0.part_number.has_value());
@@ -166,7 +166,6 @@ int main()
         CHECK(d1.locator == "CPU0_C0D1");
         CHECK(d1.bank_locator == "NODE 0");
         CHECK(d1.size.value == 0);
-        CHECK(d1.type.empty());
     }
 
     // ---- 测试 7: EDAC 回退解析 DIMM ----
@@ -211,14 +210,13 @@ int main()
 
         const auto& d0 = mem.dimms[0];
         CHECK(d0.present);
-        CHECK(d0.type == "Unbuffered-DDR4");
+        CHECK(mem.memory_type == "Unbuffered-DDR4");
         CHECK(d0.size.value == 32768ULL * 1024 * 1024);
         CHECK(d0.locator == "CPU_SrcID#0_MC#0_Chan#0_DIMM#0");
         CHECK(d0.bank_locator == "channel 0 slot 0");
 
         const auto& d1 = mem.dimms[1];
         CHECK(d1.present);
-        CHECK(d1.type == "Unbuffered-DDR4");
         CHECK(d1.size.value == 32768ULL * 1024 * 1024);
         CHECK(d1.locator == "CPU_SrcID#0_MC#0_Chan#1_DIMM#0");
     }
@@ -266,7 +264,7 @@ int main()
         CHECK(*mem.dimm_count == 1);
         CHECK(mem.populated_dimms.has_value());
         CHECK(*mem.populated_dimms == 1);
-        CHECK(mem.dimms[0].type == "DDR4");
+        CHECK(mem.memory_type == "DDR4");
         CHECK(mem.dimms[0].size.value == 34359738368ULL);
         CHECK(mem.dimms[0].present);
         bool has_warning = false;

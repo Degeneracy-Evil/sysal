@@ -477,6 +477,14 @@ int main()
     {
         label("Available", format_memory(sys.info.memory.available_memory->value));
     }
+    if(!sys.info.memory.memory_type.empty())
+    {
+        label("Memory type", sys.info.memory.memory_type);
+    }
+    if(sys.info.memory.configured_speed_mts.has_value())
+    {
+        label("Configured speed (MT/s)", sys.info.memory.configured_speed_mts->value);
+    }
     for(const auto& nm : sys.info.memory.numa_memory)
     {
         label("NUMA " + std::to_string(nm.node.value()) + " total", format_memory(nm.total.value));
@@ -503,10 +511,6 @@ int main()
             std::cout << " (" << d.bank_locator << ")";
         }
         std::cout << (d.present ? " [present]" : " [empty]") << "\n";
-        if(!d.type.empty())
-        {
-            label("  Type", d.type);
-        }
         if(d.size.value > 0)
         {
             label("  Size", format_memory(d.size.value));
@@ -514,10 +518,6 @@ int main()
         if(d.speed_mts.has_value())
         {
             label("  Speed (MT/s)", d.speed_mts->value);
-        }
-        if(d.configured_speed_mts.has_value())
-        {
-            label("  Configured speed (MT/s)", d.configured_speed_mts->value);
         }
         if(d.manufacturer.has_value())
         {

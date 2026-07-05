@@ -133,7 +133,9 @@ NumaMemory parse_numa_meminfo(std::string_view payload, std::uint32_t node_id,
 /// @param warnings 警告列表
 /// @return DIMM 列表（按索引排序）
 std::vector<DimmInfo> parse_udevadm_dimms(std::string_view payload,
-                                          std::vector<std::string>& warnings)
+                                          std::vector<std::string>& warnings,
+                                          std::string& out_memory_type,
+                                          std::optional<TransferRate>& out_configured_speed)
 {
     constexpr std::string_view prefix = "MEMORY_DEVICE_";
     std::map<std::uint32_t, DimmInfo> dimm_map;
@@ -197,7 +199,10 @@ std::vector<DimmInfo> parse_udevadm_dimms(std::string_view payload,
 
         if(field == "TYPE")
         {
-            dimm.type = value;
+            if(out_memory_type.empty())
+            {
+                out_memory_type = value;
+            }
         }
         else if(field == "SPEED_MTS")
         {
@@ -210,9 +215,9 @@ std::vector<DimmInfo> parse_udevadm_dimms(std::string_view payload,
         else if(field == "CONFIGURED_SPEED_MTS")
         {
             auto v = parse_uint(value);
-            if(v.has_value())
+            if(v.has_value() && !out_configured_speed.has_value())
             {
-                dimm.configured_speed_mts = TransferRate{*v};
+                out_configured_speed = TransferRate{*v};
             }
         }
         else if(field == "SIZE")
@@ -290,7 +295,8 @@ std::vector<DimmInfo> parse_udevadm_dimms(std::string_view payload,
 /// @brief 从 EDAC sysfs 记录解析 DIMM 信息
 /// @param edac_records SysfsEdac 成功记录指针列表
 /// @return DIMM 列表
-std::vector<DimmInfo> parse_edac_dimms(const std::vector<const RawRecord*>& edac_records)
+std::vector<DimmInfo> parse_edac_dimms(const std::vector<const RawRecord*>& edac_records,
+                                       std::string& out_memory_type)
 {
     std::map<std::string, DimmInfo> grouped;
     for(const auto* rec : edac_records)
@@ -314,7 +320,10 @@ std::vector<DimmInfo> parse_edac_dimms(const std::vector<const RawRecord*>& edac
 
         if(fname == "dimm_mem_type")
         {
-            dimm.type = value;
+            if(out_memory_type.empty())
+            {
+                out_memory_type = value;
+            }
         }
         else if(fname == "size")
         {
@@ -419,6 +428,8 @@ std::optional<Memory> parse_memory(const RawStore& raw, std::vector<std::string>
     }
 
     // 解析 DIMM 信息：udevadm 优先，无则回退 EDAC
+    std::string memory_type;
+    std::optional<TransferRate> configured_speed;
     auto udevadm_records = raw.get_all(RawSource::Udevadm);
     for(const auto* rec : udevadm_records)
     {
@@ -426,7 +437,7 @@ std::optional<Memory> parse_memory(const RawStore& raw, std::vector<std::string>
         {
             continue;
         }
-        auto dimms = parse_udevadm_dimms(rec->payload, warnings);
+        auto dimms = parse_udevadm_dimms(rec->payload, warnings, memory_type, configured_speed);
         if(!dimms.empty())
         {
             memory.dimms = std::move(dimms);
@@ -437,8 +448,11 @@ std::optional<Memory> parse_memory(const RawStore& raw, std::vector<std::string>
     if(memory.dimms.empty())
     {
         auto edac_records = raw.get_all(RawSource::SysfsEdac);
-        memory.dimms = parse_edac_dimms(edac_records);
+        memory.dimms = parse_edac_dimms(edac_records, memory_type);
     }
+
+    memory.memory_type = std::move(memory_type);
+    memory.configured_speed_mts = configured_speed;
 
     if(!memory.dimms.empty())
     {

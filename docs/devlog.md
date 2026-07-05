@@ -1,5 +1,20 @@
 # 开发记录
 
+### 2026-07-05 精简内存模型：type/configured_speed 提升到 Memory 级别
+
+- **变更类型**: refactor / src / docs / test
+- **涉及文件**: include/sysal/model/memory.hpp, src/parser/memory.cpp, src/serialization/serialize.cpp, examples/sysal_info.cpp, tests/unit/test_parse_memory.cpp, tests/unit/test_serialization.cpp, docs/design/data_model/memory.md, docs/devlog.md
+- **变更内容**:
+  1. `DimmInfo` 移除 `type`（内存代际）和 `configured_speed_mts`（运行频率），这两个字段在同一台服务器上全局一致
+  2. `Memory` 新增 `memory_type`（string）和 `configured_speed_mts`（optional<TransferRate>）
+  3. `parse_udevadm_dimms` / `parse_edac_dimms` 新增输出参数，将首个 DIMM 的 type 和 configured_speed 提升到 Memory 级别
+  4. `serialize.cpp` DimmInfo 序列化移除 type/configured_speed_mts，Memory 序列化新增 memory_type/configured_speed_mts
+  5. `sysal_info.cpp` Memory 区显示 Memory type 和 Configured speed，单个 DIMM 不再重复显示
+  6. 测试更新：test_parse_memory 和 test_serialization 断言改为 Memory 级别
+  7. `memory.md` 更新数据结构定义和设计说明
+- **原因**: 同一台服务器只能安装同一代际内存、只能跑同一运行频率。按插槽重复存储 type 和 configured_speed 是冗余的，提升到 Memory 级别更符合物理现实
+- **验证**: `xmake -r` 构建成功（0 warnings）；test_parse_memory 75/75、test_serialization 64/64 通过；sysal_info 正确显示 "Memory type: DDR4" 和 "Configured speed (MT/s): 2933" 在 Memory 级别
+
 ### 2026-07-05 完善硬件虚拟化检测功能
 
 - **变更类型**: src / fix / refactor

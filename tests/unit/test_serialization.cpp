@@ -70,11 +70,19 @@ void test_round_trip()
         CHECK(round_trip.info.memory.populated_dimms.value() ==
               sys.info.memory.populated_dimms.value());
     }
+    CHECK(round_trip.info.memory.total_memory.value == sys.info.memory.total_memory.value);
+    CHECK(round_trip.info.memory.memory_type == sys.info.memory.memory_type);
+    CHECK(round_trip.info.memory.configured_speed_mts.has_value() ==
+          sys.info.memory.configured_speed_mts.has_value());
+    if(sys.info.memory.configured_speed_mts.has_value())
+    {
+        CHECK(round_trip.info.memory.configured_speed_mts->value ==
+              sys.info.memory.configured_speed_mts->value);
+    }
     if(!sys.info.memory.dimms.empty())
     {
         const auto& a = sys.info.memory.dimms[0];
         const auto& b = round_trip.info.memory.dimms[0];
-        CHECK(b.type == a.type);
         CHECK(b.size.value == a.size.value);
         CHECK(b.speed_mts.has_value() == a.speed_mts.has_value());
         if(a.speed_mts.has_value())
