@@ -35,9 +35,9 @@ void test_round_trip()
 {
     std::cout << "  test_round_trip...\n";
 
-    auto sys = System::collect(Collect::Platform | Collect::Cpu | Collect::Memory |
-                               Collect::Accelerator | Collect::Network | Collect::Storage |
-                               Collect::Pci | Collect::Execution);
+    auto sys =
+        System::collect(Collect::Platform | Collect::Cpu | Collect::Memory | Collect::Accelerator |
+                        Collect::Network | Collect::Storage | Collect::Pci | Collect::Execution);
 
     // 序列化
     std::string json_str = to_json(sys, {.pretty_print = true});
@@ -55,8 +55,7 @@ void test_round_trip()
     CHECK(round_trip.info.execution.process.pid == sys.info.execution.process.pid);
 
     // Accelerator
-    CHECK(round_trip.info.accelerators.devices.size() ==
-          sys.info.accelerators.devices.size());
+    CHECK(round_trip.info.accelerators.devices.size() == sys.info.accelerators.devices.size());
     if(!sys.info.accelerators.devices.empty())
     {
         const auto& a = sys.info.accelerators.devices[0];
@@ -256,7 +255,7 @@ void test_compatible_version()
     },
     "meta": {
         "collect_time": 0,
-        "sysal_version": "0.0.3",
+        "sysal_version": "0.0.4",
         "collect_duration": 0.0,
         "requested_flags": 0,
         "succeeded_collectors": [],
