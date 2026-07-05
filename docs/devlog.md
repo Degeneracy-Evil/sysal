@@ -1,5 +1,17 @@
 # 开发记录
 
+### 2026-07-05 CentOS 7 兼容性构建 + xmake.lua 工具链自适应
+
+- **变更类型**: build / refactor
+- **涉及文件**: xmake.lua, docker/centos7-build/Dockerfile, docker/centos7-build/build.sh, AGENTS.md, docs/devlog.md
+- **变更内容**:
+  1. xmake.lua: C++23 降级为 C++20（项目实际只使用 C++20 特性），去掉硬编码的 `set_toolchains("clang")` 和 `-stdlib=libc++`/`-fuse-ld=lld`/`-rtlib=compiler-rt`/`-unwindlib=libunwind`，改为在 `on_config` 中检测编译器后条件添加 clang 专属选项
+  2. 新增 `docker/centos7-build/Dockerfile`：基于 centos:7，安装 devtoolset-11 (GCC 11.2.1)，从源码编译 xmake v3.0.9，设置 XMAKE_ROOT=y 允许 root 构建
+  3. 新增 `docker/centos7-build/build.sh`：在 CentOS 7 容器中编译 sysal，验证 glibc 符号版本 ≤ 2.17
+  4. AGENTS.md: 更新工具链描述、项目结构、新增兼容性构建说明
+- **原因**: 用户希望预编译产物兼容 glibc 2.17+（CentOS 7 / RHEL 7 及所有主流 Linux 发行版）。原构建环境（Ubuntu + clang + libc++）产出物依赖 GLIBC_2.38（`__isoc23_strtoll`/`__isoc23_strtoull`）和 GLIBCXX_3.4.21，CentOS 7 无法使用。在 CentOS 7 容器中用 GCC 11 编译可天然产出兼容产物
+- **验证**: `bash docker/centos7-build/build.sh` 构建成功；产物符号版本：GLIBC 最高 2.14、GLIBCXX 最高 3.4.19、CXXABI 最高 1.3.5，全部在 CentOS 7 (glibc 2.17, GCC 4.8.5 libstdc++) 范围内
+
 ### 2026-07-05 文档同步：虚拟化检测 + 内存模型变更后的设计文档对齐
 
 - **变更类型**: docs

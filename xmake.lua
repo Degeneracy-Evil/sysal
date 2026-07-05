@@ -1,22 +1,28 @@
 -- sysal 构建配置
--- C++23 / clang / libc++ / lld / compiler-rt
+-- C++20 / 自适应工具链（clang 或 gcc）
 --
 -- compile_commands.json 生成：utils/check.sh 自动调用
 --   xmake project -k compile_commands build
 -- 或手动执行上述命令。
 
-set_languages("c++23")
-set_toolchains("clang")
+set_languages("c++20")
 set_rundir(".")
 set_version("0.0.3")
 
--- 全局编译/链接选项，所有 target 共享
-add_cxxflags("-Wall", "-Wextra", "-Werror", "-O2", "-stdlib=libc++", {force = true})
-add_ldflags("-stdlib=libc++", "-fuse-ld=lld", "-rtlib=compiler-rt", "-unwindlib=libunwind",
-            {force = true})
+add_cxxflags("-Wall", "-Wextra", "-Werror", "-O2", {force = true})
 add_includedirs("include")
 add_requires("nlohmann_json")
 add_packages("nlohmann_json")
+
+-- clang 专属选项：检测到 clang 编译器时添加 libc++/lld/compiler-rt
+local function clang_flags(target)
+    local comp = target:tool("cxx")
+    if comp and comp:find("clang", 1, true) then
+        target:add("cxxflags", "-stdlib=libc++", {force = true})
+        target:add("ldflags", "-stdlib=libc++", "-fuse-ld=lld", "-rtlib=compiler-rt",
+                   "-unwindlib=libunwind", {force = true})
+    end
+end
 
 -- 源文件列表（共享给静态库和动态库）
 local SYSAL_SOURCES = {
@@ -34,8 +40,6 @@ target("sysal_static")
     add_includedirs("src")
 
     on_load(function (target)
-        -- 项目级一次性设置：首次构建时自动配置 git hooks
-        -- 挂在 sysal_static 上，因为 xmake 默认构建所有 target，此 target 必被加载
         if os.isdir(".githooks") and os.isdir(".git") then
             local configured = try { function() os.runv("git", {"config", "core.hooksPath"}); return true end }
             if not configured then
@@ -43,12 +47,18 @@ target("sysal_static")
             end
         end
     end)
+    on_config(function (target)
+        clang_flags(target)
+    end)
 
 target("sysal_shared")
     set_kind("shared")
     set_basename("sysal")
     add_files(SYSAL_SOURCES)
     add_includedirs("src")
+    on_config(function (target)
+        clang_flags(target)
+    end)
 
 -- ========== 测试 ==========
 
@@ -64,6 +74,9 @@ local function test_target(name, source, link_shared)
         end
         add_includedirs("tests")
         add_cxxflags("-UNDEBUG", {force = true})
+        on_config(function (target)
+            clang_flags(target)
+        end)
 end
 
 -- 单元测试（链接静态库，白盒可访问内部头）
@@ -102,6 +115,9 @@ target("sysal_info")
     add_files("examples/sysal_info.cpp")
     add_deps("sysal_shared")
     add_cxxflags("-UNDEBUG", {force = true})
+    on_config(function (target)
+        clang_flags(target)
+    end)
 
 -- ========== task ==========
 
