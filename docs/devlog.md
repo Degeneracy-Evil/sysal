@@ -924,3 +924,14 @@ sysal v0.0.1 重写完成。10 个阶段的核心变更：
   12. `AGENTS.md`: 命名规则引用从 `docs/命名规则.md` 更新为 `docs/design/rules/strong_typing.md`
 - **原因**: 7 个 commit 新增功能后设计文档未同步更新；缺少数据源选择原则的正式文档；naming_rules.md 包含错误项目内容
 - **验证**: 文档审查，确认所有设计文档与当前代码状态一致；`docs/naming_rules.md` 已删除；`data_source_guideline.md` 格式与现有设计文档一致
+
+### 2026-07-05 v0.0.4 代码质量评审 + O2 优化
+
+- **变更类型**: build / docs
+- **涉及文件**: xmake.lua, docs/code_quality_review_method.md, docs/quality_reports/v004_review.md, docs/devlog.md
+- **变更内容**:
+  1. xmake.lua：全局编译选项添加 `-O2` 优化
+  2. code_quality_review_method.md：新增评审前提、维度调整指南、版本对比模板、评审后行动、分批灵活性说明
+  3. v004_review.md：v0.0.4 代码质量评审报告（9 维度，5 Oracle agent，加权总分 8/10）
+- **原因**: 版本冻结前收尾——添加生产级编译优化，改进评审方法文档，执行完整代码质量评审
+- **验证**: `xmake -r` 构建成功（0 warnings）；18/18 测试通过（678 assertions）；评审报告完成，7 项 P1 + 13 项 P2 问题记录
