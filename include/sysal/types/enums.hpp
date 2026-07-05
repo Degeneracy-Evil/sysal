@@ -104,7 +104,11 @@ enum class RawSource
     HwinfoOutput, ///< hwinfo 命令输出
 
     // 新增来源（追加在末尾以保持枚举值稳定性）
-    ProcHostname ///< /proc/sys/kernel/hostname
+    ProcHostname, ///< /proc/sys/kernel/hostname
+    IfAddrs,      ///< getifaddrs() 网络接口地址
+    DfTh,         ///< df -Th 文件系统挂载信息
+    Udevadm,      ///< udevadm info -e 硬件数据库
+    SysfsEdac     ///< /sys/devices/system/edac 内存 DIMM 信息
 };
 
 /// @brief 单个原始记录的采集状态

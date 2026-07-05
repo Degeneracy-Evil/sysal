@@ -6,8 +6,12 @@
 #include "reader/linux/procfs.hpp"
 #include "reader/linux/file_utils.hpp"
 
+#include <arpa/inet.h>
 #include <cstdlib>
+#include <ifaddrs.h>
+#include <net/if.h>
 #include <string>
+#include <sys/socket.h>
 
 namespace sysal::reader
 {
@@ -79,6 +83,62 @@ void read_env_vars(RawStore& raw, const char* const names[], std::size_t count)
     }
 }
 
+/// @brief 采集网络接口 IP 地址（getifaddrs）
+/// @param raw 原始证据存储
+void read_ifaddrs(RawStore& raw)
+{
+    struct ifaddrs* ifap = nullptr;
+    if(getifaddrs(&ifap) != 0)
+    {
+        add_record(raw, RawSource::IfAddrs, "getifaddrs", "", CollectStatus::Failed);
+        return;
+    }
+
+    std::string payload;
+    char buf[INET6_ADDRSTRLEN];
+    for(struct ifaddrs* p = ifap; p; p = p->ifa_next)
+    {
+        if(!p->ifa_addr)
+        {
+            continue;
+        }
+        const char* ifname = p->ifa_name;
+        auto family = p->ifa_addr->sa_family;
+        if(family == AF_INET)
+        {
+            auto* sa = reinterpret_cast<struct sockaddr_in*>(p->ifa_addr);
+            if(inet_ntop(AF_INET, &sa->sin_addr, buf, sizeof(buf)))
+            {
+                payload += ifname;
+                payload += ' ';
+                payload += buf;
+                payload += '\n';
+            }
+        }
+        else if(family == AF_INET6)
+        {
+            auto* sa = reinterpret_cast<struct sockaddr_in6*>(p->ifa_addr);
+            if(inet_ntop(AF_INET6, &sa->sin6_addr, buf, sizeof(buf)))
+            {
+                payload += ifname;
+                payload += ' ';
+                payload += buf;
+                payload += '\n';
+            }
+        }
+    }
+    freeifaddrs(ifap);
+
+    if(!payload.empty())
+    {
+        add_record(raw, RawSource::IfAddrs, "getifaddrs", payload, CollectStatus::Success);
+    }
+    else
+    {
+        add_record(raw, RawSource::IfAddrs, "getifaddrs", "", CollectStatus::NotCollected);
+    }
+}
+
 } // namespace
 
 void read_procfs(RawStore& raw, Collect flags)
@@ -126,6 +186,7 @@ void read_procfs(RawStore& raw, Collect flags)
     if(has(flags, Collect::Memory))
     {
         read_proc_file(raw, RawSource::ProcMemInfo, "/proc/meminfo");
+        read_cmd(raw, RawSource::Udevadm, "udevadm info -e");
     }
 
     // ---- Accelerator 域 ----
@@ -141,12 +202,13 @@ void read_procfs(RawStore& raw, Collect flags)
     if(has(flags, Collect::Network))
     {
         read_cmd(raw, RawSource::Lspci, "lspci -nn");
+        read_ifaddrs(raw);
     }
 
     // ---- Storage 域 ----
     if(has(flags, Collect::Storage))
     {
-        read_cmd(raw, RawSource::Lsblk, "lsblk -b -n -o NAME,SIZE,TYPE,MOUNTPOINT");
+        read_cmd(raw, RawSource::DfTh, "df -Th");
     }
 
     // ---- Pci 域 ----
