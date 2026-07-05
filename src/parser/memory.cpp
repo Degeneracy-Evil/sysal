@@ -169,7 +169,6 @@ std::vector<DimmInfo> parse_udevadm_dimms(std::string_view payload,
 
         if(key.size() <= prefix.size() || key.substr(0, prefix.size()) != prefix)
         {
-            warnings.push_back("parse_udevadm_dimms: key 过短或前缀不匹配: " + key);
             continue;
         }
         auto after_prefix = key.substr(prefix.size());
