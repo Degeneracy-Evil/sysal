@@ -12,6 +12,8 @@
 #include <net/if.h>
 #include <string>
 #include <sys/socket.h>
+#include <sys/utsname.h>
+#include <unistd.h>
 
 namespace sysal::reader
 {
@@ -51,6 +53,37 @@ void read_cmd(RawStore& raw, RawSource source, const std::string& cmd)
     {
         add_record(raw, source, cmd, "", CollectStatus::Failed);
     }
+}
+
+/// @brief 通过 uname() 系统调用采集架构与内核信息
+/// @param raw 原始证据存储
+/// @details 一次 uname() 调用填充 Uname 与 ProcVersion 两条记录：
+///          Uname.payload = buf.machine；ProcVersion.payload = "release\nversion"。
+void read_uname(RawStore& raw)
+{
+    struct utsname buf;
+    if(uname(&buf) != 0)
+    {
+        add_record(raw, RawSource::Uname, "uname", "", CollectStatus::Failed);
+        add_record(raw, RawSource::ProcVersion, "uname", "", CollectStatus::Failed);
+        return;
+    }
+    add_record(raw, RawSource::Uname, "uname", buf.machine, CollectStatus::Success);
+    std::string version_payload = std::string(buf.release) + "\n" + buf.version;
+    add_record(raw, RawSource::ProcVersion, "uname", version_payload, CollectStatus::Success);
+}
+
+/// @brief 通过 gethostname() 系统调用采集主机名
+/// @param raw 原始证据存储
+void read_hostname(RawStore& raw)
+{
+    char buf[256];
+    if(gethostname(buf, sizeof(buf)) != 0)
+    {
+        add_record(raw, RawSource::ProcHostname, "gethostname", "", CollectStatus::Failed);
+        return;
+    }
+    add_record(raw, RawSource::ProcHostname, "gethostname", buf, CollectStatus::Success);
 }
 
 /// @brief 采集环境变量
@@ -153,10 +186,9 @@ void read_procfs(RawStore& raw, Collect flags)
     if(has(flags, Collect::Platform))
     {
         read_proc_file(raw, RawSource::ProcCpuInfo, "/proc/cpuinfo");
-        read_proc_file(raw, RawSource::ProcVersion, "/proc/version");
+        read_uname(raw);
         read_proc_file(raw, RawSource::EtcOsRelease, "/etc/os-release");
-        read_cmd(raw, RawSource::Uname, "uname -m");
-        read_proc_file(raw, RawSource::ProcHostname, "/proc/sys/kernel/hostname");
+        read_hostname(raw);
 
         // /.dockerenv 容器标记文件
         if(file_exists("/.dockerenv"))

@@ -6,8 +6,6 @@
 
 #include "parse_utils.hpp"
 
-#include <algorithm>
-#include <array>
 #include <string_view>
 
 namespace sysal::detail
@@ -58,14 +56,13 @@ Os parse_os_release(std::string_view payload, [[maybe_unused]] std::vector<std::
     return os;
 }
 
-/// @brief 解析 /proc/version 内容，填充 Kernel 结构体
-/// @param payload /proc/version 文件内容
+/// @brief 解析 uname() 产出的 ProcVersion payload，填充 Kernel 结构体
+/// @param payload "release\nversion" 两行格式（来自 uname() 的 release 与 version 字段）
 /// @param warnings 警告列表
 /// @return Kernel 结构体
 Kernel parse_proc_version(std::string_view payload, std::vector<std::string>& warnings)
 {
     Kernel kernel;
-    // 格式: Linux version 5.15.0-91-generic (buildd@...) (gcc ...) #101-Ubuntu SMP ...
     auto trimmed = trim(payload);
     if(trimmed.empty())
     {
@@ -73,57 +70,21 @@ Kernel parse_proc_version(std::string_view payload, std::vector<std::string>& wa
         return kernel;
     }
 
-    // 提取内核发行号：在 "Linux version " 之后，空格之前
-    const std::string_view prefix = "Linux version ";
-    auto pos = trimmed.find(prefix);
-    if(pos != std::string_view::npos)
-    {
-        auto rest = trimmed.substr(pos + prefix.size());
-        auto space = rest.find(' ');
-        if(space != std::string_view::npos)
-        {
-            kernel.release = std::string(rest.substr(0, space));
-        }
-        else
-        {
-            kernel.release = std::string(rest);
-        }
-    }
-    else
+    auto lines = split(trimmed, '\n');
+    if(lines.empty())
     {
         warnings.push_back("parse_platform: /proc/version 格式异常，无法提取内核发行号");
+        return kernel;
     }
 
-    // version: 从 release 截取上游版本号（"-" 之前的部分，如 "6.8.0"）
-    if(!kernel.release.empty())
-    {
-        auto dash = kernel.release.find('-');
-        kernel.version = (dash != std::string::npos)
-                             ? kernel.release.substr(0, dash)
-                             : kernel.release;
-    }
+    kernel.release = lines[0];
 
-    // compiled_at: 从 # 后提取编译时间戳（以星期几开头）
-    auto hash_pos = trimmed.rfind('#');
-    if(hash_pos != std::string_view::npos)
-    {
-        auto after_hash = trimmed.substr(hash_pos);
-        static const std::array<std::string_view, 7> days = {
-            "Mon ", "Tue ", "Wed ", "Thu ", "Fri ", "Sat ", "Sun "};
+    auto dash = kernel.release.find('-');
+    kernel.version = (dash != std::string::npos) ? kernel.release.substr(0, dash) : kernel.release;
 
-        auto ts_pos = std::string_view::npos;
-        for(auto day : days)
-        {
-            auto p = after_hash.find(day);
-            if(p != std::string_view::npos && (ts_pos == std::string_view::npos || p < ts_pos))
-            {
-                ts_pos = p;
-            }
-        }
-        if(ts_pos != std::string_view::npos)
-        {
-            kernel.compiled_at = std::string(after_hash.substr(ts_pos));
-        }
+    if(lines.size() >= 2)
+    {
+        kernel.compiled_at = lines[1];
     }
     return kernel;
 }

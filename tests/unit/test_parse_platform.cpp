@@ -30,12 +30,9 @@ int main()
                                           "VERSION_ID=\"22.04\"\n"
                                           "VERSION_CODENAME=jammy\n"));
         raw.records.push_back(
-            make_record(RawSource::ProcVersion, "/proc/version",
-                        "Linux version 5.15.0-91-generic (buildd@lcy02-amd64-003) "
-                        "(gcc (Ubuntu 11.4.0-1ubuntu1~22.04) 11.4.0, GNU ld "
-                        "(GNU Binutils for Ubuntu) 2.38) "
-                        "#101-Ubuntu SMP Mon Nov 13 18:02:07 UTC 2023\n"));
-        raw.records.push_back(make_record(RawSource::Uname, "uname -m", "x86_64\n"));
+            make_record(RawSource::ProcVersion, "uname",
+                        "5.15.0-91-generic\n#101-Ubuntu SMP Mon Nov 13 18:02:07 UTC 2023"));
+        raw.records.push_back(make_record(RawSource::Uname, "uname", "x86_64"));
         raw.records.push_back(make_record(RawSource::SysfsDmi, "/sys/class/dmi/id/bios_vendor",
                                           "American Megatrends Inc.\n"));
         raw.records.push_back(
@@ -64,7 +61,7 @@ int main()
         // Kernel
         CHECK(p.kernel.release == "5.15.0-91-generic");
         CHECK(p.kernel.version == "5.15.0");
-        CHECK(p.kernel.compiled_at == "Mon Nov 13 18:02:07 UTC 2023");
+        CHECK(p.kernel.compiled_at == "#101-Ubuntu SMP Mon Nov 13 18:02:07 UTC 2023");
         CHECK(p.kernel.architecture == "x86_64");
 
         // Architecture
@@ -92,9 +89,9 @@ int main()
         RawStore raw;
         raw.records.push_back(
             make_record(RawSource::EtcOsRelease, "/etc/os-release", "NAME=\"Ubuntu\"\n"));
-        raw.records.push_back(make_record(RawSource::ProcVersion, "/proc/version",
-                                          "Linux version 5.15.0-91-generic #101-Ubuntu SMP ...\n"));
-        raw.records.push_back(make_record(RawSource::Uname, "uname -m", "x86_64\n"));
+        raw.records.push_back(
+            make_record(RawSource::ProcVersion, "uname", "5.15.0-91-generic\n#101-Ubuntu SMP ..."));
+        raw.records.push_back(make_record(RawSource::Uname, "uname", "x86_64"));
         raw.records.push_back(
             make_record(RawSource::ProcOneCgroup, "/proc/1/cgroup", "0::/docker/abc123\n"));
         raw.records.push_back(make_record(RawSource::RootDockerenv, "/.dockerenv", ""));
@@ -111,9 +108,9 @@ int main()
         RawStore raw;
         raw.records.push_back(
             make_record(RawSource::EtcOsRelease, "/etc/os-release", "NAME=\"Ubuntu\"\n"));
-        raw.records.push_back(make_record(RawSource::ProcVersion, "/proc/version",
-                                          "Linux version 5.15.0-91-generic #101-Ubuntu SMP ...\n"));
-        raw.records.push_back(make_record(RawSource::Uname, "uname -m", "x86_64\n"));
+        raw.records.push_back(
+            make_record(RawSource::ProcVersion, "uname", "5.15.0-91-generic\n#101-Ubuntu SMP ..."));
+        raw.records.push_back(make_record(RawSource::Uname, "uname", "x86_64"));
         raw.records.push_back(
             make_record(RawSource::ProcOneCgroup, "/proc/1/cgroup", "0::/kvm/xyz\n"));
 
@@ -130,9 +127,9 @@ int main()
         RawStore raw;
         raw.records.push_back(
             make_record(RawSource::EtcOsRelease, "/etc/os-release", "NAME=\"Ubuntu\"\n"));
-        raw.records.push_back(make_record(RawSource::ProcVersion, "/proc/version",
-                                          "Linux version 5.15.0-91-generic #101-Ubuntu SMP ...\n"));
-        raw.records.push_back(make_record(RawSource::Uname, "uname -m", "aarch64\n"));
+        raw.records.push_back(
+            make_record(RawSource::ProcVersion, "uname", "5.15.0-91-generic\n#101-Ubuntu SMP ..."));
+        raw.records.push_back(make_record(RawSource::Uname, "uname", "aarch64"));
 
         std::vector<std::string> warnings;
         auto result = parse_platform(raw, warnings);
@@ -146,9 +143,9 @@ int main()
         RawStore raw;
         raw.records.push_back(
             make_record(RawSource::EtcOsRelease, "/etc/os-release", "NAME=\"Ubuntu\"\n"));
-        raw.records.push_back(make_record(RawSource::ProcVersion, "/proc/version",
-                                          "Linux version 5.15.0-91-generic #101-Ubuntu SMP ...\n"));
-        raw.records.push_back(make_record(RawSource::Uname, "uname -m", "riscv64\n"));
+        raw.records.push_back(
+            make_record(RawSource::ProcVersion, "uname", "5.15.0-91-generic\n#101-Ubuntu SMP ..."));
+        raw.records.push_back(make_record(RawSource::Uname, "uname", "riscv64"));
 
         std::vector<std::string> warnings;
         auto result = parse_platform(raw, warnings);
