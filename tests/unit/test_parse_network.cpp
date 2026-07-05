@@ -180,5 +180,39 @@ int main()
         CHECK(!result->interfaces[0].pci_address.has_value());
     }
 
+    // ---- 测试 9: IfAddrs 畸形输入（无空格、空行）不崩溃且产生警告 ----
+    {
+        RawStore raw;
+        raw.records.push_back(
+            make_record(RawSource::SysfsNet, "/sys/class/net/eth0/address", "aa:bb:cc:dd:ee:ff"));
+        raw.records.push_back(
+            make_record(RawSource::SysfsNet, "/sys/class/net/eth0/operstate", "up"));
+
+        std::string malformed = "eth0 192.168.1.10\n"
+                                "\n"
+                                "no_space_line\n"
+                                "   \n"
+                                "eth0 10.0.0.1\n";
+        raw.records.push_back(make_record(RawSource::IfAddrs, "getifaddrs", malformed));
+
+        std::vector<std::string> warnings;
+        auto result = parse_network(raw, warnings);
+        CHECK(result.has_value());
+        CHECK(result->interfaces.size() == 1);
+        CHECK(result->interfaces[0].addresses.size() == 2);
+        CHECK(result->interfaces[0].addresses[0] == IpAddress{"192.168.1.10"});
+        CHECK(result->interfaces[0].addresses[1] == IpAddress{"10.0.0.1"});
+        bool has_warning = false;
+        for(const auto& w : warnings)
+        {
+            if(w.find("IfAddrs") != std::string::npos)
+            {
+                has_warning = true;
+                break;
+            }
+        }
+        CHECK(has_warning);
+    }
+
     TEST_SUMMARY();
 }

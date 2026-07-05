@@ -75,7 +75,7 @@ std::pair<MemorySize, std::optional<MemorySize>> parse_meminfo(std::string_view 
 /// @param warnings 警告列表
 /// @return NumaMemory 结构体
 NumaMemory parse_numa_meminfo(std::string_view payload, std::uint32_t node_id,
-                              [[maybe_unused]] std::vector<std::string>& warnings)
+                              std::vector<std::string>& warnings)
 {
     NumaMemory nm;
     nm.node = NumaNodeId{node_id};
@@ -99,6 +99,11 @@ NumaMemory parse_numa_meminfo(std::string_view payload, std::uint32_t node_id,
                 {
                     nm.total = *kb;
                 }
+                else
+                {
+                    warnings.push_back("parse_numa_meminfo: node " + std::to_string(node_id) +
+                                       " Total 值解析失败: " + std::string(value));
+                }
             }
         }
         else if(trimmed_key.find("Free") != std::string::npos)
@@ -111,6 +116,11 @@ NumaMemory parse_numa_meminfo(std::string_view payload, std::uint32_t node_id,
                 {
                     nm.available = *kb;
                 }
+                else
+                {
+                    warnings.push_back("parse_numa_meminfo: node " + std::to_string(node_id) +
+                                       " Free 值解析失败: " + std::string(value));
+                }
             }
         }
     }
@@ -120,8 +130,10 @@ NumaMemory parse_numa_meminfo(std::string_view payload, std::uint32_t node_id,
 
 /// @brief 从 udevadm 输出解析 DIMM 信息
 /// @param payload udevadm info -e 输出
+/// @param warnings 警告列表
 /// @return DIMM 列表（按索引排序）
-std::vector<DimmInfo> parse_udevadm_dimms(std::string_view payload)
+std::vector<DimmInfo> parse_udevadm_dimms(std::string_view payload,
+                                          std::vector<std::string>& warnings)
 {
     constexpr std::string_view prefix = "MEMORY_DEVICE_";
     std::map<std::uint32_t, DimmInfo> dimm_map;
@@ -139,6 +151,12 @@ std::vector<DimmInfo> parse_udevadm_dimms(std::string_view payload)
         auto [tag, rest] = parse_kv(trimmed, ':');
         if(tag != "E")
         {
+            warnings.push_back("parse_udevadm_dimms: 非 E 标签: " + trimmed);
+            continue;
+        }
+        if(rest.empty())
+        {
+            warnings.push_back("parse_udevadm_dimms: E: 值为空: " + trimmed);
             continue;
         }
         auto eq_pos = rest.find('=');
@@ -151,19 +169,27 @@ std::vector<DimmInfo> parse_udevadm_dimms(std::string_view payload)
 
         if(key.size() <= prefix.size() || key.substr(0, prefix.size()) != prefix)
         {
+            warnings.push_back("parse_udevadm_dimms: key 过短或前缀不匹配: " + key);
             continue;
         }
         auto after_prefix = key.substr(prefix.size());
         auto us_pos = after_prefix.find('_');
         if(us_pos == std::string::npos)
         {
+            warnings.push_back("parse_udevadm_dimms: key 前缀后无下划线: " + key);
             continue;
         }
         auto idx_str = after_prefix.substr(0, us_pos);
         auto field = after_prefix.substr(us_pos + 1);
+        if(field.empty())
+        {
+            warnings.push_back("parse_udevadm_dimms: key 下划线后无字段: " + key);
+            continue;
+        }
         auto idx = parse_uint(idx_str);
         if(!idx.has_value())
         {
+            warnings.push_back("parse_udevadm_dimms: 索引解析失败: " + key);
             continue;
         }
 
@@ -179,7 +205,7 @@ std::vector<DimmInfo> parse_udevadm_dimms(std::string_view payload)
             auto v = parse_uint(value);
             if(v.has_value())
             {
-                dimm.speed_mts = static_cast<std::uint32_t>(*v);
+                dimm.speed_mts = TransferRate{*v};
             }
         }
         else if(field == "CONFIGURED_SPEED_MTS")
@@ -187,7 +213,7 @@ std::vector<DimmInfo> parse_udevadm_dimms(std::string_view payload)
             auto v = parse_uint(value);
             if(v.has_value())
             {
-                dimm.configured_speed_mts = static_cast<std::uint32_t>(*v);
+                dimm.configured_speed_mts = TransferRate{*v};
             }
         }
         else if(field == "SIZE")
@@ -200,7 +226,7 @@ std::vector<DimmInfo> parse_udevadm_dimms(std::string_view payload)
         }
         else if(field == "MANUFACTURER")
         {
-            dimm.manufacturer = value;
+            dimm.manufacturer = Vendor{value};
         }
         else if(field == "PART_NUMBER")
         {
@@ -401,7 +427,7 @@ std::optional<Memory> parse_memory(const RawStore& raw, std::vector<std::string>
         {
             continue;
         }
-        auto dimms = parse_udevadm_dimms(rec->payload);
+        auto dimms = parse_udevadm_dimms(rec->payload, warnings);
         if(!dimms.empty())
         {
             memory.dimms = std::move(dimms);

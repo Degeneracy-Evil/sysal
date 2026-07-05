@@ -62,6 +62,15 @@ int main()
     // RootDockerenv（可能 NotCollected，但记录应存在）
     CHECK(raw.has(sysal::RawSource::RootDockerenv));
 
+    // ProcHostname（gethostname 系统调用，始终可用）
+    CHECK(raw.has(sysal::RawSource::ProcHostname));
+
+    // IfAddrs（getifaddrs 系统调用，始终可用）
+    CHECK(raw.has(sysal::RawSource::IfAddrs));
+
+    // DfTh（df 命令，Linux 上普遍可用）
+    CHECK(raw.has(sysal::RawSource::DfTh));
+
     // ---- sysfs 采集测试 ----
 
     sysal::RawStore raw2;

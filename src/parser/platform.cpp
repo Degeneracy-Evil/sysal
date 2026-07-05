@@ -293,6 +293,10 @@ std::optional<Platform> parse_platform(const RawStore& raw, std::vector<std::str
             break;
         }
     }
+    if(platform.host.hostname.empty())
+    {
+        warnings.push_back("parse_platform: 缺少 hostname 数据");
+    }
 
     // 检测虚拟化
     platform.virtualization = detect_virtualization(raw, warnings);

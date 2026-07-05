@@ -35,9 +35,14 @@ struct FrequencyTag
 struct BandwidthTag
 {
 };
+/// @brief 传输速率量纲标签
+struct TransferRateTag
+{
+};
 
-using MemorySize = ScalarUnit<MemorySizeTag>; ///< 内存大小（字节）
-using Frequency = ScalarUnit<FrequencyTag>;   ///< 频率（赫兹）
-using Bandwidth = ScalarUnit<BandwidthTag>;   ///< 带宽（比特每秒）
+using MemorySize = ScalarUnit<MemorySizeTag>;     ///< 内存大小（字节）
+using Frequency = ScalarUnit<FrequencyTag>;       ///< 频率（赫兹）
+using Bandwidth = ScalarUnit<BandwidthTag>;       ///< 带宽（比特每秒）
+using TransferRate = ScalarUnit<TransferRateTag>; ///< 传输速率（MT/s）
 
 } // namespace sysal

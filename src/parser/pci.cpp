@@ -49,19 +49,6 @@ std::string extract_pci_address_from_path(std::string_view path)
     return std::string(after_slash);
 }
 
-/// @brief 从 sysfs 路径提取文件名
-/// @param path sysfs 路径，如 "/sys/bus/pci/devices/0000:41:00.0/vendor"
-/// @return 文件名，如 "vendor"
-std::string extract_filename_from_path(std::string_view path)
-{
-    auto last_slash = path.rfind('/');
-    if(last_slash == std::string_view::npos)
-    {
-        return std::string(path);
-    }
-    return std::string(path.substr(last_slash + 1));
-}
-
 /// @brief 归一化 lspci 地址为 DDDD:BB:DD.F 格式
 /// @param addr_raw lspci 输出中的地址字段（BB:DD.F 或 DDDD:BB:DD.F）
 /// @return 归一化后的地址字符串
@@ -187,7 +174,7 @@ std::optional<Pci> parse_pci(const RawStore& raw, std::vector<std::string>& warn
         // 从分组记录中提取各字段
         for(const auto* rec : records)
         {
-            auto filename = extract_filename_from_path(rec->path_or_command);
+            auto filename = extract_filename(rec->path_or_command);
             const auto& payload = rec->payload;
 
             if(filename == "vendor")
@@ -212,15 +199,7 @@ std::optional<Pci> parse_pci(const RawStore& raw, std::vector<std::string>& warn
                 auto val = parse_uint(trimmed);
                 if(val.has_value())
                 {
-                    if(static_cast<std::int64_t>(*val) == -1)
-                    {
-                        // -1 表示无 NUMA 归属
-                        dev.numa_node = std::nullopt;
-                    }
-                    else
-                    {
-                        dev.numa_node = NumaNodeId{static_cast<std::uint32_t>(*val)};
-                    }
+                    dev.numa_node = NumaNodeId{static_cast<std::uint32_t>(*val)};
                 }
                 else
                 {
@@ -275,8 +254,7 @@ std::optional<Pci> parse_pci(const RawStore& raw, std::vector<std::string>& warn
                 dev.device_name = DeviceName{name};
                 addr_index[addr_str] = pci.devices.size();
                 pci.devices.push_back(dev);
-                warnings.push_back("parse_pci: lspci 独有设备 " + addr_str +
-                                   "，sysfs 数据缺失");
+                warnings.push_back("parse_pci: lspci 独有设备 " + addr_str + "，sysfs 数据缺失");
             }
         }
     }

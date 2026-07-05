@@ -201,9 +201,9 @@ std::optional<std::uint32_t> extract_cpu_number_from_path(std::string_view path)
 /// @param warnings 警告列表
 /// @return pair<base_frequency, max_frequency>
 std::pair<std::optional<Frequency>, std::optional<Frequency>>
-read_cpufreq(const RawStore& raw, std::uint32_t package_id,
+read_cpufreq(const RawStore& raw, [[maybe_unused]] std::uint32_t package_id,
              const std::unordered_set<std::uint32_t>& package_cpu_ids,
-             std::vector<std::string>& warnings)
+             [[maybe_unused]] std::vector<std::string>& warnings)
 {
     std::optional<Frequency> base_freq;
     std::optional<Frequency> max_freq;
@@ -245,10 +245,6 @@ read_cpufreq(const RawStore& raw, std::uint32_t package_id,
             }
         }
     }
-
-    // 消除未使用参数警告（package_id / warnings 保留供未来使用）
-    (void)package_id;
-    (void)warnings;
 
     return {base_freq, max_freq};
 }
@@ -312,9 +308,7 @@ build_numa_mapping(const RawStore& raw, [[maybe_unused]] std::vector<std::string
                 auto end = parse_uint(trimmed.substr(dash_pos + 1));
                 if(start.has_value() && end.has_value())
                 {
-                    for(auto cpu = *start;
-                        cpu <= *end && cpu_to_numa.size() < MAX_CPUS;
-                        ++cpu)
+                    for(auto cpu = *start; cpu <= *end && cpu_to_numa.size() < MAX_CPUS; ++cpu)
                     {
                         cpu_to_numa[static_cast<std::uint32_t>(cpu)] =
                             static_cast<std::uint32_t>(*node_id);

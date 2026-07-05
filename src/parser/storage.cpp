@@ -6,6 +6,7 @@
 
 #include "parse_utils.hpp"
 
+#include <cctype>
 #include <map>
 #include <string_view>
 
@@ -64,19 +65,6 @@ std::string extract_device_name(std::string_view path)
         return std::string(after_block);
     }
     return std::string(after_block.substr(0, slash_pos));
-}
-
-/// @brief 从 sysfs 路径提取文件名
-/// @param path sysfs 路径（如 "/sys/block/nvme0n1/size"）
-/// @return 文件名（如 "size"）
-std::string extract_filename(std::string_view path)
-{
-    auto slash_pos = path.rfind('/');
-    if(slash_pos == std::string_view::npos)
-    {
-        return std::string(path);
-    }
-    return std::string(path.substr(slash_pos + 1));
 }
 
 } // namespace
@@ -143,6 +131,7 @@ std::optional<Storage> parse_storage(const RawStore& raw, std::vector<std::strin
             }
             if(fields.size() < 7)
             {
+                warnings.push_back("parse_storage: df -Th 行字段不足 7 个: " + trimmed);
                 continue;
             }
             // fields[0]=Filesystem, [1]=Type, [2]=Size, [3]=Used, [4]=Avail, [5]=Use%, [6+]=Mounted
@@ -200,22 +189,24 @@ std::optional<Storage> parse_storage(const RawStore& raw, std::vector<std::strin
         auto df_it = df_map.find(dev_name);
         if(df_it != df_map.end())
         {
-            dev.mount_point = df_it->second.first;
-            dev.fs_type = df_it->second.second;
+            dev.mount_point = MountPoint{df_it->second.first};
+            dev.fs_type = FilesystemType{df_it->second.second};
         }
         else
         {
             // 分区匹配：df 显示 sda1/sda2，sysfs 显示 sda
+            // 遍历所有匹配分区，优先选择挂载点为 "/" 的根分区
             for(const auto& [df_name, df_info] : df_map)
             {
-                if(df_name.starts_with(dev_name))
+                if(df_name.starts_with(dev_name) &&
+                   (df_name.size() == dev_name.size() ||
+                    std::isdigit(static_cast<unsigned char>(df_name[dev_name.size()]))))
                 {
-                    if(!dev.mount_point.has_value())
+                    if(!dev.mount_point.has_value() || df_info.first == "/")
                     {
-                        dev.mount_point = df_info.first;
-                        dev.fs_type = df_info.second;
+                        dev.mount_point = MountPoint{df_info.first};
+                        dev.fs_type = FilesystemType{df_info.second};
                     }
-                    break;
                 }
             }
         }

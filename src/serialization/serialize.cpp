@@ -115,10 +115,11 @@ Enum validate_enum(std::uint32_t val, Enum max_val, std::string_view field_name)
 [[nodiscard]] RawRecord raw_record_from_json(const json& j)
 {
     RawRecord rec;
-    rec.source = static_cast<RawSource>(j.at("source").get<std::uint64_t>());
+    rec.source = validate_enum(j.at("source").get<std::uint32_t>(), RawSource::SysfsEdac, "source");
     j.at("path_or_command").get_to(rec.path_or_command);
     j.at("payload").get_to(rec.payload);
-    rec.status = static_cast<CollectStatus>(j.at("status").get<std::uint64_t>());
+    rec.status =
+        validate_enum(j.at("status").get<std::uint32_t>(), CollectStatus::NotCollected, "status");
     rec.collected_at = ms_to_time_point(j.at("collected_at").get<std::int64_t>());
     return rec;
 }
@@ -515,15 +516,15 @@ Enum validate_enum(std::uint32_t val, Enum max_val, std::string_view field_name)
     };
     if(d.speed_mts)
     {
-        j["speed_mts"] = *d.speed_mts;
+        j["speed_mts"] = d.speed_mts->value;
     }
     if(d.configured_speed_mts)
     {
-        j["configured_speed_mts"] = *d.configured_speed_mts;
+        j["configured_speed_mts"] = d.configured_speed_mts->value;
     }
     if(d.manufacturer)
     {
-        j["manufacturer"] = *d.manufacturer;
+        j["manufacturer"] = d.manufacturer->value;
     }
     if(d.part_number)
     {
@@ -558,15 +559,15 @@ Enum validate_enum(std::uint32_t val, Enum max_val, std::string_view field_name)
     d.present = j.at("present").get<bool>();
     if(j.contains("speed_mts"))
     {
-        d.speed_mts = j.at("speed_mts").get<std::uint32_t>();
+        d.speed_mts = TransferRate{j.at("speed_mts").get<std::uint64_t>()};
     }
     if(j.contains("configured_speed_mts"))
     {
-        d.configured_speed_mts = j.at("configured_speed_mts").get<std::uint32_t>();
+        d.configured_speed_mts = TransferRate{j.at("configured_speed_mts").get<std::uint64_t>()};
     }
     if(j.contains("manufacturer"))
     {
-        d.manufacturer = j.at("manufacturer").get<std::string>();
+        d.manufacturer = Vendor{j.at("manufacturer").get<std::string>()};
     }
     if(j.contains("part_number"))
     {
@@ -824,11 +825,11 @@ Enum validate_enum(std::uint32_t val, Enum max_val, std::string_view field_name)
     }
     if(sd.mount_point)
     {
-        j["mount_point"] = *sd.mount_point;
+        j["mount_point"] = sd.mount_point->value;
     }
     if(sd.fs_type)
     {
-        j["fs_type"] = *sd.fs_type;
+        j["fs_type"] = sd.fs_type->value;
     }
     return j;
 }
@@ -848,11 +849,11 @@ Enum validate_enum(std::uint32_t val, Enum max_val, std::string_view field_name)
     }
     if(j.contains("mount_point"))
     {
-        sd.mount_point = j.at("mount_point").get<std::string>();
+        sd.mount_point = MountPoint{j.at("mount_point").get<std::string>()};
     }
     if(j.contains("fs_type"))
     {
-        sd.fs_type = j.at("fs_type").get<std::string>();
+        sd.fs_type = FilesystemType{j.at("fs_type").get<std::string>()};
     }
     sd.kind = validate_enum(j.at("kind").get<std::uint32_t>(), StorageKind::Other, "kind");
     return sd;

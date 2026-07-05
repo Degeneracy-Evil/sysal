@@ -1,12 +1,13 @@
 /// @file memory.hpp
 /// @brief 内存数据模型
-/// @details 定义内存子系统的数据结构：NumaMemory、Memory，
-///          描述系统内存总量与各 NUMA 节点的内存分布。
+/// @details 定义内存子系统的数据结构：NumaMemory、DimmInfo、Memory，
+///          描述系统内存总量、各 NUMA 节点的内存分布以及 DIMM 内存条详情。
 
 #pragma once
 
 #include "sysal/types/ids.hpp"
 #include "sysal/types/units.hpp"
+#include "sysal/types/value_types.hpp"
 
 #include <optional>
 #include <vector>
@@ -25,19 +26,19 @@ struct NumaMemory
 /// @brief 单条 DIMM 内存条信息
 struct DimmInfo
 {
-    std::string locator;                               ///< 物理插槽定位符（如 CPU0_C0D0）
-    std::string bank_locator;                          ///< 内存库定位符（如 NODE 0）
-    MemorySize size{0};                                ///< 容量（字节）
-    std::string type;                                  ///< 内存类型（如 DDR4）
-    std::optional<std::uint32_t> speed_mts;            ///< 标称速率（MT/s）
-    std::optional<std::uint32_t> configured_speed_mts; ///< 实际配置速率（MT/s）
-    std::optional<std::string> manufacturer;           ///< 制造商
-    std::optional<std::string> part_number;            ///< 部件号
-    std::optional<std::uint32_t> rank;                 ///< rank 数
-    std::optional<std::uint32_t> total_width;          ///< 总位宽（含 ECC）
-    std::optional<std::uint32_t> data_width;           ///< 数据位宽
-    std::optional<std::string> form_factor;            ///< 外形规格（如 DIMM）
-    bool present{};                                    ///< 插槽是否已安装内存条
+    std::string locator;                              ///< 物理插槽定位符（如 CPU0_C0D0）
+    std::string bank_locator;                         ///< 内存库定位符（如 NODE 0）
+    MemorySize size{0};                               ///< 容量（字节）
+    std::string type;                                 ///< 内存类型（如 DDR4）
+    std::optional<TransferRate> speed_mts;            ///< 标称速率（MT/s）
+    std::optional<TransferRate> configured_speed_mts; ///< 实际配置速率（MT/s）
+    std::optional<Vendor> manufacturer;               ///< 制造商
+    std::optional<std::string> part_number;           ///< 部件号
+    std::optional<std::uint32_t> rank;                ///< rank 数
+    std::optional<std::uint32_t> total_width;         ///< 总位宽（含 ECC）
+    std::optional<std::uint32_t> data_width;          ///< 数据位宽
+    std::optional<std::string> form_factor;           ///< 外形规格（如 DIMM）
+    bool present{};                                   ///< 插槽是否已安装内存条
 };
 
 /// @brief 内存子系统聚合

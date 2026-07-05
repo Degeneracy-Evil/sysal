@@ -31,5 +31,8 @@ jobs:
       - name: Build
         run: xmake build
 
+      - name: Run sysal_info
+        run: xmake run sysal_info > /dev/null
+
       - name: Run quality checks
         run: utils/check.sh

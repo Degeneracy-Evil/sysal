@@ -38,19 +38,6 @@ std::string extract_interface_name_from_path(std::string_view path)
     return std::string(after_prefix.substr(0, slash));
 }
 
-/// @brief 从 sysfs 路径提取文件名
-/// @param path sysfs 路径，如 "/sys/class/net/eth0/address"
-/// @return 文件名，如 "address"
-std::string extract_filename_from_path(std::string_view path)
-{
-    auto last_slash = path.rfind('/');
-    if(last_slash == std::string_view::npos)
-    {
-        return std::string(path);
-    }
-    return std::string(path.substr(last_slash + 1));
-}
-
 /// @brief 解析链路状态字符串
 /// @param state_str operstate 文件内容
 /// @return InterfaceState 枚举值
@@ -115,12 +102,14 @@ std::optional<Network> parse_network(const RawStore& raw, std::vector<std::strin
             auto space = line.find(' ');
             if(space == std::string::npos)
             {
+                warnings.push_back("parse_network: IfAddrs 行无空格分隔: " + line);
                 continue;
             }
             auto ifname = trim(line.substr(0, space));
             auto ip = trim(line.substr(space + 1));
             if(ifname.empty() || ip.empty())
             {
+                warnings.push_back("parse_network: IfAddrs 行接口名或 IP 为空: " + line);
                 continue;
             }
             ip_map[ifname].push_back(ip);
@@ -136,7 +125,7 @@ std::optional<Network> parse_network(const RawStore& raw, std::vector<std::strin
 
         for(const auto* rec : records)
         {
-            auto filename = extract_filename_from_path(rec->path_or_command);
+            auto filename = extract_filename(rec->path_or_command);
             const auto& payload = rec->payload;
 
             if(filename == "address")
@@ -173,6 +162,10 @@ std::optional<Network> parse_network(const RawStore& raw, std::vector<std::strin
                 if(pci.has_value())
                 {
                     iface.pci_address = pci;
+                }
+                else if(!pci_str.empty())
+                {
+                    warnings.push_back("parse_network: PCI 地址解析失败: " + pci_str);
                 }
             }
         }

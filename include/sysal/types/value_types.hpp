@@ -63,12 +63,22 @@ struct IpAddressTag
 struct PciClassTag
 {
 };
+/// @brief 挂载点标签
+struct MountPointTag
+{
+};
+/// @brief 文件系统类型标签
+struct FilesystemTypeTag
+{
+};
 
-using Vendor = NamedString<VendorTag>;               ///< 厂商名称
-using DeviceName = NamedString<DeviceNameTag>;       ///< 设备名称
-using InterfaceName = NamedString<InterfaceNameTag>; ///< 网络接口名称
-using MacAddress = NamedString<MacAddressTag>;       ///< MAC 地址
-using IpAddress = NamedString<IpAddressTag>;         ///< IP 地址
-using PciClass = NamedString<PciClassTag>;           ///< PCI 设备类别
+using Vendor = NamedString<VendorTag>;                 ///< 厂商名称
+using DeviceName = NamedString<DeviceNameTag>;         ///< 设备名称
+using InterfaceName = NamedString<InterfaceNameTag>;   ///< 网络接口名称
+using MacAddress = NamedString<MacAddressTag>;         ///< MAC 地址
+using IpAddress = NamedString<IpAddressTag>;           ///< IP 地址
+using PciClass = NamedString<PciClassTag>;             ///< PCI 设备类别
+using MountPoint = NamedString<MountPointTag>;         ///< 挂载点路径
+using FilesystemType = NamedString<FilesystemTypeTag>; ///< 文件系统类型
 
 } // namespace sysal

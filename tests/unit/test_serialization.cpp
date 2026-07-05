@@ -54,6 +54,40 @@ void test_round_trip()
     CHECK(round_trip.info.platform.host.hostname == sys.info.platform.host.hostname);
     CHECK(round_trip.info.execution.process.pid == sys.info.execution.process.pid);
 
+    // Memory: v0.0.4 DIMM 字段
+    CHECK(round_trip.info.memory.dimms.size() == sys.info.memory.dimms.size());
+    CHECK(round_trip.info.memory.dimm_count.has_value() == sys.info.memory.dimm_count.has_value());
+    if(sys.info.memory.dimm_count.has_value())
+    {
+        CHECK(round_trip.info.memory.dimm_count.value() > 0);
+        CHECK(round_trip.info.memory.dimm_count.value() == sys.info.memory.dimm_count.value());
+    }
+    CHECK(round_trip.info.memory.populated_dimms.has_value() ==
+          sys.info.memory.populated_dimms.has_value());
+    if(sys.info.memory.populated_dimms.has_value())
+    {
+        CHECK(round_trip.info.memory.populated_dimms.value() > 0);
+        CHECK(round_trip.info.memory.populated_dimms.value() ==
+              sys.info.memory.populated_dimms.value());
+    }
+    if(!sys.info.memory.dimms.empty())
+    {
+        const auto& a = sys.info.memory.dimms[0];
+        const auto& b = round_trip.info.memory.dimms[0];
+        CHECK(b.type == a.type);
+        CHECK(b.size.value == a.size.value);
+        CHECK(b.speed_mts.has_value() == a.speed_mts.has_value());
+        if(a.speed_mts.has_value())
+        {
+            CHECK(b.speed_mts->value == a.speed_mts->value);
+        }
+        CHECK(b.manufacturer.has_value() == a.manufacturer.has_value());
+        if(a.manufacturer.has_value())
+        {
+            CHECK(b.manufacturer->value == a.manufacturer->value);
+        }
+    }
+
     // Accelerator
     CHECK(round_trip.info.accelerators.devices.size() == sys.info.accelerators.devices.size());
     if(!sys.info.accelerators.devices.empty())
@@ -84,6 +118,24 @@ void test_round_trip()
         }
     }
 
+    // Storage: v0.0.4 mount_point / fs_type 往返
+    for(std::size_t i = 0; i < sys.info.storage.devices.size(); ++i)
+    {
+        const auto& a = sys.info.storage.devices[i];
+        if(a.mount_point.has_value())
+        {
+            const auto& b = round_trip.info.storage.devices[i];
+            CHECK(b.mount_point.has_value());
+            CHECK(b.mount_point->value == a.mount_point->value);
+            CHECK(b.fs_type.has_value() == a.fs_type.has_value());
+            if(a.fs_type.has_value())
+            {
+                CHECK(b.fs_type->value == a.fs_type->value);
+            }
+            break;
+        }
+    }
+
     // PCI
     CHECK(round_trip.info.pci.devices.size() == sys.info.pci.devices.size());
     if(!sys.info.pci.devices.empty())
@@ -103,6 +155,38 @@ void test_round_trip()
         const auto& b = round_trip.info.network.interfaces[0];
         CHECK(b.name.value == a.name.value);
         CHECK(b.state == a.state);
+    }
+
+    // Network: v0.0.4 addresses 往返
+    for(std::size_t i = 0; i < sys.info.network.interfaces.size(); ++i)
+    {
+        const auto& a = sys.info.network.interfaces[i];
+        if(!a.addresses.empty())
+        {
+            const auto& b = round_trip.info.network.interfaces[i];
+            CHECK(b.addresses.size() == a.addresses.size());
+            for(std::size_t j = 0; j < a.addresses.size(); ++j)
+            {
+                CHECK(b.addresses[j].value == a.addresses[j].value);
+            }
+            break;
+        }
+    }
+
+    // Network: v0.0.4 pci_address 往返
+    for(std::size_t i = 0; i < sys.info.network.interfaces.size(); ++i)
+    {
+        const auto& a = sys.info.network.interfaces[i];
+        if(a.pci_address.has_value())
+        {
+            const auto& b = round_trip.info.network.interfaces[i];
+            CHECK(b.pci_address.has_value());
+            CHECK(b.pci_address->domain == a.pci_address->domain);
+            CHECK(b.pci_address->bus == a.pci_address->bus);
+            CHECK(b.pci_address->device == a.pci_address->device);
+            CHECK(b.pci_address->function == a.pci_address->function);
+            break;
+        }
     }
 
     // Platform: kernel 与架构

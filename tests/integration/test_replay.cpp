@@ -58,7 +58,7 @@ int main()
     // 3. 回放采集
     std::cout << "\nStep 3: Replaying from raw store...\n";
     auto sys = sysal::test::collect_from_raw(raw);
-    CHECK(true);
+    CHECK(!sys.info.platform.host.hostname.empty());
 
     // 4. 验证域不变量
     std::cout << "\nStep 4: Verifying domain invariants...\n";
@@ -87,9 +87,6 @@ int main()
     // Meta
     CHECK(!sys.meta.succeeded_collectors.empty());
     CHECK(!sys.meta.sysal_version.empty());
-
-    // Warnings（可能为空，仅验证类型有效）
-    CHECK(true);
 
     // 5. 与实时采集对比关键指标
     std::cout << "\nStep 5: Comparing replay vs live collection...\n";

@@ -54,8 +54,9 @@ void shutdown_backend()
 
 /// @brief 记录成功/失败的采集器
 /// @details 根据 ParseResult 各域是否为 nullopt 判断成功与否。
-void record_collector_status(const ParseResult& result, std::vector<std::string>& succeeded,
-                             std::vector<std::string>& failed)
+///          仅检查 flags 中实际请求的域，未请求的域不计入成功或失败。
+void record_collector_status(const ParseResult& result, Collect flags,
+                             std::vector<std::string>& succeeded, std::vector<std::string>& failed)
 {
     const auto check = [&](const char* name, const auto& opt)
     {
@@ -69,15 +70,42 @@ void record_collector_status(const ParseResult& result, std::vector<std::string>
         }
     };
 
-    check("platform", result.platform);
-    check("cpu", result.cpu);
-    check("memory", result.memory);
-    check("pci", result.pci);
-    check("network", result.network);
-    check("accelerator", result.accelerators);
-    check("storage", result.storage);
-    check("software", result.software);
-    check("execution", result.execution);
+    if(has(flags, Collect::Platform))
+    {
+        check("platform", result.platform);
+    }
+    if(has(flags, Collect::Cpu))
+    {
+        check("cpu", result.cpu);
+    }
+    if(has(flags, Collect::Memory))
+    {
+        check("memory", result.memory);
+    }
+    if(has(flags, Collect::Pci))
+    {
+        check("pci", result.pci);
+    }
+    if(has(flags, Collect::Network))
+    {
+        check("network", result.network);
+    }
+    if(has(flags, Collect::Accelerator))
+    {
+        check("accelerator", result.accelerators);
+    }
+    if(has(flags, Collect::Storage))
+    {
+        check("storage", result.storage);
+    }
+    if(has(flags, Collect::Software))
+    {
+        check("software", result.software);
+    }
+    if(has(flags, Collect::Execution))
+    {
+        check("execution", result.execution);
+    }
 }
 
 struct ParserDispatch
@@ -116,6 +144,10 @@ System run_replay(const RawStore& raw, Collect flags, std::vector<std::string>& 
 
     // 后端初始化生命周期：init/shutdown 在 collect 内部配对完成
     init_backend();
+    struct BackendGuard
+    {
+        ~BackendGuard() { shutdown_backend(); }
+    } guard;
 
     ParseResult result;
 
@@ -131,7 +163,7 @@ System run_replay(const RawStore& raw, Collect flags, std::vector<std::string>& 
     // 记录成功/失败的采集器（在 resolve 移动之前）
     std::vector<std::string> succeeded_collectors;
     std::vector<std::string> failed_collectors;
-    record_collector_status(result, succeeded_collectors, failed_collectors);
+    record_collector_status(result, flags, succeeded_collectors, failed_collectors);
 
     // 全部请求的采集器失败时抛出异常
     if(succeeded_collectors.empty() && !failed_collectors.empty())
@@ -154,9 +186,6 @@ System run_replay(const RawStore& raw, Collect flags, std::vector<std::string>& 
     meta.requested_flags = flags;
     meta.succeeded_collectors = std::move(succeeded_collectors);
     meta.failed_collectors = std::move(failed_collectors);
-
-    // 后端清理
-    shutdown_backend();
 
     // 组装 System
     System sys;

@@ -167,4 +167,14 @@ std::optional<MemorySize> parse_kb_to_bytes(std::string_view s)
     return MemorySize{*value * 1024};
 }
 
+std::string extract_filename(std::string_view path)
+{
+    auto last_slash = path.rfind('/');
+    if(last_slash == std::string_view::npos)
+    {
+        return std::string(path);
+    }
+    return std::string(path.substr(last_slash + 1));
+}
+
 } // namespace sysal::detail

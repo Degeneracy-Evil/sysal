@@ -145,11 +145,11 @@ int main()
         CHECK(d0.bank_locator == "NODE 0");
         CHECK(d0.size.value == 34359738368ULL);
         CHECK(d0.speed_mts.has_value());
-        CHECK(*d0.speed_mts == 3200);
+        CHECK(d0.speed_mts->value == 3200);
         CHECK(d0.configured_speed_mts.has_value());
-        CHECK(*d0.configured_speed_mts == 2933);
+        CHECK(d0.configured_speed_mts->value == 2933);
         CHECK(d0.manufacturer.has_value());
-        CHECK(*d0.manufacturer == "Samsung");
+        CHECK(d0.manufacturer->value == "Samsung");
         CHECK(d0.part_number.has_value());
         CHECK(*d0.part_number == "M393A4K40EB3-CWE");
         CHECK(d0.rank.has_value());
@@ -238,6 +238,47 @@ int main()
         CHECK(mem.dimms.empty());
         CHECK(!mem.dimm_count.has_value());
         CHECK(!mem.populated_dimms.has_value());
+    }
+
+    // ---- 测试 9: udevadm 畸形输入（缺字段名、不可解析索引）不崩溃且产生警告 ----
+    {
+        RawStore raw;
+        raw.records.push_back(make_record(RawSource::ProcMemInfo, "/proc/meminfo",
+                                          "MemTotal:       34359738368 kB\n"
+                                          "MemAvailable:   30000000000 kB\n"));
+        raw.records.push_back(make_record(RawSource::Udevadm, "udevadm info -e",
+                                          "E: MEMORY_DEVICE_0_TYPE=DDR4\n"
+                                          "E: MEMORY_DEVICE_0_SIZE=34359738368\n"
+                                          "E: MEMORY_DEVICE_0_PRESENT=1\n"
+                                          "E: MEMORY_DEVICE_0_LOCATOR=CPU0_C0D0\n"
+                                          "E: MEMORY_DEVICE_abc_TYPE=DDR4\n"
+                                          "E: MEMORY_DEVICE_1_\n"
+                                          "E: NOT_MEMORY_DEVICE=ignore\n"
+                                          "garbage_line_no_colon\n"));
+
+        std::vector<std::string> warnings;
+        auto result = parse_memory(raw, warnings);
+        CHECK(result.has_value());
+
+        const auto& mem = *result;
+        CHECK(mem.dimms.size() == 1);
+        CHECK(mem.dimm_count.has_value());
+        CHECK(*mem.dimm_count == 1);
+        CHECK(mem.populated_dimms.has_value());
+        CHECK(*mem.populated_dimms == 1);
+        CHECK(mem.dimms[0].type == "DDR4");
+        CHECK(mem.dimms[0].size.value == 34359738368ULL);
+        CHECK(mem.dimms[0].present);
+        bool has_warning = false;
+        for(const auto& w : warnings)
+        {
+            if(w.find("parse_udevadm_dimms") != std::string::npos)
+            {
+                has_warning = true;
+                break;
+            }
+        }
+        CHECK(has_warning);
     }
 
     TEST_SUMMARY();

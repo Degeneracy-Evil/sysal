@@ -20,13 +20,13 @@ namespace sysal
 /// @brief 单个存储设备
 struct StorageDevice
 {
-    StorageId id;                           ///< 存储设备 ID
-    DeviceName name;                        ///< 设备名称
-    std::optional<MemorySize> capacity;     ///< 容量（可能未知）
-    std::optional<PciAddress> pci_address;  ///< PCI 地址（可能无）
-    StorageKind kind{};                     ///< 存储类型
-    std::optional<std::string> mount_point; ///< 挂载点
-    std::optional<std::string> fs_type;     ///< 文件系统类型
+    StorageId id;                          ///< 存储设备 ID
+    DeviceName name;                       ///< 设备名称
+    std::optional<MemorySize> capacity;    ///< 容量（可能未知）
+    std::optional<PciAddress> pci_address; ///< PCI 地址（可能无）
+    StorageKind kind{};                    ///< 存储类型
+    std::optional<MountPoint> mount_point; ///< 挂载点
+    std::optional<FilesystemType> fs_type; ///< 文件系统类型
 };
 
 /// @brief 存储子系统聚合

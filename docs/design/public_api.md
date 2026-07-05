@@ -183,10 +183,8 @@ sysal::System dispatch = sysal::System::collect(
     | Collect::Software | Collect::Execution
 );
 
-// 4) 同时保留原始证据
-sysal::System with_raw = sysal::System::collect(
-    full | Collect::Raw
-);
+// 4) 完整采集（full 已包含 Collect::Raw）
+sysal::System with_raw = sysal::System::collect(sysal::full);
 
 // 5) 读取类型化模型
 const auto& cpu  = sys.info.cpu;

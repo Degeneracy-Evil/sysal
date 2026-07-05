@@ -40,4 +40,7 @@ std::optional<PciAddress> parse_pci_address(std::string_view s);
 /// @brief 将 KB 单位的值转换为字节数
 std::optional<MemorySize> parse_kb_to_bytes(std::string_view s);
 
+/// @brief 从路径中提取文件名（最后一个 '/' 之后的部分）
+std::string extract_filename(std::string_view path);
+
 } // namespace sysal::detail

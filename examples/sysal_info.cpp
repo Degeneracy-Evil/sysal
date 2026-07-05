@@ -499,15 +499,15 @@ int main()
         }
         if(d.speed_mts.has_value())
         {
-            label("  Speed (MT/s)", *d.speed_mts);
+            label("  Speed (MT/s)", d.speed_mts->value);
         }
         if(d.configured_speed_mts.has_value())
         {
-            label("  Configured speed (MT/s)", *d.configured_speed_mts);
+            label("  Configured speed (MT/s)", d.configured_speed_mts->value);
         }
         if(d.manufacturer.has_value())
         {
-            label("  Manufacturer", *d.manufacturer);
+            label("  Manufacturer", d.manufacturer->value);
         }
         if(d.part_number.has_value())
         {
@@ -621,11 +621,11 @@ int main()
         }
         if(dev.fs_type.has_value())
         {
-            label("  FS Type", *dev.fs_type);
+            label("  FS Type", dev.fs_type->value);
         }
         if(dev.mount_point.has_value())
         {
-            label("  Mount", *dev.mount_point);
+            label("  Mount", dev.mount_point->value);
         }
     }
 
