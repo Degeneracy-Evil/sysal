@@ -233,10 +233,10 @@ std::pair<std::string, std::string> extract_dmi_vendor_product(const RawStore& r
 ///          1. /sys/hypervisor/type（Xen 半虚拟化）
 ///          2. DMI sys_vendor/product_name 关键词匹配
 ///          3. /proc/cpuinfo flags 含 hypervisor 标志（确认在 VM 中）
-std::optional<Virtualization>
-detect_virtualization(const RawStore& raw, [[maybe_unused]] std::vector<std::string>& warnings)
+std::optional<Virtualization> detect_virtualization(const RawStore& raw,
+                                                    std::vector<std::string>& warnings)
 {
-    // 1. /sys/hypervisor/type → Xen
+    // 1. /sys/hypervisor/type → Xen (PV)
     auto hypervisor_records = raw.get_all(RawSource::SysHypervisor);
     for(const auto* rec : hypervisor_records)
     {
@@ -262,10 +262,18 @@ detect_virtualization(const RawStore& raw, [[maybe_unused]] std::vector<std::str
     {
         return Virtualization{VirtualizationKind::HyperV, "Hyper-V"};
     }
+    if(icontains(sys_vendor, "KVM") || icontains(product_name, "KVM"))
+    {
+        return Virtualization{VirtualizationKind::Kvm, "KVM"};
+    }
     if(icontains(sys_vendor, "QEMU") || icontains(product_name, "QEMU") ||
        icontains(sys_vendor, "Bochs") || icontains(product_name, "Bochs"))
     {
         return Virtualization{VirtualizationKind::Qemu, "QEMU"};
+    }
+    if(icontains(sys_vendor, "Xen") || icontains(product_name, "Xen"))
+    {
+        return Virtualization{VirtualizationKind::Xen, "Xen"};
     }
     if(icontains(sys_vendor, "innotek") || icontains(product_name, "VirtualBox"))
     {
@@ -274,10 +282,6 @@ detect_virtualization(const RawStore& raw, [[maybe_unused]] std::vector<std::str
     if(icontains(sys_vendor, "Parallels") || icontains(product_name, "Parallels"))
     {
         return Virtualization{VirtualizationKind::Parallels, "Parallels"};
-    }
-    if(icontains(sys_vendor, "KVM") || icontains(product_name, "KVM"))
-    {
-        return Virtualization{VirtualizationKind::Kvm, "KVM"};
     }
 
     // 3. /proc/cpuinfo flags 含 hypervisor 标志 → 确认在 VM 中
@@ -288,7 +292,6 @@ detect_virtualization(const RawStore& raw, [[maybe_unused]] std::vector<std::str
         {
             continue;
         }
-        // 在 cpuinfo 中查找 "flags" 行并检查是否含 hypervisor 标志
         auto lines = split(rec->payload, '\n');
         for(const auto& line : lines)
         {
@@ -297,12 +300,13 @@ detect_virtualization(const RawStore& raw, [[maybe_unused]] std::vector<std::str
             if(key_trimmed == "flags")
             {
                 auto flags_lower = to_lower(value);
-                // flags 以空格分隔，确保整词匹配 hypervisor
                 auto parts = split(flags_lower, ' ');
                 for(const auto& f : parts)
                 {
                     if(trim(f) == "hypervisor")
                     {
+                        warnings.push_back("detect_virtualization: CPU hypervisor flag "
+                                           "set but DMI/sysfs did not match known hypervisor");
                         return Virtualization{VirtualizationKind::Other, "Unknown"};
                     }
                 }

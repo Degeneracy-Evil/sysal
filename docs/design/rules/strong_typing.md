@@ -37,9 +37,10 @@ template <typename Tag> struct ScalarUnit
     constexpr bool operator==(const ScalarUnit& other) const;
 };
 
-using MemorySize = ScalarUnit<MemorySizeTag>;  // 字节
-using Frequency  = ScalarUnit<FrequencyTag>;   // 赫兹
-using Bandwidth  = ScalarUnit<BandwidthTag>;   // 比特每秒
+using MemorySize   = ScalarUnit<MemorySizeTag>;    // 字节
+using Frequency    = ScalarUnit<FrequencyTag>;     // 赫兹
+using Bandwidth    = ScalarUnit<BandwidthTag>;     // 比特每秒
+using TransferRate = ScalarUnit<TransferRateTag>;  // MT/s（内存传输速率）
 ```
 
 不同 `Tag` 实例化为不同类型，不可隐式转换。
@@ -108,13 +109,17 @@ struct InterfaceNameTag {};
 struct MacAddressTag {};
 struct IpAddressTag {};
 struct PciClassTag {};
+struct MountPointTag {};
+struct FilesystemTypeTag {};
 
-using Vendor        = NamedString<VendorTag>;        // 厂商名称
-using DeviceName    = NamedString<DeviceNameTag>;     // 设备名称
-using InterfaceName = NamedString<InterfaceNameTag>;  // 网络接口名称
-using MacAddress    = NamedString<MacAddressTag>;     // MAC 地址
-using IpAddress     = NamedString<IpAddressTag>;      // IP 地址
-using PciClass      = NamedString<PciClassTag>;       // PCI 设备类别
+using Vendor         = NamedString<VendorTag>;           // 厂商名称
+using DeviceName     = NamedString<DeviceNameTag>;        // 设备名称
+using InterfaceName  = NamedString<InterfaceNameTag>;     // 网络接口名称
+using MacAddress     = NamedString<MacAddressTag>;        // MAC 地址
+using IpAddress      = NamedString<IpAddressTag>;         // IP 地址
+using PciClass       = NamedString<PciClassTag>;          // PCI 设备类别
+using MountPoint     = NamedString<MountPointTag>;        // 挂载点路径
+using FilesystemType = NamedString<FilesystemTypeTag>;    // 文件系统类型
 ```
 
 ## 枚举

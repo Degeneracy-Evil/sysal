@@ -52,6 +52,15 @@ void test_round_trip()
     CHECK(round_trip.info.platform.os.name == sys.info.platform.os.name);
     CHECK(round_trip.info.platform.os.version == sys.info.platform.os.version);
     CHECK(round_trip.info.platform.host.hostname == sys.info.platform.host.hostname);
+    CHECK(round_trip.info.platform.virtualization.has_value() ==
+          sys.info.platform.virtualization.has_value());
+    if(sys.info.platform.virtualization.has_value())
+    {
+        CHECK(round_trip.info.platform.virtualization->kind ==
+              sys.info.platform.virtualization->kind);
+        CHECK(round_trip.info.platform.virtualization->hypervisor ==
+              sys.info.platform.virtualization->hypervisor);
+    }
     CHECK(round_trip.info.execution.process.pid == sys.info.execution.process.pid);
 
     // Memory: v0.0.4 DIMM 字段

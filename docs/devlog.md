@@ -1,5 +1,21 @@
 # 开发记录
 
+### 2026-07-05 修复 v0.0.5 评审 P1 问题 + CI 添加 sysal_info
+
+- **变更类型**: fix / test / docs / chore
+- **涉及文件**: src/parser/platform.cpp, tests/unit/test_parse_platform.cpp, tests/unit/test_serialization.cpp, docs/design/rules/strong_typing.md, docs/design/testing/serialization.md, .github/workflows/ci.yml, docs/devlog.md
+- **变更内容**:
+  1. P1 #1: DMI 关键词新增 "Xen" 匹配，覆盖 Xen HVM 检测
+  2. P1 #2: KVM 检查移到 QEMU 前面，避免 KVM 客户机被误分类为 QEMU
+  3. P1 #3: detect_virtualization 去掉 [[maybe_unused]]，cpuinfo hypervisor flag 命中但 DMI 未匹配时发出 warning
+  4. P1 #4: 新增 Parallels 和 Xen HVM 测试场景
+  5. P1 #5: 序列化 round-trip 新增 platform.virtualization 断言
+  6. P1 #6: strong_typing.md 新增 TransferRate/MountPoint/FilesystemType
+  7. P1 #7: serialization.md storage kind 示例从字符串改为整数，meta 版本号更新
+  8. CI: 添加 xmake run sysal_info 步骤
+- **原因**: v0.0.5 评审报告 7 项 P1 问题修复 + CI 补充 sysal_info 运行验证
+- **验证**: `xmake -r` 构建成功；test_parse_platform 72/72、test_serialization 65/65 通过
+
 ### 2026-07-05 v0.0.5 代码质量评审
 
 - **变更类型**: docs

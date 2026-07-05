@@ -69,7 +69,7 @@ System from_json(std::string_view json);
           "name": "nvme0n1",
           "capacity": 1024209543168,
           "pci_address": "0000:01:00.0",
-          "kind": "Nvme",
+          "kind": 0,
           "mount_point": "/",
           "fs_type": "ext4"
         }
@@ -81,7 +81,7 @@ System from_json(std::string_view json);
   },
   "meta": {
     "collect_time": 1782036690146,
-    "sysal_version": "0.0.3",
+    "sysal_version": "0.0.4",
     "collect_duration": 0.158,
     "requested_flags": 1023,
     "succeeded_collectors": ["platform", "cpu", ...],

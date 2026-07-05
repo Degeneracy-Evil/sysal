@@ -225,7 +225,47 @@ int main()
         CHECK(result->virtualization->hypervisor == "VirtualBox");
     }
 
-    // ---- 测试 9: 虚拟化检测（cpuinfo hypervisor flag → Other） ----
+    // ---- 测试 9: 虚拟化检测（Parallels，通过 DMI sys_vendor） ----
+    {
+        RawStore raw;
+        raw.records.push_back(
+            make_record(RawSource::EtcOsRelease, "/etc/os-release", "NAME=\"Ubuntu\"\n"));
+        raw.records.push_back(
+            make_record(RawSource::ProcVersion, "uname", "5.15.0-91-generic\n#101-Ubuntu SMP ..."));
+        raw.records.push_back(make_record(RawSource::Uname, "uname", "x86_64"));
+        raw.records.push_back(make_record(RawSource::SysfsDmi, "/sys/class/dmi/id/sys_vendor",
+                                          "Parallels Software International Inc.\n"));
+
+        std::vector<std::string> warnings;
+        auto result = parse_platform(raw, warnings);
+        CHECK(result.has_value());
+        CHECK(result->virtualization.has_value());
+        CHECK(result->virtualization->kind == VirtualizationKind::Parallels);
+        CHECK(result->virtualization->hypervisor == "Parallels");
+    }
+
+    // ---- 测试 10: 虚拟化检测（Xen HVM，通过 DMI sys_vendor） ----
+    {
+        RawStore raw;
+        raw.records.push_back(
+            make_record(RawSource::EtcOsRelease, "/etc/os-release", "NAME=\"Ubuntu\"\n"));
+        raw.records.push_back(
+            make_record(RawSource::ProcVersion, "uname", "5.15.0-91-generic\n#101-Ubuntu SMP ..."));
+        raw.records.push_back(make_record(RawSource::Uname, "uname", "x86_64"));
+        raw.records.push_back(
+            make_record(RawSource::SysfsDmi, "/sys/class/dmi/id/sys_vendor", "Xen\n"));
+        raw.records.push_back(
+            make_record(RawSource::SysfsDmi, "/sys/class/dmi/id/product_name", "HVM domU\n"));
+
+        std::vector<std::string> warnings;
+        auto result = parse_platform(raw, warnings);
+        CHECK(result.has_value());
+        CHECK(result->virtualization.has_value());
+        CHECK(result->virtualization->kind == VirtualizationKind::Xen);
+        CHECK(result->virtualization->hypervisor == "Xen");
+    }
+
+    // ---- 测试 11: 虚拟化检测（cpuinfo hypervisor flag → Other + warning） ----
     {
         RawStore raw;
         raw.records.push_back(
@@ -243,9 +283,19 @@ int main()
         CHECK(result->virtualization.has_value());
         CHECK(result->virtualization->kind == VirtualizationKind::Other);
         CHECK(result->virtualization->hypervisor == "Unknown");
+        bool has_virt_warning = false;
+        for(const auto& w : warnings)
+        {
+            if(w.find("detect_virtualization") != std::string::npos)
+            {
+                has_virt_warning = true;
+                break;
+            }
+        }
+        CHECK(has_virt_warning);
     }
 
-    // ---- 测试 10: 物理机（无虚拟化检测） ----
+    // ---- 测试 12: 物理机（无虚拟化检测，无 warning） ----
     {
         RawStore raw;
         raw.records.push_back(
@@ -267,7 +317,7 @@ int main()
         CHECK(!result->virtualization.has_value());
     }
 
-    // ---- 测试 11: Xen 优先级高于 DMI（/sys/hypervisor/type 先命中） ----
+    // ---- 测试 13: Xen 优先级高于 DMI（/sys/hypervisor/type 先命中） ----
     {
         RawStore raw;
         raw.records.push_back(
@@ -287,7 +337,7 @@ int main()
         CHECK(result->virtualization->kind == VirtualizationKind::Xen);
     }
 
-    // ---- 测试 12: aarch64 架构 ----
+    // ---- 测试 14: aarch64 架构 ----
     {
         RawStore raw;
         raw.records.push_back(
@@ -303,7 +353,7 @@ int main()
         CHECK(result->architecture.bits == 64);
     }
 
-    // ---- 测试 13: riscv64 架构 ----
+    // ---- 测试 15: riscv64 架构 ----
     {
         RawStore raw;
         raw.records.push_back(
@@ -319,7 +369,7 @@ int main()
         CHECK(result->architecture.bits == 64);
     }
 
-    // ---- 测试 14: 缺少数据时产生警告 ----
+    // ---- 测试 16: 缺少数据时产生警告 ----
     {
         RawStore raw;
         // 不添加任何记录
