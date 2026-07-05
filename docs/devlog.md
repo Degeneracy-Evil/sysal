@@ -1,5 +1,41 @@
 # 开发记录
 
+### 2026-07-05 修复全部 P1+P2 评审问题 + README 重写 + 评审 Skill + CI 修复
+
+- **变更类型**: fix / refactor / docs / test / chore
+- **涉及文件**: include/sysal/types/units.hpp, value_types.hpp, include/sysal/model/memory.hpp, storage.hpp, src/parser/memory.cpp, network.cpp, storage.cpp, platform.cpp, pci.cpp, cpu.cpp, parse_utils.hpp, parse_utils.cpp, src/pipeline/pipeline.cpp, src/serialization/serialize.cpp, examples/sysal_info.cpp, tests/unit/test_parse_memory.cpp, test_parse_storage.cpp, test_parse_network.cpp, test_parse_platform.cpp, test_serialization.cpp, test_reader.cpp, tests/integration/test_replay.cpp, tests/fixtures/dev_machine.json, docs/design/public_api.md, README.md, .github/workflows/ci.yml, .opencode/skills/code-quality-review/SKILL.md, docs/devlog.md
+- **变更内容**:
+  **P1 修复（7 项）**:
+  1. DimmInfo.speed_mts/configured_speed_mts 改用 TransferRate ScalarUnit（新建 tag）
+  2. DimmInfo.manufacturer 改用 optional<Vendor>
+  3. StorageDevice.mount_point/fs_type 改用 MountPoint/FilesystemType NamedString（新建 tag）
+  4. record_collector_status 加 flags 参数，只检查请求域
+  5. parse_numa_meminfo 去掉 [[maybe_unused]]，NUMA 解析失败加 warning
+  6. test_serialization round-trip 加 DimmInfo/mount_point/fs_type/addresses/pci_address 断言
+  7. test_reader 加 ProcHostname/IfAddrs/DfTh 检查
+  **P2 修复（13 项）**:
+  1. 提取 extract_filename 到 parse_utils，删 3 份重复
+  2. cpu.cpp (void) cast 改为 [[maybe_unused]]
+  3. pipeline.cpp backend init/shutdown 加 RAII guard
+  4. udevadm/IfAddrs/df 畸形行加 warning
+  5. platform.cpp hostname 缺失加 warning
+  6. storage 分区匹配改为优先选 "/" 根挂载
+  7. pci.cpp 删死代码（parse_uint 无法解析 "-1" 的分支）
+  8. storage 分区前缀匹配加数字边界检查
+  9. serialize.cpp RawSource/CollectStatus 加 validate_enum
+  10. public_api.md 修 full|Collect::Raw 示例矛盾
+  11. memory.hpp 文件头注释加 DimmInfo
+  12. test_replay 替换 CHECK(true) 占位
+  13. 3 个 parser 加畸形输入测试
+  **其他**:
+  - README 重写（简洁叙事体，面向开发者）
+  - 创建 .opencode/skills/code-quality-review/SKILL.md
+  - CI 移除多余的 sysal_info 单独 step（check.sh 已覆盖 build+tests）
+  - clang-format 修复（execution.cpp, cpu.cpp, pci.cpp）
+  - 推送 v0.0.2 和 v0.0.3 tag 到远程
+- **原因**: v0.0.4 代码质量评审发现的全部 P1+P2 问题修复；README 面向开发者精简化；评审方法封装为 skill 便于复用；CI 清理
+- **验证**: `xmake -r` 构建成功（0 warnings）；18/18 测试通过（729 assertions）
+
 ### 2026-07-05 修复测试完整性问题（序列化往返、reader 覆盖、存储分区匹配、replay 占位、畸形输入）
 
 - **变更类型**: tests / src / fix
@@ -951,39 +987,3 @@ sysal v0.0.1 重写完成。10 个阶段的核心变更：
   3. v004_review.md：v0.0.4 代码质量评审报告（9 维度，5 Oracle agent，加权总分 8/10）
 - **原因**: 版本冻结前收尾——添加生产级编译优化，改进评审方法文档，执行完整代码质量评审
 - **验证**: `xmake -r` 构建成功（0 warnings）；18/18 测试通过（678 assertions）；评审报告完成，7 项 P1 + 13 项 P2 问题记录
-
-### 2026-07-05 修复全部 P1+P2 评审问题 + README 重写 + 评审 Skill + CI 修复
-
-- **变更类型**: fix / refactor / docs / test / chore
-- **涉及文件**: include/sysal/types/units.hpp, value_types.hpp, include/sysal/model/memory.hpp, storage.hpp, src/parser/memory.cpp, network.cpp, storage.cpp, platform.cpp, pci.cpp, cpu.cpp, parse_utils.hpp, parse_utils.cpp, src/pipeline/pipeline.cpp, src/serialization/serialize.cpp, examples/sysal_info.cpp, tests/unit/test_parse_memory.cpp, test_parse_storage.cpp, test_parse_network.cpp, test_parse_platform.cpp, test_serialization.cpp, test_reader.cpp, tests/integration/test_replay.cpp, tests/fixtures/dev_machine.json, docs/design/public_api.md, README.md, .github/workflows/ci.yml, .opencode/skills/code-quality-review/SKILL.md, docs/devlog.md
-- **变更内容**:
-  **P1 修复（7 项）**:
-  1. DimmInfo.speed_mts/configured_speed_mts 改用 TransferRate ScalarUnit（新建 tag）
-  2. DimmInfo.manufacturer 改用 optional<Vendor>
-  3. StorageDevice.mount_point/fs_type 改用 MountPoint/FilesystemType NamedString（新建 tag）
-  4. record_collector_status 加 flags 参数，只检查请求域
-  5. parse_numa_meminfo 去掉 [[maybe_unused]]，NUMA 解析失败加 warning
-  6. test_serialization round-trip 加 DimmInfo/mount_point/fs_type/addresses/pci_address 断言
-  7. test_reader 加 ProcHostname/IfAddrs/DfTh 检查
-  **P2 修复（13 项）**:
-  1. 提取 extract_filename 到 parse_utils，删 3 份重复
-  2. cpu.cpp (void) cast 改为 [[maybe_unused]]
-  3. pipeline.cpp backend init/shutdown 加 RAII guard
-  4. udevadm/IfAddrs/df 畸形行加 warning
-  5. platform.cpp hostname 缺失加 warning
-  6. storage 分区匹配改为优先选 "/" 根挂载
-  7. pci.cpp 删死代码（parse_uint 无法解析 "-1" 的分支）
-  8. storage 分区前缀匹配加数字边界检查
-  9. serialize.cpp RawSource/CollectStatus 加 validate_enum
-  10. public_api.md 修 full|Collect::Raw 示例矛盾
-  11. memory.hpp 文件头注释加 DimmInfo
-  12. test_replay 替换 CHECK(true) 占位
-  13. 3 个 parser 加畸形输入测试
-  **其他**:
-  - README 完整重写（叙事体，82 行）
-  - 创建 .opencode/skills/code-quality-review/SKILL.md
-  - CI 加 xmake run sysal_info step
-  - clang-format 修复（execution.cpp, cpu.cpp, pci.cpp）
-  - 推送 v0.0.2 和 v0.0.3 tag 到远程
-- **原因**: v0.0.4 代码质量评审发现的全部 P1+P2 问题修复；README 风格从碎片化 bullet 改为连贯叙事；评审方法封装为 skill 便于复用；CI 失败修复
-- **验证**: `xmake -r` 构建成功（0 warnings）；18/18 测试通过（729 assertions）
