@@ -11,7 +11,7 @@ set_rundir(".")
 set_version("0.0.3")
 
 -- 全局编译/链接选项，所有 target 共享
-add_cxxflags("-Wall", "-Wextra", "-Werror", "-stdlib=libc++", {force = true})
+add_cxxflags("-Wall", "-Wextra", "-Werror", "-O2", "-stdlib=libc++", {force = true})
 add_ldflags("-stdlib=libc++", "-fuse-ld=lld", "-rtlib=compiler-rt", "-unwindlib=libunwind",
             {force = true})
 add_includedirs("include")
