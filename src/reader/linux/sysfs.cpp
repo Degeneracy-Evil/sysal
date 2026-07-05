@@ -156,6 +156,15 @@ void read_net_sysfs(RawStore& raw)
         read_sysfs_file(raw, RawSource::SysfsNet, (dir / "address").string());
         read_sysfs_file(raw, RawSource::SysfsNet, (dir / "operstate").string());
         read_sysfs_file(raw, RawSource::SysfsNet, (dir / "speed").string());
+
+        // device 符号链接 → PCI 地址（虚拟接口如 lo 无此链接，静默跳过）
+        std::error_code link_ec;
+        auto device_target = fs::read_symlink(dir / "device", link_ec);
+        if(!link_ec)
+        {
+            add_record(raw, RawSource::SysfsNet, (dir / "device").string(), device_target.string(),
+                       CollectStatus::Success);
+        }
     }
 
     if(!found_any)
@@ -278,6 +287,57 @@ void read_dmi_sysfs(RawStore& raw)
     }
 }
 
+/// @brief 采集 EDAC 内存 DIMM 信息
+/// @param raw 原始证据存储
+/// @details 遍历 /sys/devices/system/edac/mc/mcN/dimmM/，读取各 DIMM 的
+///          mem_type、size、label、location、dev_type、edac_mode。
+///          无 EDAC 的系统（容器、消费级硬件）静默跳过。
+void read_edac_sysfs(RawStore& raw)
+{
+    const fs::path edac_base = "/sys/devices/system/edac/mc";
+    if(!fs::exists(edac_base))
+    {
+        return;
+    }
+
+    std::error_code ec;
+    for(const auto& mc_entry : fs::directory_iterator(edac_base, ec))
+    {
+        if(!mc_entry.is_directory())
+        {
+            continue;
+        }
+        auto mc_name = mc_entry.path().filename().string();
+        if(mc_name.size() < 3 || mc_name.substr(0, 2) != "mc" ||
+           mc_name.find_first_not_of("0123456789", 2) != std::string::npos)
+        {
+            continue;
+        }
+
+        for(const auto& dimm_entry : fs::directory_iterator(mc_entry.path(), ec))
+        {
+            if(!dimm_entry.is_directory())
+            {
+                continue;
+            }
+            auto dimm_name = dimm_entry.path().filename().string();
+            if(dimm_name.size() < 5 || dimm_name.substr(0, 4) != "dimm" ||
+               dimm_name.find_first_not_of("0123456789", 4) != std::string::npos)
+            {
+                continue;
+            }
+
+            const auto& dir = dimm_entry.path();
+            read_sysfs_file(raw, RawSource::SysfsEdac, (dir / "dimm_mem_type").string());
+            read_sysfs_file(raw, RawSource::SysfsEdac, (dir / "size").string());
+            read_sysfs_file(raw, RawSource::SysfsEdac, (dir / "dimm_label").string());
+            read_sysfs_file(raw, RawSource::SysfsEdac, (dir / "dimm_location").string());
+            read_sysfs_file(raw, RawSource::SysfsEdac, (dir / "dimm_dev_type").string());
+            read_sysfs_file(raw, RawSource::SysfsEdac, (dir / "dimm_edac_mode").string());
+        }
+    }
+}
+
 } // namespace
 
 void read_sysfs(RawStore& raw, Collect flags)
@@ -292,6 +352,7 @@ void read_sysfs(RawStore& raw, Collect flags)
         {Collect::Cpu, read_cpu_sysfs},       {Collect::Memory, read_numa_sysfs},
         {Collect::Network, read_net_sysfs},   {Collect::Pci, read_pci_sysfs},
         {Collect::Storage, read_block_sysfs}, {Collect::Platform, read_dmi_sysfs},
+        {Collect::Memory, read_edac_sysfs},
     };
 
     for(const auto& entry : reader_dispatch)

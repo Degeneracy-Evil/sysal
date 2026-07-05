@@ -98,5 +98,87 @@ int main()
         CHECK(!result->interfaces[0].speed.has_value());
     }
 
+    // ---- 测试 5: IfAddrs 含 IPv4 与 IPv6 → addresses 填充 ----
+    {
+        RawStore raw;
+        raw.records.push_back(
+            make_record(RawSource::SysfsNet, "/sys/class/net/eth0/address", "aa:bb:cc:dd:ee:ff"));
+        raw.records.push_back(
+            make_record(RawSource::SysfsNet, "/sys/class/net/eth0/operstate", "up"));
+        raw.records.push_back(
+            make_record(RawSource::SysfsNet, "/sys/class/net/lo/operstate", "unknown"));
+
+        std::string ifaddrs_payload = "eth0 192.168.1.10\n"
+                                      "eth0 fe80::aabb:ccff:fedd:eeff\n"
+                                      "lo 127.0.0.1\n"
+                                      "lo ::1\n";
+        raw.records.push_back(make_record(RawSource::IfAddrs, "getifaddrs", ifaddrs_payload));
+
+        std::vector<std::string> warnings;
+        auto result = parse_network(raw, warnings);
+        CHECK(result.has_value());
+        CHECK(result->interfaces.size() == 2);
+
+        // eth0 在前（字典序）
+        CHECK(result->interfaces[0].name == InterfaceName{"eth0"});
+        CHECK(result->interfaces[0].addresses.size() == 2);
+        CHECK(result->interfaces[0].addresses[0] == IpAddress{"192.168.1.10"});
+        CHECK(result->interfaces[0].addresses[1] == IpAddress{"fe80::aabb:ccff:fedd:eeff"});
+
+        CHECK(result->interfaces[1].name == InterfaceName{"lo"});
+        CHECK(result->interfaces[1].addresses.size() == 2);
+        CHECK(result->interfaces[1].addresses[0] == IpAddress{"127.0.0.1"});
+        CHECK(result->interfaces[1].addresses[1] == IpAddress{"::1"});
+    }
+
+    // ---- 测试 6: device 符号链接 → pci_address 填充 ----
+    {
+        RawStore raw;
+        raw.records.push_back(
+            make_record(RawSource::SysfsNet, "/sys/class/net/eth0/address", "aa:bb:cc:dd:ee:ff"));
+        raw.records.push_back(
+            make_record(RawSource::SysfsNet, "/sys/class/net/eth0/operstate", "up"));
+        raw.records.push_back(make_record(RawSource::SysfsNet, "/sys/class/net/eth0/device",
+                                          "../../../0000:41:00.0"));
+
+        std::vector<std::string> warnings;
+        auto result = parse_network(raw, warnings);
+        CHECK(result.has_value());
+        CHECK(result->interfaces.size() == 1);
+        CHECK(result->interfaces[0].pci_address.has_value());
+        CHECK(result->interfaces[0].pci_address->domain == 0x0000);
+        CHECK(result->interfaces[0].pci_address->bus == 0x41);
+        CHECK(result->interfaces[0].pci_address->device == 0x00);
+        CHECK(result->interfaces[0].pci_address->function == 0x0);
+    }
+
+    // ---- 测试 7: 无 IfAddrs → addresses 为空（不崩溃） ----
+    {
+        RawStore raw;
+        raw.records.push_back(
+            make_record(RawSource::SysfsNet, "/sys/class/net/eth0/address", "aa:bb:cc:dd:ee:ff"));
+        raw.records.push_back(
+            make_record(RawSource::SysfsNet, "/sys/class/net/eth0/operstate", "up"));
+
+        std::vector<std::string> warnings;
+        auto result = parse_network(raw, warnings);
+        CHECK(result.has_value());
+        CHECK(result->interfaces.size() == 1);
+        CHECK(result->interfaces[0].addresses.empty());
+    }
+
+    // ---- 测试 8: 虚拟接口无 device 符号链接 → pci_address 为 nullopt ----
+    {
+        RawStore raw;
+        raw.records.push_back(
+            make_record(RawSource::SysfsNet, "/sys/class/net/lo/operstate", "unknown"));
+
+        std::vector<std::string> warnings;
+        auto result = parse_network(raw, warnings);
+        CHECK(result.has_value());
+        CHECK(result->interfaces.size() == 1);
+        CHECK(!result->interfaces[0].pci_address.has_value());
+    }
+
     TEST_SUMMARY();
 }

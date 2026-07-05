@@ -8,6 +8,7 @@
 
 #include <map>
 #include <string_view>
+#include <vector>
 
 namespace sysal::detail
 {
@@ -96,6 +97,36 @@ std::optional<Network> parse_network(const RawStore& raw, std::vector<std::strin
         groups[ifname].push_back(rec);
     }
 
+    // 解析 IfAddrs：payload 格式 "ifname ip\n" 每行一条
+    std::map<std::string, std::vector<std::string>> ip_map;
+    auto ifaddr_records = raw.get_all(RawSource::IfAddrs);
+    for(const auto* rec : ifaddr_records)
+    {
+        if(rec->status != CollectStatus::Success || rec->payload.empty())
+        {
+            continue;
+        }
+        for(const auto& line : split(rec->payload, '\n'))
+        {
+            if(line.empty())
+            {
+                continue;
+            }
+            auto space = line.find(' ');
+            if(space == std::string::npos)
+            {
+                continue;
+            }
+            auto ifname = trim(line.substr(0, space));
+            auto ip = trim(line.substr(space + 1));
+            if(ifname.empty() || ip.empty())
+            {
+                continue;
+            }
+            ip_map[ifname].push_back(ip);
+        }
+    }
+
     Network network;
     for(const auto& [ifname, records] : groups)
     {
@@ -130,6 +161,29 @@ std::optional<Network> parse_network(const RawStore& raw, std::vector<std::strin
                 {
                     // speed 不可用（如回环接口），保持 nullopt
                 }
+            }
+            else if(filename == "device")
+            {
+                // payload 是符号链接目标，如 "../../../0000:41:00.0"
+                auto last_slash = payload.rfind('/');
+                auto pci_str = last_slash == std::string::npos
+                                   ? trim(payload)
+                                   : trim(payload.substr(last_slash + 1));
+                auto pci = parse_pci_address(pci_str);
+                if(pci.has_value())
+                {
+                    iface.pci_address = pci;
+                }
+            }
+        }
+
+        // 填充 IP 地址
+        auto ip_it = ip_map.find(ifname);
+        if(ip_it != ip_map.end())
+        {
+            for(const auto& ip : ip_it->second)
+            {
+                iface.addresses.push_back(IpAddress{ip});
             }
         }
 
