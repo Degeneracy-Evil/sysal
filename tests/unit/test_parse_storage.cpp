@@ -141,5 +141,57 @@ int main()
         CHECK(stor.devices[0].kind == StorageKind::Other);
     }
 
+    // ---- 测试 8: df -Th 合并挂载点和文件系统类型 ----
+    {
+        RawStore raw;
+        raw.records.push_back(
+            make_record(RawSource::SysfsBlock, "/sys/block/nvme0n1/size", "3750924672\n"));
+        raw.records.push_back(
+            make_record(RawSource::SysfsBlock, "/sys/block/nvme0n1/queue/rotational", "0\n"));
+        raw.records.push_back(
+            make_record(RawSource::SysfsBlock, "/sys/block/sda/size", "976773168\n"));
+        raw.records.push_back(
+            make_record(RawSource::SysfsBlock, "/sys/block/sda/queue/rotational", "1\n"));
+        raw.records.push_back(
+            make_record(RawSource::DfTh, "df -Th",
+                        "Filesystem     Type      Size  Used Avail Use% Mounted on\n"
+                        "/dev/nvme0n1   xfs       1.7T  1.2T  442G  73% /data3\n"
+                        "/dev/sda2      ext4      1.8T  1.2T  527G  70% /\n"
+                        "/dev/sda1      vfat      1.1G  6.1M  1.1G   1% /boot/efi\n"));
+
+        std::vector<std::string> warnings;
+        auto result = parse_storage(raw, warnings);
+        CHECK(result.has_value());
+
+        const auto& stor = *result;
+        CHECK(stor.devices.size() == 2);
+
+        CHECK(stor.devices[0].name.value == "nvme0n1");
+        CHECK(stor.devices[0].mount_point.has_value());
+        CHECK(*stor.devices[0].mount_point == "/data3");
+        CHECK(stor.devices[0].fs_type.has_value());
+        CHECK(*stor.devices[0].fs_type == "xfs");
+
+        CHECK(stor.devices[1].name.value == "sda");
+        CHECK(stor.devices[1].mount_point.has_value());
+        CHECK(*stor.devices[1].mount_point == "/boot/efi");
+        CHECK(stor.devices[1].fs_type.has_value());
+        CHECK(*stor.devices[1].fs_type == "vfat");
+    }
+
+    // ---- 测试 9: 无 df -Th 数据 → mount_point/fs_type 为 nullopt ----
+    {
+        RawStore raw;
+        raw.records.push_back(
+            make_record(RawSource::SysfsBlock, "/sys/block/nvme0n1/size", "1000\n"));
+
+        std::vector<std::string> warnings;
+        auto result = parse_storage(raw, warnings);
+        CHECK(result.has_value());
+        CHECK(result->devices.size() == 1);
+        CHECK(!result->devices[0].mount_point.has_value());
+        CHECK(!result->devices[0].fs_type.has_value());
+    }
+
     TEST_SUMMARY();
 }

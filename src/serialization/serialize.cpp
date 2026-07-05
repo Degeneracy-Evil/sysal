@@ -66,7 +66,7 @@ using json = nlohmann::json;
 /// @param field_name 字段名（用于错误信息）
 /// @return 校验通过的枚举值
 /// @throws SysalError 若值越界
-template<typename Enum>
+template <typename Enum>
 Enum validate_enum(std::uint32_t val, Enum max_val, std::string_view field_name)
 {
     if(val > static_cast<std::uint32_t>(max_val))
@@ -507,6 +507,90 @@ Enum validate_enum(std::uint32_t val, Enum max_val, std::string_view field_name)
     return nm;
 }
 
+[[nodiscard]] json dimm_info_to_json(const DimmInfo& d)
+{
+    json j = {
+        {"locator", d.locator}, {"bank_locator", d.bank_locator}, {"size", d.size.value},
+        {"type", d.type},       {"present", d.present},
+    };
+    if(d.speed_mts)
+    {
+        j["speed_mts"] = *d.speed_mts;
+    }
+    if(d.configured_speed_mts)
+    {
+        j["configured_speed_mts"] = *d.configured_speed_mts;
+    }
+    if(d.manufacturer)
+    {
+        j["manufacturer"] = *d.manufacturer;
+    }
+    if(d.part_number)
+    {
+        j["part_number"] = *d.part_number;
+    }
+    if(d.rank)
+    {
+        j["rank"] = *d.rank;
+    }
+    if(d.total_width)
+    {
+        j["total_width"] = *d.total_width;
+    }
+    if(d.data_width)
+    {
+        j["data_width"] = *d.data_width;
+    }
+    if(d.form_factor)
+    {
+        j["form_factor"] = *d.form_factor;
+    }
+    return j;
+}
+
+[[nodiscard]] DimmInfo dimm_info_from_json(const json& j)
+{
+    DimmInfo d;
+    j.at("locator").get_to(d.locator);
+    j.at("bank_locator").get_to(d.bank_locator);
+    d.size = MemorySize{j.at("size").get<std::uint64_t>()};
+    j.at("type").get_to(d.type);
+    d.present = j.at("present").get<bool>();
+    if(j.contains("speed_mts"))
+    {
+        d.speed_mts = j.at("speed_mts").get<std::uint32_t>();
+    }
+    if(j.contains("configured_speed_mts"))
+    {
+        d.configured_speed_mts = j.at("configured_speed_mts").get<std::uint32_t>();
+    }
+    if(j.contains("manufacturer"))
+    {
+        d.manufacturer = j.at("manufacturer").get<std::string>();
+    }
+    if(j.contains("part_number"))
+    {
+        d.part_number = j.at("part_number").get<std::string>();
+    }
+    if(j.contains("rank"))
+    {
+        d.rank = j.at("rank").get<std::uint32_t>();
+    }
+    if(j.contains("total_width"))
+    {
+        d.total_width = j.at("total_width").get<std::uint32_t>();
+    }
+    if(j.contains("data_width"))
+    {
+        d.data_width = j.at("data_width").get<std::uint32_t>();
+    }
+    if(j.contains("form_factor"))
+    {
+        d.form_factor = j.at("form_factor").get<std::string>();
+    }
+    return d;
+}
+
 [[nodiscard]] json memory_to_json(const Memory& m)
 {
     json j = {{"total_memory", m.total_memory.value}};
@@ -520,6 +604,20 @@ Enum validate_enum(std::uint32_t val, Enum max_val, std::string_view field_name)
         arr.push_back(numa_memory_to_json(nm));
     }
     j["numa_memory"] = std::move(arr);
+    json dimms = json::array();
+    for(const auto& d : m.dimms)
+    {
+        dimms.push_back(dimm_info_to_json(d));
+    }
+    j["dimms"] = std::move(dimms);
+    if(m.dimm_count)
+    {
+        j["dimm_count"] = *m.dimm_count;
+    }
+    if(m.populated_dimms)
+    {
+        j["populated_dimms"] = *m.populated_dimms;
+    }
     return j;
 }
 
@@ -537,6 +635,21 @@ Enum validate_enum(std::uint32_t val, Enum max_val, std::string_view field_name)
         {
             m.numa_memory.push_back(numa_memory_from_json(elem));
         }
+    }
+    if(j.contains("dimms"))
+    {
+        for(const auto& elem : j.at("dimms"))
+        {
+            m.dimms.push_back(dimm_info_from_json(elem));
+        }
+    }
+    if(j.contains("dimm_count"))
+    {
+        m.dimm_count = j.at("dimm_count").get<std::uint32_t>();
+    }
+    if(j.contains("populated_dimms"))
+    {
+        m.populated_dimms = j.at("populated_dimms").get<std::uint32_t>();
     }
     return m;
 }
@@ -709,6 +822,14 @@ Enum validate_enum(std::uint32_t val, Enum max_val, std::string_view field_name)
     {
         j["pci_address"] = pci_address_to_json(*sd.pci_address);
     }
+    if(sd.mount_point)
+    {
+        j["mount_point"] = *sd.mount_point;
+    }
+    if(sd.fs_type)
+    {
+        j["fs_type"] = *sd.fs_type;
+    }
     return j;
 }
 
@@ -724,6 +845,14 @@ Enum validate_enum(std::uint32_t val, Enum max_val, std::string_view field_name)
     if(j.contains("pci_address"))
     {
         sd.pci_address = pci_address_from_json(j.at("pci_address"));
+    }
+    if(j.contains("mount_point"))
+    {
+        sd.mount_point = j.at("mount_point").get<std::string>();
+    }
+    if(j.contains("fs_type"))
+    {
+        sd.fs_type = j.at("fs_type").get<std::string>();
     }
     sd.kind = validate_enum(j.at("kind").get<std::uint32_t>(), StorageKind::Other, "kind");
     return sd;
@@ -1134,8 +1263,7 @@ Enum validate_enum(std::uint32_t val, Enum max_val, std::string_view field_name)
 [[nodiscard]] Cgroup cgroup_from_json(const json& j)
 {
     Cgroup c;
-    c.version =
-        validate_enum(j.at("version").get<std::uint32_t>(), CgroupVersion::V2, "version");
+    c.version = validate_enum(j.at("version").get<std::uint32_t>(), CgroupVersion::V2, "version");
     j.at("path").get_to(c.path);
     if(j.contains("controllers"))
     {

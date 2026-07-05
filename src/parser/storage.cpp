@@ -26,8 +26,8 @@ StorageKind infer_storage_kind(std::string_view name, const std::string& rotatio
         return StorageKind::Nvme;
     }
     // 虚拟设备不按 rotational 分类
-    static constexpr std::string_view virtual_prefixes[] = {
-        "loop", "ram", "sr", "dm-", "md", "zram", "fd"};
+    static constexpr std::string_view virtual_prefixes[] = {"loop", "ram",  "sr", "dm-",
+                                                            "md",   "zram", "fd"};
     for(auto prefix : virtual_prefixes)
     {
         if(name.find(prefix) == 0)
@@ -114,6 +114,59 @@ std::optional<Storage> parse_storage(const RawStore& raw, std::vector<std::strin
         return std::nullopt;
     }
 
+    // 解析 df -Th 输出：设备名 → {mount_point, fs_type}
+    std::map<std::string, std::pair<std::string, std::string>> df_map;
+    auto df_records = raw.get_all(RawSource::DfTh);
+    for(const auto* rec : df_records)
+    {
+        if(rec->status != CollectStatus::Success)
+        {
+            continue;
+        }
+        auto lines = split(rec->payload, '\n');
+        for(const auto& line : lines)
+        {
+            auto trimmed = trim(line);
+            if(trimmed.empty() || trimmed.starts_with("Filesystem"))
+            {
+                continue;
+            }
+            auto tokens = split(trimmed, ' ');
+            std::vector<std::string> fields;
+            for(const auto& t : tokens)
+            {
+                auto v = trim(t);
+                if(!v.empty())
+                {
+                    fields.push_back(v);
+                }
+            }
+            if(fields.size() < 7)
+            {
+                continue;
+            }
+            // fields[0]=Filesystem, [1]=Type, [2]=Size, [3]=Used, [4]=Avail, [5]=Use%, [6+]=Mounted
+            // on
+            std::string fs = fields[0];
+            std::string type = fields[1];
+            std::string mount;
+            for(std::size_t i = 6; i < fields.size(); ++i)
+            {
+                if(!mount.empty())
+                {
+                    mount += ' ';
+                }
+                mount += fields[i];
+            }
+            // 去掉 /dev/ 前缀
+            if(fs.starts_with("/dev/"))
+            {
+                fs = fs.substr(5);
+            }
+            df_map[fs] = {mount, type};
+        }
+    }
+
     Storage storage;
     std::uint32_t seq = 0;
 
@@ -140,6 +193,30 @@ std::optional<Storage> parse_storage(const RawStore& raw, std::vector<std::strin
             {
                 warnings.push_back("parse_storage: 块设备 " + dev_name +
                                    " 的 size 解析失败: " + trim(size_it->second));
+            }
+        }
+
+        // 合并 df -Th 数据：精确匹配或分区前缀匹配
+        auto df_it = df_map.find(dev_name);
+        if(df_it != df_map.end())
+        {
+            dev.mount_point = df_it->second.first;
+            dev.fs_type = df_it->second.second;
+        }
+        else
+        {
+            // 分区匹配：df 显示 sda1/sda2，sysfs 显示 sda
+            for(const auto& [df_name, df_info] : df_map)
+            {
+                if(df_name.starts_with(dev_name))
+                {
+                    if(!dev.mount_point.has_value())
+                    {
+                        dev.mount_point = df_info.first;
+                        dev.fs_type = df_info.second;
+                    }
+                    break;
+                }
             }
         }
 
