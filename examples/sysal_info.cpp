@@ -206,6 +206,14 @@ const char* virt_kind_str(sysal::VirtualizationKind k)
         return "Xen";
     case sysal::VirtualizationKind::Vmware:
         return "VMware";
+    case sysal::VirtualizationKind::Qemu:
+        return "QEMU";
+    case sysal::VirtualizationKind::HyperV:
+        return "Hyper-V";
+    case sysal::VirtualizationKind::VirtualBox:
+        return "VirtualBox";
+    case sysal::VirtualizationKind::Parallels:
+        return "Parallels";
     case sysal::VirtualizationKind::Other:
         return "Other";
     }
@@ -302,6 +310,8 @@ const char* raw_source_str(sysal::RawSource s)
         return "Udevadm";
     case sysal::RawSource::SysfsEdac:
         return "SysfsEdac";
+    case sysal::RawSource::SysHypervisor:
+        return "SysHypervisor";
     }
     return "?";
 }
@@ -410,6 +420,10 @@ int main()
     {
         label("Virt kind", virt_kind_str(sys.info.platform.virtualization->kind));
         label("Hypervisor", sys.info.platform.virtualization->hypervisor);
+    }
+    else
+    {
+        label("Virt kind", "Physical (no virtualization detected)");
     }
 
     // ── 3. CPU ──────────────────────────────────────────────────────────

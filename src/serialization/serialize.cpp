@@ -115,7 +115,8 @@ Enum validate_enum(std::uint32_t val, Enum max_val, std::string_view field_name)
 [[nodiscard]] RawRecord raw_record_from_json(const json& j)
 {
     RawRecord rec;
-    rec.source = validate_enum(j.at("source").get<std::uint32_t>(), RawSource::SysfsEdac, "source");
+    rec.source =
+        validate_enum(j.at("source").get<std::uint32_t>(), RawSource::SysHypervisor, "source");
     j.at("path_or_command").get_to(rec.path_or_command);
     j.at("payload").get_to(rec.payload);
     rec.status =

@@ -1,5 +1,21 @@
 # 开发记录
 
+### 2026-07-05 完善硬件虚拟化检测功能
+
+- **变更类型**: src / fix / refactor
+- **涉及文件**: include/sysal/types/enums.hpp, src/reader/linux/sysfs.cpp, src/parser/platform.cpp, src/serialization/serialize.cpp, examples/sysal_info.cpp, tests/unit/test_parse_platform.cpp, docs/design/data_model/platform.md, docs/devlog.md
+- **变更内容**:
+  1. `VirtualizationKind` 枚举新增 `Qemu`、`HyperV`、`VirtualBox`、`Parallels` 四个值
+  2. `RawSource` 枚举末尾新增 `SysHypervisor`（/sys/hypervisor/type）
+  3. `sysfs.cpp` 新增 `read_hypervisor_type()` 读取 /sys/hypervisor/type，在 `read_sysfs()` dispatch 中绑定 `Collect::Platform`
+  4. `platform.cpp` 重写 `detect_virtualization()`：删除旧的 /proc/1/cgroup "kvm" 字符串匹配，改为多源检测——优先级 1: /sys/hypervisor/type=="xen" → Xen；优先级 2: DMI sys_vendor/product_name 关键词匹配（VMware/Hyper-V/QEMU/Bochs/VirtualBox/Parallels/KVM，大小写不敏感）；优先级 3: /proc/cpuinfo flags 含 `hypervisor` 标志 → Other/Unknown
+  5. `serialize.cpp` `validate_enum` 的 RawSource 上界从 `SysfsEdac` 改为 `SysHypervisor`
+  6. `sysal_info.cpp` `virt_kind_str()` 补全新枚举值的 case，`raw_source_str()` 补 `SysHypervisor`，虚拟化未检测到时显示 "Physical (no virtualization detected)"
+  7. `test_parse_platform.cpp` 测试 3 从 /proc/1/cgroup "kvm" 改为 DMI sys_vendor="KVM" 检测；新增测试 4-11 覆盖 Xen/VMware/Hyper-V/QEMU/VirtualBox/cpuinfo hypervisor flag/物理机/优先级场景
+  8. `platform.md` 更新 Virtualization 枚举值列表和检测优先级说明
+- **原因**: 旧实现仅检查 /proc/1/cgroup 里的 "kvm" 字符串，极不可靠（cgroup 路径名与硬件虚拟化无关）。新实现基于 /sys/hypervisor/type、DMI 厂商/产品名、CPU hypervisor flag 三源检测，覆盖主流 hypervisor
+- **验证**: `xmake -r` 构建成功（0 warnings，-Wall -Wextra -Werror）；`xmake run test_parse_platform` 63/63 通过；全部 18 个测试通过（758 assertions）；`xmake run sysal_info` 物理机正确显示 "Physical (no virtualization detected)"
+
 ### 2026-07-05 修复全部 P1+P2 评审问题 + README 重写 + 评审 Skill + CI 修复
 
 - **变更类型**: fix / refactor / docs / test / chore

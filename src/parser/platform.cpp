@@ -6,6 +6,9 @@
 
 #include "parse_utils.hpp"
 
+#include <algorithm>
+#include <cctype>
+#include <string>
 #include <string_view>
 
 namespace sysal::detail
@@ -174,39 +177,139 @@ void parse_dmi(const RawStore& raw, Platform& platform,
     }
 }
 
-/// @brief 检测硬件虚拟化信息
-/// @param raw 原始证据存储
-/// @param warnings 警告列表
-/// @return 虚拟化信息（若检测到）
-/// @details 仅检测硬件虚拟化（KVM/Xen/VMware），容器信息由 ExecutionContext.container 承载。
-std::optional<Virtualization>
-detect_virtualization(const RawStore& raw, [[maybe_unused]] std::vector<std::string>& warnings)
+/// @brief 将字符串转为小写
+/// @param s 输入字符串
+/// @return 小写字符串
+std::string to_lower(std::string_view s)
 {
-    Virtualization virt;
-    bool detected = false;
+    std::string out(s);
+    std::transform(out.begin(), out.end(), out.begin(),
+                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    return out;
+}
 
-    // 检查 /proc/1/cgroup 内容中的硬件虚拟化线索
-    auto cgroup_records = raw.get_all(RawSource::ProcOneCgroup);
-    for(const auto* rec : cgroup_records)
+/// @brief 大小写不敏感的子串查找
+/// @param haystack 被搜索字符串
+/// @param needle 子串
+/// @return 包含返回 true
+bool icontains(const std::string& haystack, std::string_view needle)
+{
+    return to_lower(haystack).find(to_lower(needle)) != std::string::npos;
+}
+
+/// @brief 从 SysfsDmi 记录中提取 sys_vendor 与 product_name
+/// @param raw 原始证据存储
+/// @return pair<sys_vendor, product_name>，未找到的字段为空
+std::pair<std::string, std::string> extract_dmi_vendor_product(const RawStore& raw)
+{
+    std::string sys_vendor;
+    std::string product_name;
+    auto dmi_records = raw.get_all(RawSource::SysfsDmi);
+    for(const auto* rec : dmi_records)
     {
         if(rec->status != CollectStatus::Success)
         {
             continue;
         }
-
-        const auto& content = rec->payload;
-        if(content.find("kvm") != std::string::npos)
+        const auto& path = rec->path_or_command;
+        if(path.find("sys_vendor") != std::string::npos)
         {
-            virt.kind = VirtualizationKind::Kvm;
-            virt.hypervisor = "KVM";
-            detected = true;
+            sys_vendor = trim(rec->payload);
+        }
+        else if(path.find("product_name") != std::string::npos)
+        {
+            product_name = trim(rec->payload);
+        }
+    }
+    return {sys_vendor, product_name};
+}
+
+/// @brief 检测硬件虚拟化信息
+/// @param raw 原始证据存储
+/// @param warnings 警告列表
+/// @return 虚拟化信息（若检测到）
+/// @details 多源检测硬件虚拟化（Xen/KVM/VMware/QEMU/Hyper-V/VirtualBox/Parallels），
+///          容器信息由 ExecutionContext.container 承载。检测优先级：
+///          1. /sys/hypervisor/type（Xen 半虚拟化）
+///          2. DMI sys_vendor/product_name 关键词匹配
+///          3. /proc/cpuinfo flags 含 hypervisor 标志（确认在 VM 中）
+std::optional<Virtualization>
+detect_virtualization(const RawStore& raw, [[maybe_unused]] std::vector<std::string>& warnings)
+{
+    // 1. /sys/hypervisor/type → Xen
+    auto hypervisor_records = raw.get_all(RawSource::SysHypervisor);
+    for(const auto* rec : hypervisor_records)
+    {
+        if(rec->status != CollectStatus::Success)
+        {
+            continue;
+        }
+        auto type = trim(rec->payload);
+        if(type == "xen")
+        {
+            return Virtualization{VirtualizationKind::Xen, "Xen"};
         }
     }
 
-    if(detected)
+    // 2. DMI sys_vendor / product_name 关键词匹配
+    auto [sys_vendor, product_name] = extract_dmi_vendor_product(raw);
+    if(icontains(sys_vendor, "VMware") || icontains(product_name, "VMware"))
     {
-        return virt;
+        return Virtualization{VirtualizationKind::Vmware, "VMware"};
     }
+    if(icontains(sys_vendor, "Microsoft") &&
+       (icontains(product_name, "Virtual") || icontains(product_name, "Hyper-V")))
+    {
+        return Virtualization{VirtualizationKind::HyperV, "Hyper-V"};
+    }
+    if(icontains(sys_vendor, "QEMU") || icontains(product_name, "QEMU") ||
+       icontains(sys_vendor, "Bochs") || icontains(product_name, "Bochs"))
+    {
+        return Virtualization{VirtualizationKind::Qemu, "QEMU"};
+    }
+    if(icontains(sys_vendor, "innotek") || icontains(product_name, "VirtualBox"))
+    {
+        return Virtualization{VirtualizationKind::VirtualBox, "VirtualBox"};
+    }
+    if(icontains(sys_vendor, "Parallels") || icontains(product_name, "Parallels"))
+    {
+        return Virtualization{VirtualizationKind::Parallels, "Parallels"};
+    }
+    if(icontains(sys_vendor, "KVM") || icontains(product_name, "KVM"))
+    {
+        return Virtualization{VirtualizationKind::Kvm, "KVM"};
+    }
+
+    // 3. /proc/cpuinfo flags 含 hypervisor 标志 → 确认在 VM 中
+    auto cpuinfo_records = raw.get_all(RawSource::ProcCpuInfo);
+    for(const auto* rec : cpuinfo_records)
+    {
+        if(rec->status != CollectStatus::Success)
+        {
+            continue;
+        }
+        // 在 cpuinfo 中查找 "flags" 行并检查是否含 hypervisor 标志
+        auto lines = split(rec->payload, '\n');
+        for(const auto& line : lines)
+        {
+            auto [key, value] = parse_kv(line, ':');
+            auto key_trimmed = trim(key);
+            if(key_trimmed == "flags")
+            {
+                auto flags_lower = to_lower(value);
+                // flags 以空格分隔，确保整词匹配 hypervisor
+                auto parts = split(flags_lower, ' ');
+                for(const auto& f : parts)
+                {
+                    if(trim(f) == "hypervisor")
+                    {
+                        return Virtualization{VirtualizationKind::Other, "Unknown"};
+                    }
+                }
+            }
+        }
+    }
+
     return std::nullopt;
 }
 

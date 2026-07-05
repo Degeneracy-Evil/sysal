@@ -287,6 +287,15 @@ void read_dmi_sysfs(RawStore& raw)
     }
 }
 
+/// @brief 采集 /sys/hypervisor/type
+/// @param raw 原始证据存储
+/// @details 读取 /sys/hypervisor/type 文件（Xen 等半虚拟化场景存在），
+///          文件不存在时记录 Failed 状态。
+void read_hypervisor_type(RawStore& raw)
+{
+    read_sysfs_file(raw, RawSource::SysHypervisor, "/sys/hypervisor/type");
+}
+
 /// @brief 采集 EDAC 内存 DIMM 信息
 /// @param raw 原始证据存储
 /// @details 遍历 /sys/devices/system/edac/mc/mcN/dimmM/，读取各 DIMM 的
@@ -349,9 +358,13 @@ void read_sysfs(RawStore& raw, Collect flags)
     };
 
     static const ReaderDispatch reader_dispatch[] = {
-        {Collect::Cpu, read_cpu_sysfs},       {Collect::Memory, read_numa_sysfs},
-        {Collect::Network, read_net_sysfs},   {Collect::Pci, read_pci_sysfs},
-        {Collect::Storage, read_block_sysfs}, {Collect::Platform, read_dmi_sysfs},
+        {Collect::Cpu, read_cpu_sysfs},
+        {Collect::Memory, read_numa_sysfs},
+        {Collect::Network, read_net_sysfs},
+        {Collect::Pci, read_pci_sysfs},
+        {Collect::Storage, read_block_sysfs},
+        {Collect::Platform, read_dmi_sysfs},
+        {Collect::Platform, read_hypervisor_type},
         {Collect::Memory, read_edac_sysfs},
     };
 

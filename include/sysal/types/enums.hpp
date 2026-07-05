@@ -108,7 +108,8 @@ enum class RawSource
     IfAddrs,      ///< getifaddrs() 网络接口地址
     DfTh,         ///< df -Th 文件系统挂载信息
     Udevadm,      ///< udevadm info -e 硬件数据库
-    SysfsEdac     ///< /sys/devices/system/edac 内存 DIMM 信息
+    SysfsEdac,    ///< /sys/devices/system/edac 内存 DIMM 信息
+    SysHypervisor ///< /sys/hypervisor/type
 };
 
 /// @brief 单个原始记录的采集状态
@@ -123,11 +124,15 @@ enum class CollectStatus
 /// @brief 虚拟化类型
 enum class VirtualizationKind
 {
-    None,   ///< 物理机
-    Kvm,    ///< KVM
-    Xen,    ///< Xen
-    Vmware, ///< VMware
-    Other   ///< 其他
+    None,       ///< 物理机
+    Kvm,        ///< KVM
+    Xen,        ///< Xen
+    Vmware,     ///< VMware
+    Qemu,       ///< QEMU
+    HyperV,     ///< Hyper-V
+    VirtualBox, ///< VirtualBox
+    Parallels,  ///< Parallels
+    Other       ///< 其他
 };
 
 /// @brief cgroup 版本

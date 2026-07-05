@@ -35,11 +35,11 @@ struct Platform
 | `Kernel` | 内核 | `release`、`version`、`compiled_at`、`architecture` |
 | `Architecture` | 硬件架构 | `name`（如 `x86_64`/`aarch64`）、`bits`（64/32）、`byte_order` |
 | `Firmware` | 固件 | `bios_vendor`（Vendor）、`bios_version`、`bios_date`、`uefi`（bool） |
-| `Virtualization` | 虚拟化 | `kind`（None/KVM/Xen/VMware/...）、`hypervisor` |
+| `Virtualization` | 虚拟化 | `kind`（None/KVM/Xen/VMware/QEMU/Hyper-V/VirtualBox/Parallels/Other）、`hypervisor` |
 
 ## 设计说明
 
 * `Platform` 只描述"机器本身"，不涉及 CPU 核数、内存大小等资源数量——
   那些属于 `Cpu` / `Memory` 等资源子域。
-* `Virtualization::kind` 为枚举，`None` 表示物理机，非容器非虚拟化。
+* `Virtualization::kind` 为枚举，`None` 表示物理机。检测优先级：`/sys/hypervisor/type`（Xen）→ DMI sys_vendor/product_name 关键词匹配 → `/proc/cpuinfo` flags 含 `hypervisor` 标志。容器检测独立于硬件虚拟化，由 `ExecutionContext.container` 承载。
 * 字段命名遵循 `snake_case`，类型名遵循 `PascalCase`。
