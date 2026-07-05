@@ -36,6 +36,8 @@ System from_json(std::string_view json);
     "memory": {
       "total_memory": 34359738368,
       "available_memory": 21474836480,
+      "memory_type": "DDR4",
+      "configured_speed_mts": 2933,
       "numa_memory": [
         { "node": 0, "total": 17179869184, "available": 10737418240 },
         { "node": 1, "total": 17179869184, "available": 10737418240 }
@@ -45,9 +47,7 @@ System from_json(std::string_view json);
           "locator": "CPU0_C0D0",
           "bank_locator": "NODE 0",
           "size": 17179869184,
-          "type": "DDR4",
           "speed_mts": 3200,
-          "configured_speed_mts": 2933,
           "manufacturer": "Samsung",
           "part_number": "M393A2K43DB3-CWE",
           "rank": 2,

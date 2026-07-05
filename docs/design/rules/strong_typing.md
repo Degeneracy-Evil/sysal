@@ -127,7 +127,7 @@ enum class InterfaceState  { Up, Down, Unknown };
 enum class StorageKind     { Nvme, Ssd, Hdd, Other };
 enum class AcceleratorKind { Gpu, Npu, Fpga, Other };
 enum class IsaExtension    { Sse, Sse2, Sse3, Ssse3, Sse41, Sse42, Avx, Avx2, Avx512f, Avx512cd, Avx512bw, Avx512dq, Avx512vl, Aes, Fma, F16c, Pclmulqdq };
-enum class VirtualizationKind { None, Kvm, Xen, Vmware, Other };
+enum class VirtualizationKind { None, Kvm, Xen, Vmware, Qemu, HyperV, VirtualBox, Parallels, Other };
 enum class CgroupVersion { V1, V2 };
 enum class ContainerKind { Docker, Podman, Lxc, Kubernetes, Other };
 ```

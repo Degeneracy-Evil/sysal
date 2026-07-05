@@ -58,7 +58,7 @@ docs/design/
 | [data_model/system.md](data_model/system.md) | `System` 类、`SystemInfo` 结构、`SnapshotMeta` 元数据 |
 | [data_model/platform.md](data_model/platform.md) | `Platform`：host / OS / kernel / arch / firmware / virt |
 | [data_model/cpu.md](data_model/cpu.md) | `Cpu`：packages / cores / logical CPUs / ISA extensions |
-| [data_model/memory.md](data_model/memory.md) | `Memory`：total / available / NUMA 内存分布 |
+| [data_model/memory.md](data_model/memory.md) | `Memory`：total / available / 内存类型 / 配置速率 / NUMA / DIMM 拓扑 |
 | [data_model/accelerator.md](data_model/accelerator.md) | `Accelerators`：GPU / NPU / FPGA 设备 |
 | [data_model/network.md](data_model/network.md) | `Network`：网卡列表 / 链路状态 / IP / PCI 地址 |
 | [data_model/storage.md](data_model/storage.md) | `Storage`：块设备清单 / 容量 / 类型 |

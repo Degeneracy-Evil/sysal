@@ -20,7 +20,7 @@
 | `SystemInfo` | 扁平结构，包含全部子系统 |
 | `Platform` | 主机名、OS、内核、架构、固件、虚拟化 |
 | `Cpu` | packages / cores / logical CPUs / ISA 扩展 / 可见性 |
-| `Memory` | 总量 / 可用量 / NUMA 内存分布 |
+| `Memory` | 总量 / 可用量 / 内存类型 / 配置速率 / NUMA / DIMM 拓扑 |
 | `Accelerators` | GPU / NPU / FPGA 设备列表 |
 | `Network` | 网卡列表 / 链路状态 / IP / PCI 地址 |
 | `Storage` | 块设备清单 / 容量 / 类型 |
@@ -56,7 +56,7 @@ Reader → RawStore → Parser → ParseResult → Resolver → System
 | 子域 | 采集内容 |
 |------|----------|
 | CPU | 架构、packages、cores、逻辑 CPU（含父 ID）、ISA 扩展、可见 CPU、设备级 `numa_node` |
-| Memory | 总量、NUMA 内存 |
+| Memory | 总量、NUMA 内存、DIMM 拓扑（类型、速率、厂商） |
 | Accelerator | NVIDIA GPU 名称、显存、PCI 地址、可见性、`numa_node` |
 | Network | 名称、状态、速率、IP、PCI 地址、可见性 |
 | Software | OS、内核、NVIDIA 驱动、CUDA 运行时 |

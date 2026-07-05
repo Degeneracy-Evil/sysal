@@ -1,5 +1,19 @@
 # 开发记录
 
+### 2026-07-05 文档同步：虚拟化检测 + 内存模型变更后的设计文档对齐
+
+- **变更类型**: docs
+- **涉及文件**: docs/design/rules/strong_typing.md, docs/design/testing/serialization.md, docs/design/roadmap.md, docs/issues.md, docs/design/index.md, docs/quality_reports/v004_review.md, docs/devlog.md
+- **变更内容**:
+  1. `strong_typing.md`: VirtualizationKind 枚举追加 Qemu/HyperV/VirtualBox/Parallels
+  2. `serialization.md`: JSON 示例从 DimmInfo 移除 type/configured_speed_mts，Memory 级别新增 memory_type/configured_speed_mts
+  3. `roadmap.md`: Memory 描述补充 DIMM 拓扑、内存类型、配置速率
+  4. `issues.md`: D-7 描述更新为三源虚拟化检测方案
+  5. `index.md`: Memory 索引描述补充 DIMM 详情
+  6. `v004_review.md`: 添加脚注说明报告反映 v0.0.4 tag 时状态，后续已变更
+- **原因**: 虚拟化检测完善和内存模型精简后，6 个设计文档与代码不一致
+- **验证**: 文档审查，确认所有设计文档与当前代码状态一致
+
 ### 2026-07-05 精简内存模型：type/configured_speed 提升到 Memory 级别
 
 - **变更类型**: refactor / src / docs / test

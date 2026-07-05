@@ -120,7 +120,7 @@
 
 - **严重程度**: 低
 - **状态**: 已通过重写修复
-- **描述**: Reader 采集 `/.dockerenv` 和 `/proc/1/cgroup`，platform parser 检测 Docker/KVM/Podman/LXC/Kubernetes 虚拟化，填充 `Platform::virtualization`。
+- **描述**: 三源检测硬件虚拟化：`/sys/hypervisor/type`（Xen）→ DMI sys_vendor/product_name 关键词匹配（VMware/Hyper-V/QEMU/VirtualBox/Parallels/KVM）→ `/proc/cpuinfo` flags 含 `hypervisor` 标志（Other）。容器检测独立于硬件虚拟化，由 `ExecutionContext.container` 承载。
 
 ### D-8 软件栈大面积空白
 
