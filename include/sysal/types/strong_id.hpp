@@ -21,6 +21,7 @@ namespace sysal
 template <typename T, typename Tag> class StrongId
 {
 public:
+    /// @brief 默认构造，底层值初始化为 T{}
     StrongId() = default;
     /// @brief 从底层值显式构造
     /// @param value 底层值
@@ -31,11 +32,18 @@ public:
     constexpr T value() const { return value_; }
 
     /// @brief 相等比较
+    /// @param other 另一个同类型 ID
+    /// @return 底层值相等时返回 true
     constexpr bool operator==(const StrongId& other) const { return value_ == other.value_; }
     /// @brief 不等比较
+    /// @param other 另一个同类型 ID
+    /// @return 底层值不等时返回 true
     constexpr bool operator!=(const StrongId& other) const { return value_ != other.value_; }
 
     /// @brief 流输出底层值
+    /// @param os 输出流
+    /// @param id 标识符
+    /// @return 输出流引用
     friend std::ostream& operator<<(std::ostream& os, const StrongId& id)
     {
         return os << id.value_;

@@ -20,6 +20,8 @@ struct PciAddress
     std::uint8_t function{}; ///< 功能号
 
     /// @brief 相等比较
+    /// @param other 另一个 PCI 地址
+    /// @return 四字段全部相等时返回 true
     bool operator==(const PciAddress& other) const
     {
         return domain == other.domain && bus == other.bus && device == other.device &&
@@ -35,6 +37,8 @@ template <typename Tag> struct NamedString
     std::string value; ///< 原始字符串值
 
     /// @brief 相等比较
+    /// @param other 另一个同类型字符串
+    /// @return 字符串值相等时返回 true
     bool operator==(const NamedString& other) const { return value == other.value; }
 };
 

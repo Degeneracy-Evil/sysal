@@ -15,16 +15,16 @@ namespace sysal
 /// @brief 错误类别
 enum class ErrorKind
 {
-    CollectionFailed,     ///< 采集失败
-    ParseError,           ///< 解析错误
-    IoError,              ///< I/O 错误
-    FileNotFound,         ///< 文件未找到
-    PermissionDenied,     ///< 权限不足
-    BackendUnavailable,   ///< 后端不可用
-    BackendError,         ///< 后端错误
-    SerializationError,   ///< 序列化错误
-    DeserializationError, ///< 反序列化错误
-    Unknown               ///< 未知错误
+    CollectionFailed,
+    ParseError,
+    IoError,
+    FileNotFound,
+    PermissionDenied,
+    BackendUnavailable,
+    BackendError,
+    SerializationError,
+    DeserializationError,
+    Unknown
 };
 
 /// @brief sysal 异常类
@@ -32,13 +32,20 @@ enum class ErrorKind
 class SysalError : public std::exception
 {
 public:
+    /// @brief 构造异常
+    /// @param kind 错误类别
+    /// @param message 错误描述
     SysalError(ErrorKind kind, std::string_view message)
         : kind_(kind), message_(std::string{message})
     {
     }
 
+    /// @brief 获取错误描述
+    /// @return C 风格字符串
     [[nodiscard]] const char* what() const noexcept override { return message_.c_str(); }
 
+    /// @brief 获取错误类别
+    /// @return 错误类别枚举值
     [[nodiscard]] ErrorKind kind() const noexcept { return kind_; }
 
 private:

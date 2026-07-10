@@ -13,7 +13,7 @@ namespace sysal
 /// @brief CPU 架构
 enum class Arch
 {
-    X86_64,  ///< x86-64
+    X86_64,
     AArch64, ///< ARM 64
     Riscv64, ///< RISC-V 64
     Other    ///< 其他或未知
@@ -22,9 +22,9 @@ enum class Arch
 /// @brief 网络接口链路状态
 enum class InterfaceState
 {
-    Up,     ///< 链路已连接
-    Down,   ///< 链路已断开
-    Unknown ///< 状态未知
+    Up,   ///< 链路已连接
+    Down, ///< 链路已断开
+    Unknown
 };
 
 /// @brief 存储设备类型
@@ -39,7 +39,7 @@ enum class StorageKind
 /// @brief 加速器设备类型
 enum class AcceleratorKind
 {
-    Gpu,  ///< GPU
+    Gpu,
     Npu,  ///< 神经网络处理器
     Fpga, ///< 现场可编程门阵列
     Other ///< 其他或未知
@@ -48,23 +48,23 @@ enum class AcceleratorKind
 /// @brief CPU ISA 扩展
 enum class IsaExtension
 {
-    Sse,      ///< SSE
-    Sse2,     ///< SSE2
-    Sse3,     ///< SSE3
-    Ssse3,    ///< SSSE3
-    Sse41,    ///< SSE4.1
-    Sse42,    ///< SSE4.2
-    Avx,      ///< AVX
-    Avx2,     ///< AVX2
+    Sse,
+    Sse2,
+    Sse3,
+    Ssse3,
+    Sse41,
+    Sse42,
+    Avx,
+    Avx2,
     Avx512f,  ///< AVX-512 Foundation
     Avx512cd, ///< AVX-512 Conflict Detection
     Avx512bw, ///< AVX-512 Byte/Word
     Avx512dq, ///< AVX-512 Doubleword/Quadword
     Avx512vl, ///< AVX-512 Vector Length
     Aes,      ///< AES 指令集
-    Fma,      ///< FMA
-    F16c,     ///< F16C
-    Pclmulqdq ///< PCLMULQDQ
+    Fma,
+    F16c,
+    Pclmulqdq
 };
 
 /// @brief 原始数据来源
@@ -115,41 +115,41 @@ enum class RawSource
 /// @brief 单个原始记录的采集状态
 enum class CollectStatus
 {
-    Success,     ///< 采集成功
-    Partial,     ///< 部分成功
-    Failed,      ///< 采集失败
-    NotCollected ///< 未采集
+    Success,
+    Partial,
+    Failed,
+    NotCollected
 };
 
 /// @brief 虚拟化类型
 enum class VirtualizationKind
 {
-    None,       ///< 物理机
-    Kvm,        ///< KVM
-    Xen,        ///< Xen
-    Vmware,     ///< VMware
-    Qemu,       ///< QEMU
-    HyperV,     ///< Hyper-V
-    VirtualBox, ///< VirtualBox
-    Parallels,  ///< Parallels
-    Other       ///< 其他
+    None, ///< 物理机
+    Kvm,
+    Xen,
+    Vmware,
+    Qemu,
+    HyperV, ///< Hyper-V
+    VirtualBox,
+    Parallels,
+    Other
 };
 
 /// @brief cgroup 版本
 enum class CgroupVersion
 {
-    V1, ///< cgroup v1
-    V2  ///< cgroup v2
+    V1,
+    V2
 };
 
 /// @brief 容器类型
 enum class ContainerKind
 {
-    Docker,     ///< Docker
-    Podman,     ///< Podman
+    Docker,
+    Podman,
     Lxc,        ///< LXC
     Kubernetes, ///< Kubernetes
-    Other       ///< 其他
+    Other
 };
 
 } // namespace sysal

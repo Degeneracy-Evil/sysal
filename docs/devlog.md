@@ -1,6 +1,18 @@
 # 开发记录
 
-### 2026-07-08 重构 CentOS 7 构建脚本
+### 2026-07-10 修复 Doxygen 注释覆盖率与冗余
+
+- **变更类型**: docs
+- **涉及文件**: include/sysal/core/collect.hpp, include/sysal/core/error.hpp, include/sysal/core/system.hpp, include/sysal/types/strong_id.hpp, include/sysal/types/value_types.hpp, include/sysal/types/enums.hpp, docs/devlog.md
+- **变更内容**:
+  1. collect.hpp: operator| 和 has 补 @param + @return；删 10 个枚举值纯翻译注释
+  2. error.hpp: SysalError 构造函数补 @brief + @param×2；what() 补 @brief + @return；kind() 补 @brief + @return；删 10 个 ErrorKind 枚举值纯翻译注释
+  3. system.hpp: refresh() 补 @throws
+  4. strong_id.hpp: 默认构造函数补 @brief；operator==/!=/<< 补 @param + @return
+  5. value_types.hpp: PciAddress::operator== 和 NamedString::operator== 补 @param + @return
+  6. enums.hpp: 删除 ~25 个纯翻译冗余注释（如 Gpu→GPU、X86_64→x86-64、V1→cgroup v1），保留有信息增益的注释（如 AArch64→ARM 64、None→物理机、Avx512f→AVX-512 Foundation）
+- **原因**: 为 API 文档生成做准备，审计发现 31 处 Doxygen 注释缺失和 ~45 处纯翻译冗余注释
+- **验证**: `xmake -r` 构建成功（13.4s）
 
 - **变更类型**: refactor / docs
 - **涉及文件**: docker/centos7-build/build.sh, docker/centos7-build/build_inside.sh (新增), docker/centos7-build/Dockerfile, README.md, docs/centos7-build.md (新增), docs/devlog.md

@@ -54,6 +54,7 @@ public:
     static System collect(Collect flags = full);
 
     /// @brief 在已有对象上重新采集，替换内部状态
+    /// @throws SysalError 采集彻底失败时抛出
     void refresh();
 
 public:
