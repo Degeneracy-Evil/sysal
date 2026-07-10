@@ -1,0 +1,56 @@
+# Doxyfile — sysal API 文档生成配置
+
+PROJECT_NAME           = "sysal"
+PROJECT_NUMBER         =
+PROJECT_BRIEF          = "C++ 系统信息抽象库"
+
+INPUT                  = include/ \
+                         docs/api_main.md
+RECURSIVE              = YES
+FILE_PATTERNS          = *.hpp *.md
+
+OUTPUT_DIRECTORY       = output/docs
+GENERATE_HTML          = YES
+GENERATE_LATEX         = NO
+GENERATE_MAN           = NO
+GENERATE_XML           = NO
+HTML_OUTPUT            = html
+
+USE_MDFILE_AS_MAINPAGE = docs/api_main.md
+
+EXTRACT_ALL            = YES
+EXTRACT_PRIVATE        = NO
+EXTRACT_STATIC         = YES
+
+JAVADOC_AUTOBRIEF      = NO
+QT_AUTOBRIEF           = NO
+
+WARN_IF_UNDOCUMENTED   = YES
+WARN_IF_DOC_ERROR      = YES
+WARN_NO_PARAMDOC       = YES
+WARN_AS_ERROR          = NO
+
+QUIET                  = YES
+RECURSIVE              = YES
+
+SORT_MEMBER_DOCS       = YES
+SORT_BRIEF_DOCS        = NO
+SORT_GROUP_NAMES       = YES
+
+HIDE_UNDOC_MEMBERS     = NO
+HIDE_UNDOC_CLASSES     = NO
+HIDE_SCOPE_NAMES       = NO
+
+SHOW_INCLUDE_FILES     = YES
+SHOW_USED_FILES        = NO
+
+REFERENCED_BY_RELATION = NO
+REFERENCES_RELATION    = NO
+
+SEARCHENGINE           = YES
+
+GENERATE_TREEVIEW      = YES
+DISABLE_INDEX          = YES
+FULL_SIDEBAR           = YES
+
+HAVE_DOT               = NO

@@ -1,5 +1,15 @@
 # 开发记录
 
+### 2026-07-10 引入 Doxygen 文档生成
+
+- **变更类型**: docs / chore
+- **涉及文件**: Doxyfile (新增), docs/api_main.md (新增), docs/devlog.md
+- **变更内容**:
+  1. 新增 Doxyfile，配置 INPUT=include/ + docs/api_main.md，GENERATE_HTML=YES，EXTRACT_PRIVATE=NO，WARN_IF_UNDOCUMENTED=YES
+  2. 新增 docs/api_main.md 作为 Doxygen 首页，包含快速开始、核心类型、模块列表、设计原则
+- **原因**: API 文档生成准备，Doxygen 注释已就绪，需要配置文件和入口页面
+- **验证**: 待 doxygen 安装后生成验证
+
 ### 2026-07-10 修复 Doxygen 注释覆盖率与冗余
 
 - **变更类型**: docs
