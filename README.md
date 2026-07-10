@@ -63,13 +63,19 @@ xmake run test_replay   # 运行 replay 测试
 
 CI 在 push 或 PR 时自动运行 clang-format + clang-tidy + build + tests。
 
-### 兼容性
+### 兼容性构建（CentOS 7 / RHEL 7）
 
-预编译产物兼容 glibc 2.17+（CentOS 7 / RHEL 7 及所有主流 Linux 发行版）。
+在 CentOS 7 容器中编译，产出 glibc 2.17 兼容的 `.so` / `.a`。覆盖 CentOS 7 / RHEL 7 及所有主流 Linux 发行版。
+
+**前提条件：** 已安装 Docker 并运行。
 
 ```bash
-bash docker/centos7-build/build.sh   # 在 CentOS 7 容器中编译，产出兼容的 .so/.a
+bash docker/centos7-build/build.sh
 ```
+
+脚本流程：构建 Docker 镜像（centos:7 + devtoolset-11 + xmake）→ 容器内编译 → 运行 `sysal_info` 验证可执行。
+
+详见 [CentOS 7 构建文档](docs/centos7-build.md)。
 
 ## 项目边界
 

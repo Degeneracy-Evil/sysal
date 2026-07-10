@@ -1,5 +1,23 @@
 # 开发记录
 
+### 2026-07-08 重构 CentOS 7 构建脚本
+
+- **变更类型**: refactor / docs
+- **涉及文件**: docker/centos7-build/build.sh, docker/centos7-build/build_inside.sh (新增), docker/centos7-build/Dockerfile, README.md, docs/centos7-build.md (新增), docs/devlog.md
+- **变更内容**:
+  1. 从 build.sh 提取 40 行内联脚本为独立文件 build_inside.sh
+  2. build.sh 新增 `--build-arg HTTP_PROXY/HTTPS_PROXY` 传递给 `docker build`（镜像构建时 yum/curl 需要网络）
+  3. build.sh 新增 Docker 前置检查（docker 是否安装、daemon 是否运行）
+  4. build_inside.sh 删除全部 GLIBC/libstdc++/CXXABI/ldd 符号检查，改为编译后运行 `sysal_info` 验证产物在 CentOS 7 环境下可正常执行
+  5. build_inside.sh 用固定路径 `build/linux/x86_64/release/` + 文件存在性断言
+  6. Dockerfile xmake 版本提为 `ARG XMAKE_VERSION=3.0.9`
+  7. 删除冗余的 `XMAKE_ROOT=y` export（Dockerfile ENV 已设置）
+  8. 删除 Dockerfile 多余注释
+  9. README 兼容性章节扩展：前提条件、流程说明、文档链接
+  10. 新增 docs/centos7-build.md：脚本流程、文件说明、xmake 源码编译原因、vault 源说明、代理支持、已知限制
+- **原因**: 原构建脚本内联 40 行 bash 不可维护，无文档，符号检查冗余（能在 CentOS 7 跑起来就是最强证明）
+- **验证**: `xmake -r` 构建成功（1.3s，cache hit）
+
 ### 2026-07-06 修复 test_replay 环境绑定
 
 - **变更类型**: test / fix

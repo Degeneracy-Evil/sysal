@@ -1,13 +1,22 @@
 #!/bin/bash
+# 在 CentOS 7 容器中编译 sysal，产出 glibc 2.17 兼容的 .so / .a。
+# 前提条件：已安装 Docker 并运行。
+# 代理用户：设置 http_proxy / https_proxy 环境变量后运行，脚本会自动传递给容器。
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 IMAGE_NAME="sysal-centos7-build"
-CONTAINER_NAME="sysal-centos7-build-run"
+
+command -v docker >/dev/null 2>&1 || { echo "ERROR: docker not found. Install Docker first."; exit 1; }
+docker info >/dev/null 2>&1 || { echo "ERROR: Docker daemon not running."; exit 1; }
 
 echo "=== Building Docker image ==="
-docker build -t "$IMAGE_NAME" "$SCRIPT_DIR"
+docker build \
+    --build-arg HTTP_PROXY="${http_proxy:-}" \
+    --build-arg HTTPS_PROXY="${https_proxy:-}" \
+    -t "$IMAGE_NAME" \
+    "$SCRIPT_DIR"
 
 echo "=== Running build in container ==="
 docker run --rm \
@@ -16,52 +25,10 @@ docker run --rm \
     -e https_proxy="${https_proxy:-}" \
     -v "$PROJECT_ROOT:/workspace" \
     -w /workspace \
-    --name "$CONTAINER_NAME" \
     "$IMAGE_NAME" \
-    bash -c '
-        set -euo pipefail
-        echo "--- Toolchain versions ---"
-        gcc --version | head -1
-        g++ --version | head -1
-        xmake --version | head -1
+    bash /workspace/docker/centos7-build/build_inside.sh
 
-        echo "--- Building sysal ---"
-        export XMAKE_ROOT=y
-        xmake f -c -y --toolchain=gcc
-        xmake -r
-
-        echo "--- Verifying glibc symbol versions ---"
-        echo "=== libsysal.so ==="
-        objdump -T build/linux/x86_64/release/libsysal.so | grep -o "GLIBC_[0-9.]*" | sort -V -u
-        echo "=== libsysal.a ==="
-        objdump -T build/linux/x86_64/release/static/libsysal.a | grep -o "GLIBC_[0-9.]*" | sort -V -u
-
-        echo "--- Checking for GLIBC > 2.17 ---"
-        BAD=$(objdump -T build/linux/x86_64/release/libsysal.so | grep -o "GLIBC_[0-9.]*" | sort -V -u | while read v; do
-            major=$(echo "$v" | cut -d_ -f2 | cut -d. -f1)
-            minor=$(echo "$v" | cut -d. -f2)
-            patch=$(echo "$v" | cut -d. -f3)
-            if [ "$major" -gt 2 ] || ([ "$major" -eq 2 ] && [ "$minor" -gt 17 ]); then
-                echo "$v"
-            fi
-        done)
-        if [ -z "$BAD" ]; then
-            echo "PASS: All GLIBC symbols <= 2.17"
-        else
-            echo "FAIL: Found GLIBC symbols > 2.17:"
-            echo "$BAD"
-            exit 1
-        fi
-
-        echo "--- Checking libstdc++ symbol versions ==="
-        objdump -T build/linux/x86_64/release/libsysal.so | grep -o "GLIBCXX_[0-9.]*" | sort -V -u || echo "(none)"
-        objdump -T build/linux/x86_64/release/libsysal.so | grep -o "CXXABI_[0-9.]*" | sort -V -u || echo "(none)"
-
-        echo "--- ldd ==="
-        ldd build/linux/x86_64/release/libsysal.so
-    '
-
-echo "=== Build complete ==="
+echo "=== Done ==="
 echo "Artifacts:"
-echo "  build/linux/x86_64/release/libsysal.so"
-echo "  build/linux/x86_64/release/static/libsysal.a"
+echo "  $PROJECT_ROOT/build/linux/x86_64/release/libsysal.so"
+echo "  $PROJECT_ROOT/build/linux/x86_64/release/static/libsysal.a"
