@@ -1,5 +1,21 @@
 # 开发记录
 
+### 2026-07-30 迁移 base_project 脚手架
+
+- **变更类型**: refactor / build / chore
+- **涉及文件**: xmake.lua, .githooks/pre-commit, .github/workflows/ci.yml, .clang-format, .clang-tidy, .clangd, AGENTS.md, docs/devlog.md, utils/check.sh (删除)
+- **变更内容**:
+  1. xmake.lua: 添加 `plugin.compile_commands.autoupdate` 规则（compile_commands.json 自动更新到 build/），添加 `xmake check` task（format+tidy+rebuild+test）和 `xmake test` task，删除 `set_version()`（版本号只维护 version.hpp），删除头部注释中对 check.sh 的引用，githooks 检测增加 `.git` 文件支持（worktree 兼容）
+  2. 删除 `utils/check.sh`（293 行），功能由 `xmake check` task 替代
+  3. `.githooks/pre-commit`: 替换为自包含版本（31 行），只修空白+clang-format+git add，不再转发到 check.sh，commit 更快
+  4. `.github/workflows/ci.yml`: 改为 `xmake check` + `xmake run sysal_info`
+  5. `.clang-format`: ColumnLimit 100→120，PointerAlignment Left→Right，新增 AllowShortFunctionsOnASingleLine/AllowShortIfStatementsOnASingleLine/AllowShortLoopsOnASingleLine/NamespaceIndentation，全量 reformat
+  6. `.clang-tidy`: 新增 modernize-use-using、modernize-redundant-void-arg、modernize-loop-convert、readability-const-return-type 检查，保留 sysal 的 4 个额外排除
+  7. `.clangd`: 新增 Diagnostics（UnusedIncludes Strict）、InlayHints、Index 配置，保留 sysal 的 Add flags
+  8. AGENTS.md: 更新项目结构描述、关键约定（autoupdate、xmake check/test、无 check.sh）
+- **原因**: 从 base_project 模板迁移最新脚手架，去掉 293 行 check.sh 脚本，改用 xmake 内置 task，简化维护
+- **验证**: `xmake -r` 构建成功；18/18 测试通过；clang-tidy 新增检查零 warning
+
 ### 2026-07-30 v0.0.5 收口：版本号更新 + 静态库 fPIC
 
 - **变更类型**: build / chore

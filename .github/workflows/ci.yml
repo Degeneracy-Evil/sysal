@@ -28,11 +28,8 @@ jobs:
       - name: Configure
         run: xmake f -c -y --toolchain=clang
 
-      - name: Build
-        run: xmake build
+      - name: Run quality checks
+        run: xmake check
 
       - name: Run sysal_info
         run: xmake run sysal_info
-
-      - name: Run quality checks
-        run: utils/check.sh

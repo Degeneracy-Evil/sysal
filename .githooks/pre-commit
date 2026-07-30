@@ -1,3 +1,31 @@
 #!/usr/bin/env bash
-# pre-commit hook — 转发到统一质量检查脚本
-exec "$(git rev-parse --show-toplevel)/utils/check.sh" --hook
+# pre-commit: auto-fix format + whitespace on staged files, then stage fixes.
+set -euo pipefail
+
+mapfile -d '' STAGED < <(git diff --cached --name-only -z --diff-filter=ACMR)
+[ "${#STAGED[@]}" -gt 0 ] || exit 0
+
+# Fix whitespace/EOF on staged text files (sed replaces perl)
+for f in "${STAGED[@]}"; do
+    [ -f "$f" ] || continue
+    file --mime-type "$f" 2>/dev/null | grep -q ': text/' || continue
+    sed -i 's/[[:blank:]]*$//' "$f"
+    if [ -s "$f" ] && [ "$(tail -c 1 "$f" | wc -l)" -eq 0 ]; then
+        printf '\n' >> "$f"
+    fi
+done
+
+# Auto-format staged C/C++ files
+if command -v clang-format >/dev/null 2>&1; then
+    for f in "${STAGED[@]}"; do
+        case "$f" in
+            *.h|*.hpp|*.c|*.cpp) ;;
+            *) continue ;;
+        esac
+        [ -f "$f" ] || continue
+        clang-format -i "$f"
+    done
+fi
+
+# Stage any modifications from the fixes above
+git add -- "${STAGED[@]}"
