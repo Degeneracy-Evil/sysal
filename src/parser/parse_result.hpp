@@ -20,19 +20,19 @@
 namespace sysal::detail
 {
 
-/// @brief 解析结果
-/// @details 各域独立解析，每个字段为 optional —— 该域可能失败或未被请求。
-struct ParseResult
-{
-    std::optional<Platform> platform;
-    std::optional<Cpu> cpu;
-    std::optional<Memory> memory;
-    std::optional<Pci> pci;
-    std::optional<Network> network;
-    std::optional<Accelerators> accelerators;
-    std::optional<Storage> storage;
-    std::optional<SoftwareStack> software;
-    std::optional<ExecutionContext> execution;
-};
+    /// @brief 解析结果
+    /// @details 各域独立解析，每个字段为 optional —— 该域可能失败或未被请求。
+    struct ParseResult
+    {
+        std::optional<Platform> platform;
+        std::optional<Cpu> cpu;
+        std::optional<Memory> memory;
+        std::optional<Pci> pci;
+        std::optional<Network> network;
+        std::optional<Accelerators> accelerators;
+        std::optional<Storage> storage;
+        std::optional<SoftwareStack> software;
+        std::optional<ExecutionContext> execution;
+    };
 
 } // namespace sysal::detail

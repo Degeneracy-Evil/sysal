@@ -15,10 +15,10 @@
 namespace sysal::detail
 {
 
-/// @brief 合并 ParseResult，解决冲突，计算可见性，构建 SystemInfo
-/// @param result 解析结果（右值引用，内部移动）
-/// @param warnings 警告列表（追加写入）
-/// @return 完整的 SystemInfo
-SystemInfo resolve(ParseResult result, std::vector<std::string>& warnings);
+    /// @brief 合并 ParseResult，解决冲突，计算可见性，构建 SystemInfo
+    /// @param result 解析结果（右值引用，内部移动）
+    /// @param warnings 警告列表（追加写入）
+    /// @return 完整的 SystemInfo
+    SystemInfo resolve(ParseResult result, std::vector<std::string> &warnings);
 
 } // namespace sysal::detail

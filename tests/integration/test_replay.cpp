@@ -14,24 +14,24 @@
 namespace
 {
 
-/// @brief fixture 文件路径
-const std::string fixture_path = "tests/fixtures/dev_machine.json";
+    /// @brief fixture 文件路径
+    const std::string fixture_path = "tests/fixtures/dev_machine.json";
 
-/// @brief 生成 fixture 文件
-/// @details 采集当前机器的原始数据并保存到 fixture 路径。
-void generate_fixture()
-{
-    auto sys = sysal::System::collect(sysal::full);
-    if(sys.raw.has_value())
+    /// @brief 生成 fixture 文件
+    /// @details 采集当前机器的原始数据并保存到 fixture 路径。
+    void generate_fixture()
     {
-        sysal::test::save_raw_store(*sys.raw, fixture_path);
-        std::cout << "  Generated fixture: " << fixture_path << "\n";
+        auto sys = sysal::System::collect(sysal::full);
+        if(sys.raw.has_value())
+        {
+            sysal::test::save_raw_store(*sys.raw, fixture_path);
+            std::cout << "  Generated fixture: " << fixture_path << "\n";
+        }
+        else
+        {
+            std::cerr << "  WARNING: No raw data collected, cannot generate fixture\n";
+        }
     }
-    else
-    {
-        std::cerr << "  WARNING: No raw data collected, cannot generate fixture\n";
-    }
-}
 
 } // namespace
 

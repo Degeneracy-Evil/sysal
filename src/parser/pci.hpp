@@ -15,10 +15,10 @@
 namespace sysal::detail
 {
 
-/// @brief 解析 PCI 信息
-/// @param raw 原始证据存储（只读）
-/// @param warnings 警告列表（追加写入）
-/// @return 解析成功返回 Pci，否则返回 nullopt
-std::optional<Pci> parse_pci(const RawStore& raw, std::vector<std::string>& warnings);
+    /// @brief 解析 PCI 信息
+    /// @param raw 原始证据存储（只读）
+    /// @param warnings 警告列表（追加写入）
+    /// @return 解析成功返回 Pci，否则返回 nullopt
+    std::optional<Pci> parse_pci(const RawStore &raw, std::vector<std::string> &warnings);
 
 } // namespace sysal::detail

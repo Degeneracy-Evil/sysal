@@ -46,7 +46,7 @@ int main()
 
         // 无可见性交叉校验警告（一致）
         bool has_visibility_mismatch = false;
-        for(const auto& w : warnings)
+        for(const auto &w : warnings)
         {
             if(w.find("[visibility_mismatch]") != std::string::npos)
             {
@@ -79,7 +79,7 @@ int main()
         std::vector<std::string> warnings;
         auto info = resolve(std::move(result), warnings);
 
-        for(const auto& lc : info.cpu.logical_cpus)
+        for(const auto &lc : info.cpu.logical_cpus)
         {
             CHECK(lc.visible_to_current_process == true);
         }
@@ -134,7 +134,7 @@ int main()
         std::vector<std::string> warnings;
         auto info = resolve(std::move(result), warnings);
 
-        for(const auto& dev : info.accelerators.devices)
+        for(const auto &dev : info.accelerators.devices)
         {
             CHECK(dev.visible_to_current_process == true);
         }
@@ -160,7 +160,7 @@ int main()
         std::vector<std::string> warnings;
         auto info = resolve(std::move(result), warnings);
 
-        for(const auto& iface : info.network.interfaces)
+        for(const auto &iface : info.network.interfaces)
         {
             CHECK(iface.visible_to_current_process == true);
         }
@@ -198,8 +198,8 @@ int main()
 
         // visible_logical_cpu_ids 包含 CPU 0,1,2,3 (全部存在) + CPU 99 (不存在)
         ExecutionContext exec;
-        exec.visible_logical_cpu_ids = {LogicalCpuId{0}, LogicalCpuId{1}, LogicalCpuId{2},
-                                        LogicalCpuId{3}, LogicalCpuId{99}};
+        exec.visible_logical_cpu_ids = {LogicalCpuId{0}, LogicalCpuId{1}, LogicalCpuId{2}, LogicalCpuId{3},
+                                        LogicalCpuId{99}};
         result.execution = std::move(exec);
 
         std::vector<std::string> warnings;
@@ -214,10 +214,9 @@ int main()
         // 应检测到幻影 ID cpu_99
         bool has_phantom_warning = false;
         bool has_constraint_warning = false;
-        for(const auto& w : warnings)
+        for(const auto &w : warnings)
         {
-            if(w.find("[visibility_mismatch]") != std::string::npos &&
-               w.find("cpu_99") != std::string::npos)
+            if(w.find("[visibility_mismatch]") != std::string::npos && w.find("cpu_99") != std::string::npos)
             {
                 has_phantom_warning = true;
             }
@@ -261,10 +260,10 @@ int main()
         CHECK(info.cpu.logical_cpus[3].visible_to_current_process == false);
 
         bool has_constraint = false;
-        for(const auto& w : warnings)
+        for(const auto &w : warnings)
         {
-            if(w.find("[constraint]") != std::string::npos &&
-               w.find("4 total") != std::string::npos && w.find("2 visible") != std::string::npos)
+            if(w.find("[constraint]") != std::string::npos && w.find("4 total") != std::string::npos &&
+               w.find("2 visible") != std::string::npos)
             {
                 has_constraint = true;
             }
@@ -288,18 +287,16 @@ int main()
 
         // visible_accelerator_ids 包含 0,1,2 (全部存在) + 99 (不存在)
         ExecutionContext exec;
-        exec.visible_accelerator_ids = {AcceleratorId{0}, AcceleratorId{1}, AcceleratorId{2},
-                                        AcceleratorId{99}};
+        exec.visible_accelerator_ids = {AcceleratorId{0}, AcceleratorId{1}, AcceleratorId{2}, AcceleratorId{99}};
         result.execution = std::move(exec);
 
         std::vector<std::string> warnings;
         auto info = resolve(std::move(result), warnings);
 
         bool has_phantom = false;
-        for(const auto& w : warnings)
+        for(const auto &w : warnings)
         {
-            if(w.find("[visibility_mismatch]") != std::string::npos &&
-               w.find("accelerator_99") != std::string::npos)
+            if(w.find("[visibility_mismatch]") != std::string::npos && w.find("accelerator_99") != std::string::npos)
             {
                 has_phantom = true;
             }

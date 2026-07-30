@@ -11,10 +11,9 @@
 using namespace sysal;
 using namespace sysal::detail;
 
-static RawRecord make_record(RawSource source, const std::string& path, const std::string& payload)
+static RawRecord make_record(RawSource source, const std::string &path, const std::string &payload)
 {
-    return RawRecord{source, path, payload, CollectStatus::Success,
-                     std::chrono::system_clock::now()};
+    return RawRecord{source, path, payload, CollectStatus::Success, std::chrono::system_clock::now()};
 }
 
 int main()
@@ -31,8 +30,7 @@ int main()
                                           "Cpus_allowed_list:\t0-3,5\n"
                                           "Mems_allowed_list:\t0-1\n"
                                           "CapEff:\t000001ff\n"));
-        raw.records.push_back(
-            make_record(RawSource::ProcSelfCgroup, "/proc/self/cgroup", "0::/user.slice\n"));
+        raw.records.push_back(make_record(RawSource::ProcSelfCgroup, "/proc/self/cgroup", "0::/user.slice\n"));
         raw.records.push_back(make_record(RawSource::RootDockerenv, "/.dockerenv", ""));
         raw.records.push_back(make_record(RawSource::Environment, "environ",
                                           "CUDA_VISIBLE_DEVICES=0,1\n"
@@ -43,7 +41,7 @@ int main()
         auto result = parse_execution(raw, warnings);
         CHECK(result.has_value());
 
-        const auto& ctx = *result;
+        const auto &ctx = *result;
 
         // 进程
         CHECK(ctx.process.pid == 1234);
@@ -112,7 +110,7 @@ int main()
         auto result = parse_execution(raw, warnings);
         CHECK(result.has_value());
 
-        const auto& ctx = *result;
+        const auto &ctx = *result;
         CHECK(ctx.process.pid == 5678);
         CHECK(ctx.process.uid == 1000);
         CHECK(ctx.permission.euid == 1000);
@@ -129,8 +127,8 @@ int main()
                                           "Pid:\t1\n"
                                           "Uid:\t0\t0\t0\t0\n"
                                           "Gid:\t0\t0\t0\t0\n"));
-        raw.records.push_back(make_record(RawSource::ProcSelfCgroup, "/proc/self/cgroup",
-                                          "1:cpu,cpuacct:/user.slice\n"));
+        raw.records.push_back(
+            make_record(RawSource::ProcSelfCgroup, "/proc/self/cgroup", "1:cpu,cpuacct:/user.slice\n"));
 
         std::vector<std::string> warnings;
         auto result = parse_execution(raw, warnings);
@@ -147,10 +145,9 @@ int main()
                                           "Pid:\t1\n"
                                           "Uid:\t0\t0\t0\t0\n"
                                           "Gid:\t0\t0\t0\t0\n"));
-        raw.records.push_back(make_record(RawSource::ProcOneCgroup, "/proc/1/cgroup",
-                                          "0::/kubepods/besteffort/pod1234\n"));
         raw.records.push_back(
-            make_record(RawSource::Environment, "environ", "KUBERNETES_SERVICE_HOST=10.0.0.1\n"));
+            make_record(RawSource::ProcOneCgroup, "/proc/1/cgroup", "0::/kubepods/besteffort/pod1234\n"));
+        raw.records.push_back(make_record(RawSource::Environment, "environ", "KUBERNETES_SERVICE_HOST=10.0.0.1\n"));
 
         std::vector<std::string> warnings;
         auto result = parse_execution(raw, warnings);

@@ -13,18 +13,18 @@
 namespace sysal
 {
 
-System System::collect(Collect flags)
-{
-    std::vector<std::string> warnings;
-    return detail::run_pipeline(flags, warnings);
-}
+    System System::collect(Collect flags)
+    {
+        std::vector<std::string> warnings;
+        return detail::run_pipeline(flags, warnings);
+    }
 
-void System::refresh()
-{
-    auto flags = meta.requested_flags;
-    std::vector<std::string> warnings;
-    auto new_sys = detail::run_pipeline(flags, warnings);
-    *this = std::move(new_sys);
-}
+    void System::refresh()
+    {
+        auto flags = meta.requested_flags;
+        std::vector<std::string> warnings;
+        auto new_sys = detail::run_pipeline(flags, warnings);
+        *this = std::move(new_sys);
+    }
 
 } // namespace sysal

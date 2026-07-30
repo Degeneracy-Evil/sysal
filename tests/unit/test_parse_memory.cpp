@@ -12,10 +12,9 @@ using namespace sysal;
 using namespace sysal::detail;
 
 /// @brief 创建一条 RawRecord
-static RawRecord make_record(RawSource source, const std::string& path, const std::string& payload)
+static RawRecord make_record(RawSource source, const std::string &path, const std::string &payload)
 {
-    return RawRecord{source, path, payload, CollectStatus::Success,
-                     std::chrono::system_clock::now()};
+    return RawRecord{source, path, payload, CollectStatus::Success, std::chrono::system_clock::now()};
 }
 
 int main()
@@ -34,7 +33,7 @@ int main()
         auto result = parse_memory(raw, warnings);
         CHECK(result.has_value());
 
-        const auto& mem = *result;
+        const auto &mem = *result;
         // 395617072 kB → 395617072 * 1024 bytes
         CHECK(mem.total_memory.value == 395617072ULL * 1024);
         CHECK(mem.available_memory.has_value());
@@ -58,7 +57,7 @@ int main()
         auto result = parse_memory(raw, warnings);
         CHECK(result.has_value());
 
-        const auto& mem = *result;
+        const auto &mem = *result;
         CHECK(mem.numa_memory.size() == 2);
         CHECK(mem.numa_memory[0].node == NumaNodeId{0});
         CHECK(mem.numa_memory[0].total.value == 197808536ULL * 1024);
@@ -92,8 +91,7 @@ int main()
     // ---- 测试 5: MemTotal 为 0 ----
     {
         RawStore raw;
-        raw.records.push_back(
-            make_record(RawSource::ProcMemInfo, "/proc/meminfo", "MemTotal:             0 kB\n"));
+        raw.records.push_back(make_record(RawSource::ProcMemInfo, "/proc/meminfo", "MemTotal:             0 kB\n"));
 
         std::vector<std::string> warnings;
         auto result = parse_memory(raw, warnings);
@@ -131,14 +129,14 @@ int main()
         auto result = parse_memory(raw, warnings);
         CHECK(result.has_value());
 
-        const auto& mem = *result;
+        const auto &mem = *result;
         CHECK(mem.dimms.size() == 2);
         CHECK(mem.dimm_count.has_value());
         CHECK(*mem.dimm_count == 2);
         CHECK(mem.populated_dimms.has_value());
         CHECK(*mem.populated_dimms == 1);
 
-        const auto& d0 = mem.dimms[0];
+        const auto &d0 = mem.dimms[0];
         CHECK(d0.present);
         CHECK(mem.memory_type == "DDR4");
         CHECK(d0.locator == "CPU0_C0D0");
@@ -161,7 +159,7 @@ int main()
         CHECK(d0.form_factor.has_value());
         CHECK(*d0.form_factor == "DIMM");
 
-        const auto& d1 = mem.dimms[1];
+        const auto &d1 = mem.dimms[1];
         CHECK(!d1.present);
         CHECK(d1.locator == "CPU0_C0D1");
         CHECK(d1.bank_locator == "NODE 0");
@@ -174,48 +172,42 @@ int main()
         raw.records.push_back(make_record(RawSource::ProcMemInfo, "/proc/meminfo",
                                           "MemTotal:       32768000 kB\n"
                                           "MemAvailable:   30000000 kB\n"));
-        raw.records.push_back(make_record(RawSource::SysfsEdac,
-                                          "/sys/devices/system/edac/mc/mc0/dimm0/dimm_mem_type",
+        raw.records.push_back(make_record(RawSource::SysfsEdac, "/sys/devices/system/edac/mc/mc0/dimm0/dimm_mem_type",
                                           "Unbuffered-DDR4\n"));
-        raw.records.push_back(make_record(RawSource::SysfsEdac,
-                                          "/sys/devices/system/edac/mc/mc0/dimm0/size", "32768\n"));
-        raw.records.push_back(make_record(RawSource::SysfsEdac,
-                                          "/sys/devices/system/edac/mc/mc0/dimm0/dimm_label",
+        raw.records.push_back(
+            make_record(RawSource::SysfsEdac, "/sys/devices/system/edac/mc/mc0/dimm0/size", "32768\n"));
+        raw.records.push_back(make_record(RawSource::SysfsEdac, "/sys/devices/system/edac/mc/mc0/dimm0/dimm_label",
                                           "CPU_SrcID#0_MC#0_Chan#0_DIMM#0\n"));
-        raw.records.push_back(make_record(RawSource::SysfsEdac,
-                                          "/sys/devices/system/edac/mc/mc0/dimm0/dimm_location",
+        raw.records.push_back(make_record(RawSource::SysfsEdac, "/sys/devices/system/edac/mc/mc0/dimm0/dimm_location",
                                           "channel 0 slot 0\n"));
-        raw.records.push_back(make_record(RawSource::SysfsEdac,
-                                          "/sys/devices/system/edac/mc/mc0/dimm1/dimm_mem_type",
+        raw.records.push_back(make_record(RawSource::SysfsEdac, "/sys/devices/system/edac/mc/mc0/dimm1/dimm_mem_type",
                                           "Unbuffered-DDR4\n"));
-        raw.records.push_back(make_record(RawSource::SysfsEdac,
-                                          "/sys/devices/system/edac/mc/mc0/dimm1/size", "32768\n"));
-        raw.records.push_back(make_record(RawSource::SysfsEdac,
-                                          "/sys/devices/system/edac/mc/mc0/dimm1/dimm_label",
+        raw.records.push_back(
+            make_record(RawSource::SysfsEdac, "/sys/devices/system/edac/mc/mc0/dimm1/size", "32768\n"));
+        raw.records.push_back(make_record(RawSource::SysfsEdac, "/sys/devices/system/edac/mc/mc0/dimm1/dimm_label",
                                           "CPU_SrcID#0_MC#0_Chan#1_DIMM#0\n"));
-        raw.records.push_back(make_record(RawSource::SysfsEdac,
-                                          "/sys/devices/system/edac/mc/mc0/dimm1/dimm_location",
+        raw.records.push_back(make_record(RawSource::SysfsEdac, "/sys/devices/system/edac/mc/mc0/dimm1/dimm_location",
                                           "channel 1 slot 0\n"));
 
         std::vector<std::string> warnings;
         auto result = parse_memory(raw, warnings);
         CHECK(result.has_value());
 
-        const auto& mem = *result;
+        const auto &mem = *result;
         CHECK(mem.dimms.size() == 2);
         CHECK(mem.dimm_count.has_value());
         CHECK(*mem.dimm_count == 2);
         CHECK(mem.populated_dimms.has_value());
         CHECK(*mem.populated_dimms == 2);
 
-        const auto& d0 = mem.dimms[0];
+        const auto &d0 = mem.dimms[0];
         CHECK(d0.present);
         CHECK(mem.memory_type == "Unbuffered-DDR4");
         CHECK(d0.size.value == 32768ULL * 1024 * 1024);
         CHECK(d0.locator == "CPU_SrcID#0_MC#0_Chan#0_DIMM#0");
         CHECK(d0.bank_locator == "channel 0 slot 0");
 
-        const auto& d1 = mem.dimms[1];
+        const auto &d1 = mem.dimms[1];
         CHECK(d1.present);
         CHECK(d1.size.value == 32768ULL * 1024 * 1024);
         CHECK(d1.locator == "CPU_SrcID#0_MC#0_Chan#1_DIMM#0");
@@ -232,7 +224,7 @@ int main()
         auto result = parse_memory(raw, warnings);
         CHECK(result.has_value());
 
-        const auto& mem = *result;
+        const auto &mem = *result;
         CHECK(mem.dimms.empty());
         CHECK(!mem.dimm_count.has_value());
         CHECK(!mem.populated_dimms.has_value());
@@ -258,7 +250,7 @@ int main()
         auto result = parse_memory(raw, warnings);
         CHECK(result.has_value());
 
-        const auto& mem = *result;
+        const auto &mem = *result;
         CHECK(mem.dimms.size() == 1);
         CHECK(mem.dimm_count.has_value());
         CHECK(*mem.dimm_count == 1);
@@ -268,7 +260,7 @@ int main()
         CHECK(mem.dimms[0].size.value == 34359738368ULL);
         CHECK(mem.dimms[0].present);
         bool has_warning = false;
-        for(const auto& w : warnings)
+        for(const auto &w : warnings)
         {
             if(w.find("parse_udevadm_dimms") != std::string::npos)
             {

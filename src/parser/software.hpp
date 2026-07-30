@@ -15,11 +15,10 @@
 namespace sysal::detail
 {
 
-/// @brief 解析软件栈信息
-/// @param raw 原始证据存储（只读）
-/// @param warnings 警告列表（追加写入）
-/// @return 解析成功返回 SoftwareStack，否则返回 nullopt
-std::optional<SoftwareStack> parse_software(const RawStore& raw,
-                                            std::vector<std::string>& warnings);
+    /// @brief 解析软件栈信息
+    /// @param raw 原始证据存储（只读）
+    /// @param warnings 警告列表（追加写入）
+    /// @return 解析成功返回 SoftwareStack，否则返回 nullopt
+    std::optional<SoftwareStack> parse_software(const RawStore &raw, std::vector<std::string> &warnings);
 
 } // namespace sysal::detail

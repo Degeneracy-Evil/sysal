@@ -11,9 +11,9 @@
 namespace sysal::reader
 {
 
-/// @brief 采集 procfs 及相关来源的原始数据
-/// @param raw 原始证据存储
-/// @param flags 采集范围位掩码
-void read_procfs(RawStore& raw, Collect flags);
+    /// @brief 采集 procfs 及相关来源的原始数据
+    /// @param raw 原始证据存储
+    /// @param flags 采集范围位掩码
+    void read_procfs(RawStore &raw, Collect flags);
 
 } // namespace sysal::reader

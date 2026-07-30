@@ -12,10 +12,9 @@ using namespace sysal;
 using namespace sysal::detail;
 
 /// @brief 创建一条 RawRecord
-static RawRecord make_record(RawSource source, const std::string& path, const std::string& payload)
+static RawRecord make_record(RawSource source, const std::string &path, const std::string &payload)
 {
-    return RawRecord{source, path, payload, CollectStatus::Success,
-                     std::chrono::system_clock::now()};
+    return RawRecord{source, path, payload, CollectStatus::Success, std::chrono::system_clock::now()};
 }
 
 int main()
@@ -23,20 +22,16 @@ int main()
     // ---- 测试 1: 2 块设备（nvme0n1 + sda，sda 为 HDD） ----
     {
         RawStore raw;
-        raw.records.push_back(
-            make_record(RawSource::SysfsBlock, "/sys/block/nvme0n1/size", "3750924672\n"));
-        raw.records.push_back(
-            make_record(RawSource::SysfsBlock, "/sys/block/nvme0n1/queue/rotational", "0\n"));
-        raw.records.push_back(
-            make_record(RawSource::SysfsBlock, "/sys/block/sda/size", "976773168\n"));
-        raw.records.push_back(
-            make_record(RawSource::SysfsBlock, "/sys/block/sda/queue/rotational", "1\n"));
+        raw.records.push_back(make_record(RawSource::SysfsBlock, "/sys/block/nvme0n1/size", "3750924672\n"));
+        raw.records.push_back(make_record(RawSource::SysfsBlock, "/sys/block/nvme0n1/queue/rotational", "0\n"));
+        raw.records.push_back(make_record(RawSource::SysfsBlock, "/sys/block/sda/size", "976773168\n"));
+        raw.records.push_back(make_record(RawSource::SysfsBlock, "/sys/block/sda/queue/rotational", "1\n"));
 
         std::vector<std::string> warnings;
         auto result = parse_storage(raw, warnings);
         CHECK(result.has_value());
 
-        const auto& stor = *result;
+        const auto &stor = *result;
         CHECK(stor.devices.size() == 2);
 
         // nvme0n1
@@ -71,7 +66,7 @@ int main()
         auto result = parse_storage(raw, warnings);
         CHECK(result.has_value());
 
-        const auto& stor = *result;
+        const auto &stor = *result;
         CHECK(stor.devices.size() == 1);
         CHECK(stor.devices[0].name.value == "loop0");
         CHECK(stor.devices[0].kind == StorageKind::Other);
@@ -80,8 +75,7 @@ int main()
     // ---- 测试 4: 单设备无 rotational ----
     {
         RawStore raw;
-        raw.records.push_back(
-            make_record(RawSource::SysfsBlock, "/sys/block/nvme0n1/size", "1000\n"));
+        raw.records.push_back(make_record(RawSource::SysfsBlock, "/sys/block/nvme0n1/size", "1000\n"));
 
         std::vector<std::string> warnings;
         auto result = parse_storage(raw, warnings);
@@ -95,16 +89,14 @@ int main()
     // ---- 测试 5: rotational=0 → Ssd ----
     {
         RawStore raw;
-        raw.records.push_back(
-            make_record(RawSource::SysfsBlock, "/sys/block/sdb/size", "500118192\n"));
-        raw.records.push_back(
-            make_record(RawSource::SysfsBlock, "/sys/block/sdb/queue/rotational", "0\n"));
+        raw.records.push_back(make_record(RawSource::SysfsBlock, "/sys/block/sdb/size", "500118192\n"));
+        raw.records.push_back(make_record(RawSource::SysfsBlock, "/sys/block/sdb/queue/rotational", "0\n"));
 
         std::vector<std::string> warnings;
         auto result = parse_storage(raw, warnings);
         CHECK(result.has_value());
 
-        const auto& stor = *result;
+        const auto &stor = *result;
         CHECK(stor.devices.size() == 1);
         CHECK(stor.devices[0].name.value == "sdb");
         CHECK(stor.devices[0].kind == StorageKind::Ssd);
@@ -113,14 +105,13 @@ int main()
     // ---- 测试 6: nvme 设备无 rotational → Nvme ----
     {
         RawStore raw;
-        raw.records.push_back(
-            make_record(RawSource::SysfsBlock, "/sys/block/nvme1n1/size", "1000\n"));
+        raw.records.push_back(make_record(RawSource::SysfsBlock, "/sys/block/nvme1n1/size", "1000\n"));
 
         std::vector<std::string> warnings;
         auto result = parse_storage(raw, warnings);
         CHECK(result.has_value());
 
-        const auto& stor = *result;
+        const auto &stor = *result;
         CHECK(stor.devices.size() == 1);
         CHECK(stor.devices[0].name.value == "nvme1n1");
         CHECK(stor.devices[0].kind == StorageKind::Nvme);
@@ -135,7 +126,7 @@ int main()
         auto result = parse_storage(raw, warnings);
         CHECK(result.has_value());
 
-        const auto& stor = *result;
+        const auto &stor = *result;
         CHECK(stor.devices.size() == 1);
         CHECK(stor.devices[0].name.value == "sdc");
         CHECK(stor.devices[0].kind == StorageKind::Other);
@@ -144,26 +135,21 @@ int main()
     // ---- 测试 8: df -Th 合并挂载点和文件系统类型 ----
     {
         RawStore raw;
-        raw.records.push_back(
-            make_record(RawSource::SysfsBlock, "/sys/block/nvme0n1/size", "3750924672\n"));
-        raw.records.push_back(
-            make_record(RawSource::SysfsBlock, "/sys/block/nvme0n1/queue/rotational", "0\n"));
-        raw.records.push_back(
-            make_record(RawSource::SysfsBlock, "/sys/block/sda/size", "976773168\n"));
-        raw.records.push_back(
-            make_record(RawSource::SysfsBlock, "/sys/block/sda/queue/rotational", "1\n"));
-        raw.records.push_back(
-            make_record(RawSource::DfTh, "df -Th",
-                        "Filesystem     Type      Size  Used Avail Use% Mounted on\n"
-                        "/dev/nvme0n1   xfs       1.7T  1.2T  442G  73% /data3\n"
-                        "/dev/sda2      ext4      1.8T  1.2T  527G  70% /\n"
-                        "/dev/sda1      vfat      1.1G  6.1M  1.1G   1% /boot/efi\n"));
+        raw.records.push_back(make_record(RawSource::SysfsBlock, "/sys/block/nvme0n1/size", "3750924672\n"));
+        raw.records.push_back(make_record(RawSource::SysfsBlock, "/sys/block/nvme0n1/queue/rotational", "0\n"));
+        raw.records.push_back(make_record(RawSource::SysfsBlock, "/sys/block/sda/size", "976773168\n"));
+        raw.records.push_back(make_record(RawSource::SysfsBlock, "/sys/block/sda/queue/rotational", "1\n"));
+        raw.records.push_back(make_record(RawSource::DfTh, "df -Th",
+                                          "Filesystem     Type      Size  Used Avail Use% Mounted on\n"
+                                          "/dev/nvme0n1   xfs       1.7T  1.2T  442G  73% /data3\n"
+                                          "/dev/sda2      ext4      1.8T  1.2T  527G  70% /\n"
+                                          "/dev/sda1      vfat      1.1G  6.1M  1.1G   1% /boot/efi\n"));
 
         std::vector<std::string> warnings;
         auto result = parse_storage(raw, warnings);
         CHECK(result.has_value());
 
-        const auto& stor = *result;
+        const auto &stor = *result;
         CHECK(stor.devices.size() == 2);
 
         CHECK(stor.devices[0].name.value == "nvme0n1");
@@ -182,8 +168,7 @@ int main()
     // ---- 测试 9: 无 df -Th 数据 → mount_point/fs_type 为 nullopt ----
     {
         RawStore raw;
-        raw.records.push_back(
-            make_record(RawSource::SysfsBlock, "/sys/block/nvme0n1/size", "1000\n"));
+        raw.records.push_back(make_record(RawSource::SysfsBlock, "/sys/block/nvme0n1/size", "1000\n"));
 
         std::vector<std::string> warnings;
         auto result = parse_storage(raw, warnings);
@@ -196,16 +181,13 @@ int main()
     // ---- 测试 10: df -Th 畸形输入（字段不足）不崩溃且产生警告 ----
     {
         RawStore raw;
-        raw.records.push_back(
-            make_record(RawSource::SysfsBlock, "/sys/block/sda/size", "976773168\n"));
-        raw.records.push_back(
-            make_record(RawSource::SysfsBlock, "/sys/block/sda/queue/rotational", "1\n"));
-        raw.records.push_back(
-            make_record(RawSource::DfTh, "df -Th",
-                        "Filesystem     Type      Size  Used Avail Use% Mounted on\n"
-                        "/dev/sda2 ext4 1.8T 1.2T 527G 70% /\n"
-                        "truncated_line\n"
-                        "short fields only\n"));
+        raw.records.push_back(make_record(RawSource::SysfsBlock, "/sys/block/sda/size", "976773168\n"));
+        raw.records.push_back(make_record(RawSource::SysfsBlock, "/sys/block/sda/queue/rotational", "1\n"));
+        raw.records.push_back(make_record(RawSource::DfTh, "df -Th",
+                                          "Filesystem     Type      Size  Used Avail Use% Mounted on\n"
+                                          "/dev/sda2 ext4 1.8T 1.2T 527G 70% /\n"
+                                          "truncated_line\n"
+                                          "short fields only\n"));
 
         std::vector<std::string> warnings;
         auto result = parse_storage(raw, warnings);
@@ -216,7 +198,7 @@ int main()
         CHECK(result->devices[0].fs_type.has_value());
         CHECK(result->devices[0].fs_type->value == "ext4");
         bool has_warning = false;
-        for(const auto& w : warnings)
+        for(const auto &w : warnings)
         {
             if(w.find("df -Th") != std::string::npos)
             {

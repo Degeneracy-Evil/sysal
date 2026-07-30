@@ -13,134 +13,131 @@
 namespace
 {
 
-template <typename Range, typename Member, typename Key>
-[[nodiscard]] auto* find_by_member(const Range& range, Member member, const Key& key)
-{
-    for(const auto& item : range)
+    template <typename Range, typename Member, typename Key>
+    [[nodiscard]] auto *find_by_member(const Range &range, Member member, const Key &key)
     {
-        if(item.*member == key)
+        for(const auto &item : range)
         {
-            return &item;
+            if(item.*member == key)
+            {
+                return &item;
+            }
         }
+        return static_cast<const std::remove_reference_t<decltype(range.front())> *>(nullptr);
     }
-    return static_cast<const std::remove_reference_t<decltype(range.front())>*>(nullptr);
-}
 
-template <typename Range, typename Pred> [[nodiscard]] auto filter_by(const Range& range, Pred pred)
-{
-    std::vector<const std::remove_reference_t<decltype(range.front())>*> result;
-    for(const auto& item : range)
+    template <typename Range, typename Pred> [[nodiscard]] auto filter_by(const Range &range, Pred pred)
     {
-        if(pred(item))
+        std::vector<const std::remove_reference_t<decltype(range.front())> *> result;
+        for(const auto &item : range)
         {
-            result.push_back(&item);
+            if(pred(item))
+            {
+                result.push_back(&item);
+            }
         }
+        return result;
     }
-    return result;
-}
 
 } // namespace
 
 namespace sysal
 {
 
-// ---- Cpu ----
+    // ---- Cpu ----
 
-const CpuPackage* Cpu::find_package(CpuPackageId id) const
-{
-    return find_by_member(packages, &CpuPackage::id, id);
-}
-
-const CpuCore* Cpu::find_core(CpuCoreId id) const
-{
-    return find_by_member(cores, &CpuCore::id, id);
-}
-
-const LogicalCpu* Cpu::find_logical_cpu(LogicalCpuId id) const
-{
-    return find_by_member(logical_cpus, &LogicalCpu::id, id);
-}
-
-std::vector<const LogicalCpu*> Cpu::logical_cpus_of_package(CpuPackageId id) const
-{
-    return filter_by(logical_cpus, [id](const LogicalCpu& cpu) { return cpu.package_id == id; });
-}
-
-std::vector<const LogicalCpu*> Cpu::logical_cpus_of_core(CpuCoreId id) const
-{
-    return filter_by(logical_cpus, [id](const LogicalCpu& cpu) { return cpu.core_id == id; });
-}
-
-std::vector<const CpuCore*> Cpu::cores_of_package(CpuPackageId id) const
-{
-    return filter_by(cores, [id](const CpuCore& core) { return core.package_id == id; });
-}
-
-std::vector<const LogicalCpu*> Cpu::visible_logical_cpus() const
-{
-    return filter_by(logical_cpus,
-                     [](const LogicalCpu& cpu) { return cpu.visible_to_current_process; });
-}
-
-// ---- Accelerators ----
-
-std::vector<const AcceleratorDevice*> Accelerators::by_kind(AcceleratorKind kind) const
-{
-    std::vector<const AcceleratorDevice*> result;
-    for(const auto& dev : devices)
+    const CpuPackage *Cpu::find_package(CpuPackageId id) const
     {
-        if(dev.kind == kind)
-        {
-            result.push_back(&dev);
-        }
+        return find_by_member(packages, &CpuPackage::id, id);
     }
-    return result;
-}
 
-std::vector<const AcceleratorDevice*> Accelerators::gpus() const
-{
-    return by_kind(AcceleratorKind::Gpu);
-}
+    const CpuCore *Cpu::find_core(CpuCoreId id) const
+    {
+        return find_by_member(cores, &CpuCore::id, id);
+    }
 
-std::vector<const AcceleratorDevice*> Accelerators::npus() const
-{
-    return by_kind(AcceleratorKind::Npu);
-}
+    const LogicalCpu *Cpu::find_logical_cpu(LogicalCpuId id) const
+    {
+        return find_by_member(logical_cpus, &LogicalCpu::id, id);
+    }
 
-std::vector<const AcceleratorDevice*> Accelerators::fpgas() const
-{
-    return by_kind(AcceleratorKind::Fpga);
-}
+    std::vector<const LogicalCpu *> Cpu::logical_cpus_of_package(CpuPackageId id) const
+    {
+        return filter_by(logical_cpus, [id](const LogicalCpu &cpu) { return cpu.package_id == id; });
+    }
 
-std::vector<const AcceleratorDevice*> Accelerators::visible() const
-{
-    return filter_by(devices,
-                     [](const AcceleratorDevice& dev) { return dev.visible_to_current_process; });
-}
+    std::vector<const LogicalCpu *> Cpu::logical_cpus_of_core(CpuCoreId id) const
+    {
+        return filter_by(logical_cpus, [id](const LogicalCpu &cpu) { return cpu.core_id == id; });
+    }
 
-const AcceleratorDevice* Accelerators::find(AcceleratorId id) const
-{
-    return find_by_member(devices, &AcceleratorDevice::id, id);
-}
+    std::vector<const CpuCore *> Cpu::cores_of_package(CpuPackageId id) const
+    {
+        return filter_by(cores, [id](const CpuCore &core) { return core.package_id == id; });
+    }
 
-// ---- Network ----
+    std::vector<const LogicalCpu *> Cpu::visible_logical_cpus() const
+    {
+        return filter_by(logical_cpus, [](const LogicalCpu &cpu) { return cpu.visible_to_current_process; });
+    }
 
-std::vector<const NetworkInterface*> Network::visible() const
-{
-    return filter_by(interfaces, [](const NetworkInterface& iface)
-                     { return iface.visible_to_current_process; });
-}
+    // ---- Accelerators ----
 
-const NetworkInterface* Network::find(const InterfaceName& name) const
-{
-    return find_by_member(interfaces, &NetworkInterface::name, name);
-}
+    std::vector<const AcceleratorDevice *> Accelerators::by_kind(AcceleratorKind kind) const
+    {
+        std::vector<const AcceleratorDevice *> result;
+        for(const auto &dev : devices)
+        {
+            if(dev.kind == kind)
+            {
+                result.push_back(&dev);
+            }
+        }
+        return result;
+    }
 
-// ---- Pci ----
+    std::vector<const AcceleratorDevice *> Accelerators::gpus() const
+    {
+        return by_kind(AcceleratorKind::Gpu);
+    }
 
-const PciDevice* Pci::find(PciAddress addr) const
-{
-    return find_by_member(devices, &PciDevice::address, addr);
-}
+    std::vector<const AcceleratorDevice *> Accelerators::npus() const
+    {
+        return by_kind(AcceleratorKind::Npu);
+    }
+
+    std::vector<const AcceleratorDevice *> Accelerators::fpgas() const
+    {
+        return by_kind(AcceleratorKind::Fpga);
+    }
+
+    std::vector<const AcceleratorDevice *> Accelerators::visible() const
+    {
+        return filter_by(devices, [](const AcceleratorDevice &dev) { return dev.visible_to_current_process; });
+    }
+
+    const AcceleratorDevice *Accelerators::find(AcceleratorId id) const
+    {
+        return find_by_member(devices, &AcceleratorDevice::id, id);
+    }
+
+    // ---- Network ----
+
+    std::vector<const NetworkInterface *> Network::visible() const
+    {
+        return filter_by(interfaces, [](const NetworkInterface &iface) { return iface.visible_to_current_process; });
+    }
+
+    const NetworkInterface *Network::find(const InterfaceName &name) const
+    {
+        return find_by_member(interfaces, &NetworkInterface::name, name);
+    }
+
+    // ---- Pci ----
+
+    const PciDevice *Pci::find(PciAddress addr) const
+    {
+        return find_by_member(devices, &PciDevice::address, addr);
+    }
 
 } // namespace sysal

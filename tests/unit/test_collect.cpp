@@ -63,7 +63,7 @@ int main()
             auto sys = sysal::test::collect_from_raw(empty_raw, Collect::Cpu);
             (void)sys;
         }
-        catch(const SysalError& e)
+        catch(const SysalError &e)
         {
             CHECK(e.kind() == ErrorKind::CollectionFailed);
             threw = true;

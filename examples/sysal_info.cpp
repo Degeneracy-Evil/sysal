@@ -20,334 +20,348 @@
 namespace
 {
 
-// ── 格式化辅助 ──────────────────────────────────────────────────────────
+    // ── 格式化辅助 ──────────────────────────────────────────────────────────
 
-/// @brief 格式化内存大小为人类可读字符串
-/// @param bytes 字节数
-/// @return 格式化字符串（如 "4096 MiB"）
-std::string format_memory(std::uint64_t bytes)
-{
-    const auto gib = 1024ULL * 1024 * 1024;
-    const auto mib = 1024ULL * 1024;
-    const auto kib = 1024ULL;
-    if(bytes >= gib)
+    /// @brief 格式化内存大小为人类可读字符串
+    /// @param bytes 字节数
+    /// @return 格式化字符串（如 "4096 MiB"）
+    std::string format_memory(std::uint64_t bytes)
     {
-        double val = static_cast<double>(bytes) / static_cast<double>(gib);
-        char buf[32];
-        std::snprintf(buf, sizeof(buf), "%.2f GiB", val);
+        const auto gib = 1024ULL * 1024 * 1024;
+        const auto mib = 1024ULL * 1024;
+        const auto kib = 1024ULL;
+        if(bytes >= gib)
+        {
+            double val = static_cast<double>(bytes) / static_cast<double>(gib);
+            char buf[32];
+            std::snprintf(buf, sizeof(buf), "%.2f GiB", val);
+            return buf;
+        }
+        if(bytes >= mib)
+        {
+            double val = static_cast<double>(bytes) / static_cast<double>(mib);
+            char buf[32];
+            std::snprintf(buf, sizeof(buf), "%.2f MiB", val);
+            return buf;
+        }
+        if(bytes >= kib)
+        {
+            return std::to_string(bytes / kib) + " KiB";
+        }
+        return std::to_string(bytes) + " B";
+    }
+
+    /// @brief 格式化频率为人类可读字符串，按量级自动选择 GHz/MHz/kHz/Hz
+    /// @param hz 频率（赫兹）
+    /// @return 格式化字符串（如 "2 GHz"、"2200 MHz"）
+    std::string format_frequency(std::uint64_t hz)
+    {
+        if(hz >= 1'000'000'000)
+        {
+            double ghz = static_cast<double>(hz) / 1'000'000'000.0;
+            char buf[32];
+            std::snprintf(buf, sizeof(buf), "%.2f GHz", ghz);
+            return buf;
+        }
+        if(hz >= 1'000'000)
+        {
+            double mhz = static_cast<double>(hz) / 1'000'000.0;
+            char buf[32];
+            std::snprintf(buf, sizeof(buf), "%.2f MHz", mhz);
+            return buf;
+        }
+        if(hz >= 1'000)
+        {
+            return std::to_string(hz / 1'000) + " kHz";
+        }
+        return std::to_string(hz) + " Hz";
+    }
+
+    /// @brief 格式化 PCI 地址为十六进制零填充
+    /// @param addr PCI 地址
+    /// @return 格式化字符串（如 "0000:65:00.0"）
+    std::string format_pci(const sysal::PciAddress &addr)
+    {
+        char buf[16];
+        std::snprintf(buf, sizeof(buf), "%04x:%02x:%02x.%x", addr.domain, addr.bus, addr.device, addr.function);
         return buf;
     }
-    if(bytes >= mib)
+
+    // ── 枚举转字符串 ───────────────────────────────────────────────────────
+
+    const char *arch_str(sysal::Arch a)
     {
-        double val = static_cast<double>(bytes) / static_cast<double>(mib);
-        char buf[32];
-        std::snprintf(buf, sizeof(buf), "%.2f MiB", val);
-        return buf;
+        switch(a)
+        {
+        case sysal::Arch::X86_64:
+            return "x86_64";
+        case sysal::Arch::AArch64:
+            return "AArch64";
+        case sysal::Arch::Riscv64:
+            return "Riscv64";
+        case sysal::Arch::Other:
+            return "Other";
+        }
+        return "?";
     }
-    if(bytes >= kib)
+
+    const char *isa_str(sysal::IsaExtension e)
     {
-        return std::to_string(bytes / kib) + " KiB";
+        switch(e)
+        {
+        case sysal::IsaExtension::Sse:
+            return "SSE";
+        case sysal::IsaExtension::Sse2:
+            return "SSE2";
+        case sysal::IsaExtension::Sse3:
+            return "SSE3";
+        case sysal::IsaExtension::Ssse3:
+            return "SSSE3";
+        case sysal::IsaExtension::Sse41:
+            return "SSE4.1";
+        case sysal::IsaExtension::Sse42:
+            return "SSE4.2";
+        case sysal::IsaExtension::Avx:
+            return "AVX";
+        case sysal::IsaExtension::Avx2:
+            return "AVX2";
+        case sysal::IsaExtension::Avx512f:
+            return "AVX-512F";
+        case sysal::IsaExtension::Avx512cd:
+            return "AVX-512CD";
+        case sysal::IsaExtension::Avx512bw:
+            return "AVX-512BW";
+        case sysal::IsaExtension::Avx512dq:
+            return "AVX-512DQ";
+        case sysal::IsaExtension::Avx512vl:
+            return "AVX-512VL";
+        case sysal::IsaExtension::Aes:
+            return "AES";
+        case sysal::IsaExtension::Fma:
+            return "FMA";
+        case sysal::IsaExtension::F16c:
+            return "F16C";
+        case sysal::IsaExtension::Pclmulqdq:
+            return "PCLMULQDQ";
+        }
+        return "?";
     }
-    return std::to_string(bytes) + " B";
-}
 
-/// @brief 格式化频率为人类可读字符串，按量级自动选择 GHz/MHz/kHz/Hz
-/// @param hz 频率（赫兹）
-/// @return 格式化字符串（如 "2 GHz"、"2200 MHz"）
-std::string format_frequency(std::uint64_t hz)
-{
-    if(hz >= 1'000'000'000)
+    const char *state_str(sysal::InterfaceState s)
     {
-        double ghz = static_cast<double>(hz) / 1'000'000'000.0;
-        char buf[32];
-        std::snprintf(buf, sizeof(buf), "%.2f GHz", ghz);
-        return buf;
+        switch(s)
+        {
+        case sysal::InterfaceState::Up:
+            return "UP";
+        case sysal::InterfaceState::Down:
+            return "DOWN";
+        case sysal::InterfaceState::Unknown:
+            return "UNKNOWN";
+        }
+        return "?";
     }
-    if(hz >= 1'000'000)
+
+    const char *storage_kind_str(sysal::StorageKind k)
     {
-        double mhz = static_cast<double>(hz) / 1'000'000.0;
-        char buf[32];
-        std::snprintf(buf, sizeof(buf), "%.2f MHz", mhz);
-        return buf;
+        switch(k)
+        {
+        case sysal::StorageKind::Nvme:
+            return "NVMe";
+        case sysal::StorageKind::Ssd:
+            return "SSD";
+        case sysal::StorageKind::Hdd:
+            return "HDD";
+        case sysal::StorageKind::Other:
+            return "Other";
+        }
+        return "?";
     }
-    if(hz >= 1'000)
+
+    const char *accel_kind_str(sysal::AcceleratorKind k)
     {
-        return std::to_string(hz / 1'000) + " kHz";
+        switch(k)
+        {
+        case sysal::AcceleratorKind::Gpu:
+            return "GPU";
+        case sysal::AcceleratorKind::Npu:
+            return "NPU";
+        case sysal::AcceleratorKind::Fpga:
+            return "FPGA";
+        case sysal::AcceleratorKind::Other:
+            return "Other";
+        }
+        return "?";
     }
-    return std::to_string(hz) + " Hz";
-}
 
-/// @brief 格式化 PCI 地址为十六进制零填充
-/// @param addr PCI 地址
-/// @return 格式化字符串（如 "0000:65:00.0"）
-std::string format_pci(const sysal::PciAddress& addr)
-{
-    char buf[16];
-    std::snprintf(buf, sizeof(buf), "%04x:%02x:%02x.%x", addr.domain, addr.bus, addr.device,
-                  addr.function);
-    return buf;
-}
-
-// ── 枚举转字符串 ───────────────────────────────────────────────────────
-
-const char* arch_str(sysal::Arch a)
-{
-    switch(a)
+    const char *virt_kind_str(sysal::VirtualizationKind k)
     {
-    case sysal::Arch::X86_64:
-        return "x86_64";
-    case sysal::Arch::AArch64:
-        return "AArch64";
-    case sysal::Arch::Riscv64:
-        return "Riscv64";
-    case sysal::Arch::Other:
-        return "Other";
+        switch(k)
+        {
+        case sysal::VirtualizationKind::None:
+            return "None";
+        case sysal::VirtualizationKind::Kvm:
+            return "KVM";
+        case sysal::VirtualizationKind::Xen:
+            return "Xen";
+        case sysal::VirtualizationKind::Vmware:
+            return "VMware";
+        case sysal::VirtualizationKind::Qemu:
+            return "QEMU";
+        case sysal::VirtualizationKind::HyperV:
+            return "Hyper-V";
+        case sysal::VirtualizationKind::VirtualBox:
+            return "VirtualBox";
+        case sysal::VirtualizationKind::Parallels:
+            return "Parallels";
+        case sysal::VirtualizationKind::Other:
+            return "Other";
+        }
+        return "?";
     }
-    return "?";
-}
 
-const char* isa_str(sysal::IsaExtension e)
-{
-    switch(e)
+    const char *cgroup_ver_str(sysal::CgroupVersion v)
     {
-    case sysal::IsaExtension::Sse:
-        return "SSE";
-    case sysal::IsaExtension::Sse2:
-        return "SSE2";
-    case sysal::IsaExtension::Sse3:
-        return "SSE3";
-    case sysal::IsaExtension::Ssse3:
-        return "SSSE3";
-    case sysal::IsaExtension::Sse41:
-        return "SSE4.1";
-    case sysal::IsaExtension::Sse42:
-        return "SSE4.2";
-    case sysal::IsaExtension::Avx:
-        return "AVX";
-    case sysal::IsaExtension::Avx2:
-        return "AVX2";
-    case sysal::IsaExtension::Avx512f:
-        return "AVX-512F";
-    case sysal::IsaExtension::Avx512cd:
-        return "AVX-512CD";
-    case sysal::IsaExtension::Avx512bw:
-        return "AVX-512BW";
-    case sysal::IsaExtension::Avx512dq:
-        return "AVX-512DQ";
-    case sysal::IsaExtension::Avx512vl:
-        return "AVX-512VL";
-    case sysal::IsaExtension::Aes:
-        return "AES";
-    case sysal::IsaExtension::Fma:
-        return "FMA";
-    case sysal::IsaExtension::F16c:
-        return "F16C";
-    case sysal::IsaExtension::Pclmulqdq:
-        return "PCLMULQDQ";
+        switch(v)
+        {
+        case sysal::CgroupVersion::V1:
+            return "v1";
+        case sysal::CgroupVersion::V2:
+            return "v2";
+        }
+        return "?";
     }
-    return "?";
-}
 
-const char* state_str(sysal::InterfaceState s)
-{
-    switch(s)
+    const char *container_kind_str(sysal::ContainerKind k)
     {
-    case sysal::InterfaceState::Up:
-        return "UP";
-    case sysal::InterfaceState::Down:
-        return "DOWN";
-    case sysal::InterfaceState::Unknown:
-        return "UNKNOWN";
+        switch(k)
+        {
+        case sysal::ContainerKind::Docker:
+            return "Docker";
+        case sysal::ContainerKind::Podman:
+            return "Podman";
+        case sysal::ContainerKind::Lxc:
+            return "LXC";
+        case sysal::ContainerKind::Kubernetes:
+            return "Kubernetes";
+        case sysal::ContainerKind::Other:
+            return "Other";
+        }
+        return "?";
     }
-    return "?";
-}
 
-const char* storage_kind_str(sysal::StorageKind k)
-{
-    switch(k)
+    const char *raw_source_str(sysal::RawSource s)
     {
-    case sysal::StorageKind::Nvme:
-        return "NVMe";
-    case sysal::StorageKind::Ssd:
-        return "SSD";
-    case sysal::StorageKind::Hdd:
-        return "HDD";
-    case sysal::StorageKind::Other:
-        return "Other";
+        switch(s)
+        {
+        case sysal::RawSource::ProcCpuInfo:
+            return "ProcCpuInfo";
+        case sysal::RawSource::ProcMemInfo:
+            return "ProcMemInfo";
+        case sysal::RawSource::ProcVersion:
+            return "ProcVersion";
+        case sysal::RawSource::ProcSelfCgroup:
+            return "ProcSelfCgroup";
+        case sysal::RawSource::ProcSelfStatus:
+            return "ProcSelfStatus";
+        case sysal::RawSource::ProcOneCgroup:
+            return "ProcOneCgroup";
+        case sysal::RawSource::ProcHostname:
+            return "ProcHostname";
+        case sysal::RawSource::SysfsCpu:
+            return "SysfsCpu";
+        case sysal::RawSource::SysfsNuma:
+            return "SysfsNuma";
+        case sysal::RawSource::SysfsNet:
+            return "SysfsNet";
+        case sysal::RawSource::SysfsPci:
+            return "SysfsPci";
+        case sysal::RawSource::SysfsBlock:
+            return "SysfsBlock";
+        case sysal::RawSource::SysfsDmi:
+            return "SysfsDmi";
+        case sysal::RawSource::EtcOsRelease:
+            return "EtcOsRelease";
+        case sysal::RawSource::RootDockerenv:
+            return "RootDockerenv";
+        case sysal::RawSource::Uname:
+            return "Uname";
+        case sysal::RawSource::Lspci:
+            return "Lspci";
+        case sysal::RawSource::NvidiaSmi:
+            return "NvidiaSmi";
+        case sysal::RawSource::Nvcc:
+            return "Nvcc";
+        case sysal::RawSource::Lsblk:
+            return "Lsblk";
+        case sysal::RawSource::Environment:
+            return "Environment";
+        case sysal::RawSource::Nvml:
+            return "Nvml";
+        case sysal::RawSource::Ibverbs:
+            return "Ibverbs";
+        case sysal::RawSource::HwinfoOutput:
+            return "HwinfoOutput";
+        case sysal::RawSource::IfAddrs:
+            return "IfAddrs";
+        case sysal::RawSource::DfTh:
+            return "DfTh";
+        case sysal::RawSource::Udevadm:
+            return "Udevadm";
+        case sysal::RawSource::SysfsEdac:
+            return "SysfsEdac";
+        case sysal::RawSource::SysHypervisor:
+            return "SysHypervisor";
+        }
+        return "?";
     }
-    return "?";
-}
 
-const char* accel_kind_str(sysal::AcceleratorKind k)
-{
-    switch(k)
+    const char *collect_status_str(sysal::CollectStatus s)
     {
-    case sysal::AcceleratorKind::Gpu:
-        return "GPU";
-    case sysal::AcceleratorKind::Npu:
-        return "NPU";
-    case sysal::AcceleratorKind::Fpga:
-        return "FPGA";
-    case sysal::AcceleratorKind::Other:
-        return "Other";
+        switch(s)
+        {
+        case sysal::CollectStatus::Success:
+            return "Success";
+        case sysal::CollectStatus::Partial:
+            return "Partial";
+        case sysal::CollectStatus::Failed:
+            return "Failed";
+        case sysal::CollectStatus::NotCollected:
+            return "NotCollected";
+        }
+        return "?";
     }
-    return "?";
-}
 
-const char* virt_kind_str(sysal::VirtualizationKind k)
-{
-    switch(k)
+    // ── 输出辅助 ───────────────────────────────────────────────────────────
+
+    void section(const std::string &title)
     {
-    case sysal::VirtualizationKind::None:
-        return "None";
-    case sysal::VirtualizationKind::Kvm:
-        return "KVM";
-    case sysal::VirtualizationKind::Xen:
-        return "Xen";
-    case sysal::VirtualizationKind::Vmware:
-        return "VMware";
-    case sysal::VirtualizationKind::Qemu:
-        return "QEMU";
-    case sysal::VirtualizationKind::HyperV:
-        return "Hyper-V";
-    case sysal::VirtualizationKind::VirtualBox:
-        return "VirtualBox";
-    case sysal::VirtualizationKind::Parallels:
-        return "Parallels";
-    case sysal::VirtualizationKind::Other:
-        return "Other";
+        std::cout << "\n--- " << title << " ---\n";
     }
-    return "?";
-}
 
-const char* cgroup_ver_str(sysal::CgroupVersion v)
-{
-    switch(v)
+    void label(const std::string &key, const std::string &value)
     {
-    case sysal::CgroupVersion::V1:
-        return "v1";
-    case sysal::CgroupVersion::V2:
-        return "v2";
+        std::cout << "  " << std::left << std::setw(24) << key << ": " << value << "\n";
     }
-    return "?";
-}
 
-const char* container_kind_str(sysal::ContainerKind k)
-{
-    switch(k)
+    void label(const std::string &key, std::uint64_t value)
     {
-    case sysal::ContainerKind::Docker:
-        return "Docker";
-    case sysal::ContainerKind::Podman:
-        return "Podman";
-    case sysal::ContainerKind::Lxc:
-        return "LXC";
-    case sysal::ContainerKind::Kubernetes:
-        return "Kubernetes";
-    case sysal::ContainerKind::Other:
-        return "Other";
+        label(key, std::to_string(value));
     }
-    return "?";
-}
 
-const char* raw_source_str(sysal::RawSource s)
-{
-    switch(s)
+    void label(const std::string &key, std::uint32_t value)
     {
-    case sysal::RawSource::ProcCpuInfo:
-        return "ProcCpuInfo";
-    case sysal::RawSource::ProcMemInfo:
-        return "ProcMemInfo";
-    case sysal::RawSource::ProcVersion:
-        return "ProcVersion";
-    case sysal::RawSource::ProcSelfCgroup:
-        return "ProcSelfCgroup";
-    case sysal::RawSource::ProcSelfStatus:
-        return "ProcSelfStatus";
-    case sysal::RawSource::ProcOneCgroup:
-        return "ProcOneCgroup";
-    case sysal::RawSource::ProcHostname:
-        return "ProcHostname";
-    case sysal::RawSource::SysfsCpu:
-        return "SysfsCpu";
-    case sysal::RawSource::SysfsNuma:
-        return "SysfsNuma";
-    case sysal::RawSource::SysfsNet:
-        return "SysfsNet";
-    case sysal::RawSource::SysfsPci:
-        return "SysfsPci";
-    case sysal::RawSource::SysfsBlock:
-        return "SysfsBlock";
-    case sysal::RawSource::SysfsDmi:
-        return "SysfsDmi";
-    case sysal::RawSource::EtcOsRelease:
-        return "EtcOsRelease";
-    case sysal::RawSource::RootDockerenv:
-        return "RootDockerenv";
-    case sysal::RawSource::Uname:
-        return "Uname";
-    case sysal::RawSource::Lspci:
-        return "Lspci";
-    case sysal::RawSource::NvidiaSmi:
-        return "NvidiaSmi";
-    case sysal::RawSource::Nvcc:
-        return "Nvcc";
-    case sysal::RawSource::Lsblk:
-        return "Lsblk";
-    case sysal::RawSource::Environment:
-        return "Environment";
-    case sysal::RawSource::Nvml:
-        return "Nvml";
-    case sysal::RawSource::Ibverbs:
-        return "Ibverbs";
-    case sysal::RawSource::HwinfoOutput:
-        return "HwinfoOutput";
-    case sysal::RawSource::IfAddrs:
-        return "IfAddrs";
-    case sysal::RawSource::DfTh:
-        return "DfTh";
-    case sysal::RawSource::Udevadm:
-        return "Udevadm";
-    case sysal::RawSource::SysfsEdac:
-        return "SysfsEdac";
-    case sysal::RawSource::SysHypervisor:
-        return "SysHypervisor";
+        label(key, std::to_string(value));
     }
-    return "?";
-}
 
-const char* collect_status_str(sysal::CollectStatus s)
-{
-    switch(s)
+    void label(const std::string &key, std::int32_t value)
     {
-    case sysal::CollectStatus::Success:
-        return "Success";
-    case sysal::CollectStatus::Partial:
-        return "Partial";
-    case sysal::CollectStatus::Failed:
-        return "Failed";
-    case sysal::CollectStatus::NotCollected:
-        return "NotCollected";
+        label(key, std::to_string(value));
     }
-    return "?";
-}
 
-// ── 输出辅助 ───────────────────────────────────────────────────────────
-
-void section(const std::string& title) { std::cout << "\n--- " << title << " ---\n"; }
-
-void label(const std::string& key, const std::string& value)
-{
-    std::cout << "  " << std::left << std::setw(24) << key << ": " << value << "\n";
-}
-
-void label(const std::string& key, std::uint64_t value) { label(key, std::to_string(value)); }
-
-void label(const std::string& key, std::uint32_t value) { label(key, std::to_string(value)); }
-
-void label(const std::string& key, std::int32_t value) { label(key, std::to_string(value)); }
-
-void label(const std::string& key, const char* value) { label(key, std::string{value}); }
+    void label(const std::string &key, const char *value)
+    {
+        label(key, std::string{value});
+    }
 
 } // namespace
 
@@ -369,12 +383,11 @@ int main()
     assert(sys.meta.sysal_version == sysal::VERSION_STRING);
     assert(sys.meta.collect_duration.count() >= 0.0);
 
-    label("Collect duration (ms)",
-          std::to_string(static_cast<long>(sys.meta.collect_duration.count() * 1000.0)));
+    label("Collect duration (ms)", std::to_string(static_cast<long>(sys.meta.collect_duration.count() * 1000.0)));
     label("Succeeded collectors", sys.meta.succeeded_collectors.size());
     label("Failed collectors", sys.meta.failed_collectors.size());
     std::cout << "  Succeeded:";
-    for(const auto& c : sys.meta.succeeded_collectors)
+    for(const auto &c : sys.meta.succeeded_collectors)
     {
         std::cout << " " << c;
     }
@@ -382,7 +395,7 @@ int main()
     if(!sys.meta.failed_collectors.empty())
     {
         std::cout << "  Failed:";
-        for(const auto& c : sys.meta.failed_collectors)
+        for(const auto &c : sys.meta.failed_collectors)
         {
             std::cout << " " << c;
         }
@@ -396,8 +409,7 @@ int main()
     label("OS version", sys.info.platform.os.version);
     if(!sys.info.platform.os.distribution.empty())
     {
-        label("Distribution",
-              sys.info.platform.os.distribution + " " + sys.info.platform.os.distribution_version);
+        label("Distribution", sys.info.platform.os.distribution + " " + sys.info.platform.os.distribution_version);
     }
     if(!sys.info.platform.os.codename.empty())
     {
@@ -434,7 +446,7 @@ int main()
     label("Logical CPUs", sys.info.cpu.logical_cpus.size());
     label("NUMA nodes", sys.info.cpu.numa_nodes.size());
 
-    for(const auto& pkg : sys.info.cpu.packages)
+    for(const auto &pkg : sys.info.cpu.packages)
     {
         std::cout << "  Package " << pkg.id << ": " << pkg.model_name.value << "\n";
         label("  Vendor", pkg.vendor.value);
@@ -453,17 +465,17 @@ int main()
     if(!sys.info.cpu.isa_extensions.empty())
     {
         std::cout << "  ISA extensions:";
-        for(const auto& ext : sys.info.cpu.isa_extensions)
+        for(const auto &ext : sys.info.cpu.isa_extensions)
         {
             std::cout << " " << isa_str(ext);
         }
         std::cout << "\n";
     }
 
-    for(const auto& node : sys.info.cpu.numa_nodes)
+    for(const auto &node : sys.info.cpu.numa_nodes)
     {
         std::cout << "  NUMA node " << node.id << ": CPUs";
-        for(const auto& cpu_id : node.cpus)
+        for(const auto &cpu_id : node.cpus)
         {
             std::cout << " " << cpu_id;
         }
@@ -485,13 +497,12 @@ int main()
     {
         label("Configured speed (MT/s)", sys.info.memory.configured_speed_mts->value);
     }
-    for(const auto& nm : sys.info.memory.numa_memory)
+    for(const auto &nm : sys.info.memory.numa_memory)
     {
         label("NUMA " + std::to_string(nm.node.value()) + " total", format_memory(nm.total.value));
         if(nm.available.has_value())
         {
-            label("NUMA " + std::to_string(nm.node.value()) + " available",
-                  format_memory(nm.available->value));
+            label("NUMA " + std::to_string(nm.node.value()) + " available", format_memory(nm.available->value));
         }
     }
     if(sys.info.memory.dimm_count.has_value())
@@ -504,7 +515,7 @@ int main()
     }
     for(std::size_t i = 0; i < sys.info.memory.dimms.size(); ++i)
     {
-        const auto& d = sys.info.memory.dimms[i];
+        const auto &d = sys.info.memory.dimms[i];
         std::cout << "  DIMM " << i << ": " << d.locator;
         if(!d.bank_locator.empty())
         {
@@ -556,7 +567,7 @@ int main()
         label("NPUs", npus.size());
         label("FPGAs", fpgas.size());
 
-        for(const auto* gpu : gpus)
+        for(const auto *gpu : gpus)
         {
             std::cout << "  GPU [" << gpu->id << "] " << gpu->name.value << "\n";
             label("  Vendor", gpu->vendor.value);
@@ -583,7 +594,7 @@ int main()
     // ── 6. Network ──────────────────────────────────────────────────────
     section("6. Network");
     label("Interfaces", sys.info.network.interfaces.size());
-    for(const auto& iface : sys.info.network.interfaces)
+    for(const auto &iface : sys.info.network.interfaces)
     {
         label("Name", iface.name.value);
         label("State", state_str(iface.state));
@@ -598,7 +609,7 @@ int main()
         if(!iface.addresses.empty())
         {
             std::string ips;
-            for(const auto& addr : iface.addresses)
+            for(const auto &addr : iface.addresses)
             {
                 if(!ips.empty())
                 {
@@ -622,7 +633,7 @@ int main()
     // ── 7. Storage ──────────────────────────────────────────────────────
     section("7. Storage");
     label("Devices", sys.info.storage.devices.size());
-    for(const auto& dev : sys.info.storage.devices)
+    for(const auto &dev : sys.info.storage.devices)
     {
         std::cout << "  " << dev.name.value << " (" << storage_kind_str(dev.kind) << ")\n";
         if(dev.capacity.has_value())
@@ -648,7 +659,7 @@ int main()
     label("Devices", sys.info.pci.devices.size());
     {
         std::size_t shown = 0;
-        for(const auto& dev : sys.info.pci.devices)
+        for(const auto &dev : sys.info.pci.devices)
         {
             if(shown >= 5)
             {
@@ -674,22 +685,22 @@ int main()
     // ── 9. Software ─────────────────────────────────────────────────────
     section("9. Software");
     label("Drivers", sys.info.software.drivers.size());
-    for(const auto& drv : sys.info.software.drivers)
+    for(const auto &drv : sys.info.software.drivers)
     {
         label("  " + drv.name, drv.version + (drv.loaded ? " (loaded)" : " (not loaded)"));
     }
     label("Runtimes", sys.info.software.runtimes.size());
-    for(const auto& rt : sys.info.software.runtimes)
+    for(const auto &rt : sys.info.software.runtimes)
     {
         label("  " + rt.name, rt.version);
     }
     label("Compilers", sys.info.software.compilers.size());
-    for(const auto& cc : sys.info.software.compilers)
+    for(const auto &cc : sys.info.software.compilers)
     {
         label("  " + cc.name, cc.version);
     }
     label("Libraries", sys.info.software.libraries.size());
-    for(const auto& lib : sys.info.software.libraries)
+    for(const auto &lib : sys.info.software.libraries)
     {
         label("  " + lib.name, lib.version + " [" + lib.kind + "]");
     }
@@ -736,7 +747,7 @@ int main()
     if(!sys.info.execution.permission.capabilities.empty())
     {
         std::string caps;
-        for(const auto& cap : sys.info.execution.permission.capabilities)
+        for(const auto &cap : sys.info.execution.permission.capabilities)
         {
             if(!caps.empty())
             {
@@ -751,7 +762,7 @@ int main()
     if(!sys.info.execution.cgroup.controllers.empty())
     {
         std::string ctrls;
-        for(const auto& c : sys.info.execution.cgroup.controllers)
+        for(const auto &c : sys.info.execution.cgroup.controllers)
         {
             if(!ctrls.empty())
             {
@@ -789,7 +800,7 @@ int main()
     section("12. Raw Store");
     if(sys.raw.has_value())
     {
-        const auto& raw = *sys.raw;
+        const auto &raw = *sys.raw;
         label("Total records", raw.records.size());
 
         std::cout << "  Sources breakdown:\n";
@@ -799,21 +810,20 @@ int main()
             const auto cnt = raw.count(src);
             if(cnt > 0)
             {
-                std::cout << "    " << std::left << std::setw(20) << raw_source_str(src) << ": "
-                          << cnt << "\n";
+                std::cout << "    " << std::left << std::setw(20) << raw_source_str(src) << ": " << cnt << "\n";
             }
         }
 
         std::cout << "  First records:\n";
         std::size_t shown = 0;
-        for(const auto& rec : raw.records)
+        for(const auto &rec : raw.records)
         {
             if(shown >= 10)
             {
                 break;
             }
-            std::cout << "    [" << raw_source_str(rec.source) << "] " << rec.path_or_command
-                      << " (" << collect_status_str(rec.status) << ")\n";
+            std::cout << "    [" << raw_source_str(rec.source) << "] " << rec.path_or_command << " ("
+                      << collect_status_str(rec.status) << ")\n";
             ++shown;
         }
     }
@@ -825,7 +835,7 @@ int main()
     // ── 13. Warnings & Meta ─────────────────────────────────────────────
     section("13. Warnings & Meta");
     label("Warnings", sys.warnings.size());
-    for(const auto& w : sys.warnings)
+    for(const auto &w : sys.warnings)
     {
         std::cout << "    " << w << "\n";
     }
@@ -858,9 +868,8 @@ int main()
         assert(partial.info.memory.total_memory.value > 0);
         label("Requested: CPU logical CPUs", partial.info.cpu.logical_cpus.size());
         label("Requested: Memory total", format_memory(partial.info.memory.total_memory.value));
-        label("Unrequested: Platform hostname", partial.info.platform.host.hostname.empty()
-                                                    ? "(empty)"
-                                                    : partial.info.platform.host.hostname);
+        label("Unrequested: Platform hostname",
+              partial.info.platform.host.hostname.empty() ? "(empty)" : partial.info.platform.host.hostname);
         label("Unrequested: Network interfaces", partial.info.network.interfaces.size());
     }
 
@@ -889,11 +898,10 @@ int main()
             (void)sysal::test::collect_from_raw(empty_raw, sysal::Collect::Cpu);
             label("Expected SysalError", "NOT thrown");
         }
-        catch(const sysal::SysalError& e)
+        catch(const sysal::SysalError &e)
         {
             label("Caught SysalError", e.what());
-            label("Error kind",
-                  e.kind() == sysal::ErrorKind::CollectionFailed ? "CollectionFailed" : "other");
+            label("Error kind", e.kind() == sysal::ErrorKind::CollectionFailed ? "CollectionFailed" : "other");
             assert(e.kind() == sysal::ErrorKind::CollectionFailed);
         }
     }

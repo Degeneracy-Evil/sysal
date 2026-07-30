@@ -12,10 +12,9 @@ using namespace sysal;
 using namespace sysal::detail;
 
 /// @brief 创建一条 RawRecord
-static RawRecord make_record(RawSource source, const std::string& path, const std::string& payload)
+static RawRecord make_record(RawSource source, const std::string &path, const std::string &payload)
 {
-    return RawRecord{source, path, payload, CollectStatus::Success,
-                     std::chrono::system_clock::now()};
+    return RawRecord{source, path, payload, CollectStatus::Success, std::chrono::system_clock::now()};
 }
 
 int main()
@@ -56,7 +55,7 @@ int main()
         auto result = parse_cpu(raw, warnings);
         CHECK(result.has_value());
 
-        const auto& cpu = *result;
+        const auto &cpu = *result;
 
         // 2 封装
         CHECK(cpu.packages.size() == 2);
@@ -80,7 +79,7 @@ int main()
         CHECK(cpu.arch == Arch::X86_64);
 
         // 逻辑 CPU 可见性
-        for(const auto& lc : cpu.logical_cpus)
+        for(const auto &lc : cpu.logical_cpus)
         {
             CHECK(lc.visible_to_current_process == true);
         }
@@ -102,7 +101,7 @@ int main()
         auto result = parse_cpu(raw, warnings);
         CHECK(result.has_value());
 
-        const auto& cpu = *result;
+        const auto &cpu = *result;
         // 所有 CPU 归入封装 0
         CHECK(cpu.packages.size() == 1);
         CHECK(cpu.packages[0].logical_threads == 2);
@@ -126,7 +125,7 @@ int main()
         auto result = parse_cpu(raw, warnings);
         CHECK(result.has_value());
 
-        const auto& cpu = *result;
+        const auto &cpu = *result;
         // core_id 默认为 processor 编号，所以 2 个不同的核
         CHECK(cpu.cores.size() == 2);
         CHECK(cpu.logical_cpus.size() == 2);
@@ -162,7 +161,7 @@ int main()
         auto result = parse_cpu(raw, warnings);
         CHECK(result.has_value());
 
-        const auto& cpu = *result;
+        const auto &cpu = *result;
         // NUMA 节点
         CHECK(cpu.numa_nodes.size() == 2);
         CHECK(cpu.numa_nodes[0].id == NumaNodeId{0});
@@ -189,16 +188,14 @@ int main()
                                           "physical id\t: 0\n"
                                           "core id\t\t: 0\n"
                                           "flags\t\t: sse4_2\n"));
-        raw.records.push_back(
-            make_record(RawSource::SysfsCpu, "cpu/cpu0/cpufreq/base_frequency", "2300000\n"));
-        raw.records.push_back(
-            make_record(RawSource::SysfsCpu, "cpu/cpu0/cpufreq/scaling_max_freq", "3300000\n"));
+        raw.records.push_back(make_record(RawSource::SysfsCpu, "cpu/cpu0/cpufreq/base_frequency", "2300000\n"));
+        raw.records.push_back(make_record(RawSource::SysfsCpu, "cpu/cpu0/cpufreq/scaling_max_freq", "3300000\n"));
 
         std::vector<std::string> warnings;
         auto result = parse_cpu(raw, warnings);
         CHECK(result.has_value());
 
-        const auto& cpu = *result;
+        const auto &cpu = *result;
         CHECK(cpu.packages[0].base_frequency.has_value());
         // 2300000 kHz → 2300000000 Hz
         CHECK(cpu.packages[0].base_frequency->value == 2300000ULL * 1000);
@@ -230,29 +227,21 @@ int main()
                                           "core id\t\t: 1\n"
                                           "flags\t\t: sse4_2\n"));
         // Package 0: CPU 0 and 1
-        raw.records.push_back(
-            make_record(RawSource::SysfsCpu, "cpu/cpu0/cpufreq/base_frequency", "2400000\n"));
-        raw.records.push_back(
-            make_record(RawSource::SysfsCpu, "cpu/cpu0/cpufreq/scaling_max_freq", "3500000\n"));
-        raw.records.push_back(
-            make_record(RawSource::SysfsCpu, "cpu/cpu1/cpufreq/base_frequency", "2400000\n"));
-        raw.records.push_back(
-            make_record(RawSource::SysfsCpu, "cpu/cpu1/cpufreq/scaling_max_freq", "3500000\n"));
+        raw.records.push_back(make_record(RawSource::SysfsCpu, "cpu/cpu0/cpufreq/base_frequency", "2400000\n"));
+        raw.records.push_back(make_record(RawSource::SysfsCpu, "cpu/cpu0/cpufreq/scaling_max_freq", "3500000\n"));
+        raw.records.push_back(make_record(RawSource::SysfsCpu, "cpu/cpu1/cpufreq/base_frequency", "2400000\n"));
+        raw.records.push_back(make_record(RawSource::SysfsCpu, "cpu/cpu1/cpufreq/scaling_max_freq", "3500000\n"));
         // Package 1: CPU 2 and 3 — different frequencies
-        raw.records.push_back(
-            make_record(RawSource::SysfsCpu, "cpu/cpu2/cpufreq/base_frequency", "1800000\n"));
-        raw.records.push_back(
-            make_record(RawSource::SysfsCpu, "cpu/cpu2/cpufreq/scaling_max_freq", "2900000\n"));
-        raw.records.push_back(
-            make_record(RawSource::SysfsCpu, "cpu/cpu3/cpufreq/base_frequency", "1800000\n"));
-        raw.records.push_back(
-            make_record(RawSource::SysfsCpu, "cpu/cpu3/cpufreq/scaling_max_freq", "2900000\n"));
+        raw.records.push_back(make_record(RawSource::SysfsCpu, "cpu/cpu2/cpufreq/base_frequency", "1800000\n"));
+        raw.records.push_back(make_record(RawSource::SysfsCpu, "cpu/cpu2/cpufreq/scaling_max_freq", "2900000\n"));
+        raw.records.push_back(make_record(RawSource::SysfsCpu, "cpu/cpu3/cpufreq/base_frequency", "1800000\n"));
+        raw.records.push_back(make_record(RawSource::SysfsCpu, "cpu/cpu3/cpufreq/scaling_max_freq", "2900000\n"));
 
         std::vector<std::string> warnings;
         auto result = parse_cpu(raw, warnings);
         CHECK(result.has_value());
 
-        const auto& cpu = *result;
+        const auto &cpu = *result;
         CHECK(cpu.packages.size() == 2);
 
         // Package 0: 2400000 kHz → 2400000000 Hz
@@ -284,19 +273,18 @@ int main()
     // ---- 测试 8: 全部 ISA 扩展解析 ----
     {
         RawStore raw;
-        raw.records.push_back(make_record(
-            RawSource::ProcCpuInfo, "/proc/cpuinfo",
-            "processor\t: 0\n"
-            "physical id\t: 0\n"
-            "core id\t\t: 0\n"
-            "flags\t\t: sse sse2 sse3 ssse3 sse4_1 sse4_2 aes fma f16c avx avx2 avx512f "
-            "avx512cd avx512bw avx512dq avx512vl pclmulqdq\n"));
+        raw.records.push_back(make_record(RawSource::ProcCpuInfo, "/proc/cpuinfo",
+                                          "processor\t: 0\n"
+                                          "physical id\t: 0\n"
+                                          "core id\t\t: 0\n"
+                                          "flags\t\t: sse sse2 sse3 ssse3 sse4_1 sse4_2 aes fma f16c avx avx2 avx512f "
+                                          "avx512cd avx512bw avx512dq avx512vl pclmulqdq\n"));
 
         std::vector<std::string> warnings;
         auto result = parse_cpu(raw, warnings);
         CHECK(result.has_value());
 
-        const auto& cpu = *result;
+        const auto &cpu = *result;
         CHECK(cpu.isa_extensions.size() == 17);
         CHECK(cpu.isa_extensions[0] == IsaExtension::Sse);
         CHECK(cpu.isa_extensions[1] == IsaExtension::Sse2);

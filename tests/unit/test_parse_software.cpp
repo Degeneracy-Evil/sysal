@@ -11,10 +11,9 @@
 using namespace sysal;
 using namespace sysal::detail;
 
-static RawRecord make_record(RawSource source, const std::string& path, const std::string& payload)
+static RawRecord make_record(RawSource source, const std::string &path, const std::string &payload)
 {
-    return RawRecord{source, path, payload, CollectStatus::Success,
-                     std::chrono::system_clock::now()};
+    return RawRecord{source, path, payload, CollectStatus::Success, std::chrono::system_clock::now()};
 }
 
 int main()
@@ -22,10 +21,9 @@ int main()
     // ---- 测试 1: 完整软件栈解析（NVIDIA 驱动 + CUDA） ----
     {
         RawStore raw;
-        raw.records.push_back(make_record(
-            RawSource::NvidiaSmi, "nvidia-smi",
-            "0, NVIDIA A100 80GB PCIe, 81920 MiB, 00000000:65:00.0, 535.129.03\n"
-            "1, NVIDIA A100 80GB PCIe, 81920 MiB, 00000000:ca:00.0, 535.129.03\n"));
+        raw.records.push_back(make_record(RawSource::NvidiaSmi, "nvidia-smi",
+                                          "0, NVIDIA A100 80GB PCIe, 81920 MiB, 00000000:65:00.0, 535.129.03\n"
+                                          "1, NVIDIA A100 80GB PCIe, 81920 MiB, 00000000:ca:00.0, 535.129.03\n"));
         raw.records.push_back(make_record(RawSource::Nvcc, "nvcc --version",
                                           "nvcc: NVIDIA (R) Cuda compiler driver\n"
                                           "Cuda compilation tools, release 12.4, V12.4.131\n"));
@@ -34,7 +32,7 @@ int main()
         auto result = parse_software(raw, warnings);
         CHECK(result.has_value());
 
-        const auto& s = *result;
+        const auto &s = *result;
 
         // 驱动
         CHECK(s.drivers.size() == 1);
@@ -66,9 +64,8 @@ int main()
     // ---- 测试 2: 仅 NVIDIA 驱动（无 CUDA） ----
     {
         RawStore raw;
-        raw.records.push_back(
-            make_record(RawSource::NvidiaSmi, "nvidia-smi",
-                        "0, NVIDIA GeForce RTX 3090, 24576 MiB, 00000000:01:00.0, 470.42\n"));
+        raw.records.push_back(make_record(RawSource::NvidiaSmi, "nvidia-smi",
+                                          "0, NVIDIA GeForce RTX 3090, 24576 MiB, 00000000:01:00.0, 470.42\n"));
 
         std::vector<std::string> warnings;
         auto result = parse_software(raw, warnings);
@@ -84,8 +81,8 @@ int main()
     // ---- 测试 3: 仅 CUDA（无 NVIDIA 驱动） ----
     {
         RawStore raw;
-        raw.records.push_back(make_record(RawSource::Nvcc, "nvcc --version",
-                                          "Cuda compilation tools, release 11.8, V11.8.89\n"));
+        raw.records.push_back(
+            make_record(RawSource::Nvcc, "nvcc --version", "Cuda compilation tools, release 11.8, V11.8.89\n"));
 
         std::vector<std::string> warnings;
         auto result = parse_software(raw, warnings);

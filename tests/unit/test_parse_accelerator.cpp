@@ -12,10 +12,9 @@ using namespace sysal;
 using namespace sysal::detail;
 
 /// @brief 创建一条 RawRecord
-static RawRecord make_record(RawSource source, const std::string& path, const std::string& payload)
+static RawRecord make_record(RawSource source, const std::string &path, const std::string &payload)
 {
-    return RawRecord{source, path, payload, CollectStatus::Success,
-                     std::chrono::system_clock::now()};
+    return RawRecord{source, path, payload, CollectStatus::Success, std::chrono::system_clock::now()};
 }
 
 int main()
@@ -23,17 +22,16 @@ int main()
     // ---- 测试 1: 2 块 NVIDIA H20 GPU ----
     {
         RawStore raw;
-        raw.records.push_back(
-            make_record(RawSource::NvidiaSmi, "nvidia-smi",
-                        "index, name, memory.total, pci.bus_id, driver_version\n"
-                        "0, NVIDIA H20 96GB, 97536 MiB, 00000000:41:00.0, 535.129.03\n"
-                        "1, NVIDIA H20 96GB, 97536 MiB, 00000000:42:00.0, 535.129.03\n"));
+        raw.records.push_back(make_record(RawSource::NvidiaSmi, "nvidia-smi",
+                                          "index, name, memory.total, pci.bus_id, driver_version\n"
+                                          "0, NVIDIA H20 96GB, 97536 MiB, 00000000:41:00.0, 535.129.03\n"
+                                          "1, NVIDIA H20 96GB, 97536 MiB, 00000000:42:00.0, 535.129.03\n"));
 
         std::vector<std::string> warnings;
         auto result = parse_accelerator(raw, warnings);
         CHECK(result.has_value());
 
-        const auto& acc = *result;
+        const auto &acc = *result;
         CHECK(acc.devices.size() == 2);
 
         // 设备 0
@@ -64,18 +62,16 @@ int main()
     // ---- 测试 2: NUMA 节点查找（D-4 修正） ----
     {
         RawStore raw;
-        raw.records.push_back(
-            make_record(RawSource::NvidiaSmi, "nvidia-smi",
-                        "index, name, memory.total, pci.bus_id, driver_version\n"
-                        "0, NVIDIA H20 96GB, 97536 MiB, 00000000:41:00.0, 535.129.03\n"));
-        raw.records.push_back(
-            make_record(RawSource::SysfsPci, "/sys/bus/pci/devices/0000:41:00.0/numa_node", "0\n"));
+        raw.records.push_back(make_record(RawSource::NvidiaSmi, "nvidia-smi",
+                                          "index, name, memory.total, pci.bus_id, driver_version\n"
+                                          "0, NVIDIA H20 96GB, 97536 MiB, 00000000:41:00.0, 535.129.03\n"));
+        raw.records.push_back(make_record(RawSource::SysfsPci, "/sys/bus/pci/devices/0000:41:00.0/numa_node", "0\n"));
 
         std::vector<std::string> warnings;
         auto result = parse_accelerator(raw, warnings);
         CHECK(result.has_value());
 
-        const auto& acc = *result;
+        const auto &acc = *result;
         CHECK(acc.devices.size() == 1);
         CHECK(acc.devices[0].nearest_numa_node.has_value());
         CHECK(*acc.devices[0].nearest_numa_node == NumaNodeId{0});
@@ -92,16 +88,15 @@ int main()
     // ---- 测试 4: GiB 单位解析 ----
     {
         RawStore raw;
-        raw.records.push_back(
-            make_record(RawSource::NvidiaSmi, "nvidia-smi",
-                        "index, name, memory.total, pci.bus_id, driver_version\n"
-                        "0, NVIDIA A100 80GB, 80 GiB, 00000000:3b:00.0, 535.129.03\n"));
+        raw.records.push_back(make_record(RawSource::NvidiaSmi, "nvidia-smi",
+                                          "index, name, memory.total, pci.bus_id, driver_version\n"
+                                          "0, NVIDIA A100 80GB, 80 GiB, 00000000:3b:00.0, 535.129.03\n"));
 
         std::vector<std::string> warnings;
         auto result = parse_accelerator(raw, warnings);
         CHECK(result.has_value());
 
-        const auto& acc = *result;
+        const auto &acc = *result;
         CHECK(acc.devices.size() == 1);
         CHECK(acc.devices[0].memory_size.has_value());
         CHECK(acc.devices[0].memory_size->value == 80ULL * 1024ULL * 1024ULL * 1024ULL);

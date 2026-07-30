@@ -11,78 +11,80 @@
 namespace sysal
 {
 
-/// @brief PCI 设备地址
-struct PciAddress
-{
-    std::uint16_t domain{};  ///< PCI 域号
-    std::uint8_t bus{};      ///< 总线号
-    std::uint8_t device{};   ///< 设备号
-    std::uint8_t function{}; ///< 功能号
-
-    /// @brief 相等比较
-    /// @param other 另一个 PCI 地址
-    /// @return 四字段全部相等时返回 true
-    bool operator==(const PciAddress& other) const
+    /// @brief PCI 设备地址
+    struct PciAddress
     {
-        return domain == other.domain && bus == other.bus && device == other.device &&
-               function == other.function;
-    }
-};
+        std::uint16_t domain{};  ///< PCI 域号
+        std::uint8_t bus{};      ///< 总线号
+        std::uint8_t device{};   ///< 设备号
+        std::uint8_t function{}; ///< 功能号
 
-/// @brief 带幻影标签的字符串类型模板
-/// @details 不同 Tag 实例化为不同类型，用于在类型层面区分语义不同的字符串。
-/// @tparam Tag 幻影标签类型
-template <typename Tag> struct NamedString
-{
-    std::string value; ///< 原始字符串值
+        /// @brief 相等比较
+        /// @param other 另一个 PCI 地址
+        /// @return 四字段全部相等时返回 true
+        bool operator==(const PciAddress &other) const
+        {
+            return domain == other.domain && bus == other.bus && device == other.device && function == other.function;
+        }
+    };
 
-    /// @brief 相等比较
-    /// @param other 另一个同类型字符串
-    /// @return 字符串值相等时返回 true
-    bool operator==(const NamedString& other) const { return value == other.value; }
-};
+    /// @brief 带幻影标签的字符串类型模板
+    /// @details 不同 Tag 实例化为不同类型，用于在类型层面区分语义不同的字符串。
+    /// @tparam Tag 幻影标签类型
+    template <typename Tag> struct NamedString
+    {
+        std::string value; ///< 原始字符串值
 
-/// @brief 厂商标签
-struct VendorTag
-{
-};
-/// @brief 设备名标签
-struct DeviceNameTag
-{
-};
-/// @brief 网络接口名标签
-struct InterfaceNameTag
-{
-};
-/// @brief MAC 地址标签
-struct MacAddressTag
-{
-};
-/// @brief IP 地址标签
-struct IpAddressTag
-{
-};
+        /// @brief 相等比较
+        /// @param other 另一个同类型字符串
+        /// @return 字符串值相等时返回 true
+        bool operator==(const NamedString &other) const
+        {
+            return value == other.value;
+        }
+    };
 
-/// @brief PCI 设备类别标签
-struct PciClassTag
-{
-};
-/// @brief 挂载点标签
-struct MountPointTag
-{
-};
-/// @brief 文件系统类型标签
-struct FilesystemTypeTag
-{
-};
+    /// @brief 厂商标签
+    struct VendorTag
+    {
+    };
+    /// @brief 设备名标签
+    struct DeviceNameTag
+    {
+    };
+    /// @brief 网络接口名标签
+    struct InterfaceNameTag
+    {
+    };
+    /// @brief MAC 地址标签
+    struct MacAddressTag
+    {
+    };
+    /// @brief IP 地址标签
+    struct IpAddressTag
+    {
+    };
 
-using Vendor = NamedString<VendorTag>;                 ///< 厂商名称
-using DeviceName = NamedString<DeviceNameTag>;         ///< 设备名称
-using InterfaceName = NamedString<InterfaceNameTag>;   ///< 网络接口名称
-using MacAddress = NamedString<MacAddressTag>;         ///< MAC 地址
-using IpAddress = NamedString<IpAddressTag>;           ///< IP 地址
-using PciClass = NamedString<PciClassTag>;             ///< PCI 设备类别
-using MountPoint = NamedString<MountPointTag>;         ///< 挂载点路径
-using FilesystemType = NamedString<FilesystemTypeTag>; ///< 文件系统类型
+    /// @brief PCI 设备类别标签
+    struct PciClassTag
+    {
+    };
+    /// @brief 挂载点标签
+    struct MountPointTag
+    {
+    };
+    /// @brief 文件系统类型标签
+    struct FilesystemTypeTag
+    {
+    };
+
+    using Vendor = NamedString<VendorTag>;                 ///< 厂商名称
+    using DeviceName = NamedString<DeviceNameTag>;         ///< 设备名称
+    using InterfaceName = NamedString<InterfaceNameTag>;   ///< 网络接口名称
+    using MacAddress = NamedString<MacAddressTag>;         ///< MAC 地址
+    using IpAddress = NamedString<IpAddressTag>;           ///< IP 地址
+    using PciClass = NamedString<PciClassTag>;             ///< PCI 设备类别
+    using MountPoint = NamedString<MountPointTag>;         ///< 挂载点路径
+    using FilesystemType = NamedString<FilesystemTypeTag>; ///< 文件系统类型
 
 } // namespace sysal
