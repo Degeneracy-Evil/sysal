@@ -1,5 +1,23 @@
 # 开发记录
 
+### 2026-07-31 v0.0.5 代码质量评审（脚手架迁移后）
+
+- **变更类型**: docs
+- **涉及文件**: docs/quality_reports/v005_post_scaffold_review.md, docs/devlog.md
+- **变更内容**: 9 维度评审报告，5 Oracle agent，加权总分 8/10（与上次持平）。3 项 P1：container env var 误分类、storage.md 过期、raw_store.md 缺 SysHypervisor。8 项 P2
+- **原因**: 脚手架迁移 + clang-format reformat 后全面质量核对
+- **验证**: 评审报告完成
+
+### 2026-07-31 更新计划文档 + 删除 set_version
+
+- **变更类型**: docs / build
+- **涉及文件**: .sisyphus/plans/v002_r5_plan.md, .sisyphus/plans/v002_dev_plan.md, .sisyphus/plans/version_release.md, xmake.lua, docs/devlog.md
+- **变更内容**:
+  1. 三个计划文件标记为"全部已完成"，核实 R5a-R5d 在 v0.0.3~v0.0.5 期间已逐步完成
+  2. xmake.lua 删除 `set_version()`，版本号只维护 `include/sysal/version.hpp`
+- **原因**: 计划文件停留在 v0.0.2 时期，与实际代码状态不符；`set_version()` 与 version.hpp 重复维护
+- **验证**: `xmake -r` 构建成功
+
 ### 2026-07-30 迁移 base_project 脚手架
 
 - **变更类型**: refactor / build / chore
