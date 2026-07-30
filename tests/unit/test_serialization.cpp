@@ -356,7 +356,7 @@ void test_compatible_version()
     },
     "meta": {
         "collect_time": 0,
-        "sysal_version": "0.0.4",
+        "sysal_version": "0.0.5",
         "collect_duration": 0.0,
         "requested_flags": 0,
         "succeeded_collectors": [],

@@ -1,5 +1,15 @@
 # 开发记录
 
+### 2026-07-30 v0.0.5 收口：版本号更新 + 静态库 fPIC
+
+- **变更类型**: build / chore
+- **涉及文件**: include/sysal/version.hpp, xmake.lua, docs/devlog.md
+- **变更内容**:
+  1. 版本号 0.0.4 → 0.0.5（version.hpp + xmake.lua set_version）
+  2. 静态库 sysal_static 添加 `-fPIC`，使 libsysal.a 可被链接进下游 .so
+- **原因**: v0.0.5 功能开发完成，收口发布。主要交付：CentOS 7 兼容性构建（Docker + glibc 2.17）、硬件虚拟化检测全覆盖、Doxygen 配置、两轮质量评审修复
+- **验证**: `xmake -r` 构建成功
+
 ### 2026-07-10 引入 Doxygen 文档生成
 
 - **变更类型**: docs / chore

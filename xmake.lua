@@ -7,7 +7,7 @@
 
 set_languages("c++20")
 set_rundir(".")
-set_version("0.0.3")
+set_version("0.0.5")
 
 add_cxxflags("-Wall", "-Wextra", "-Werror", "-O2", {force = true})
 add_includedirs("include")
