@@ -12,21 +12,33 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install toolchain
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            build-essential \
-            clang clang-format clang-tidy lld \
-            libc++-dev libc++abi-dev
+      - name: Cache apt packages
+        uses: awalsh128/cache-apt-pkgs-action@latest
+        with:
+          packages: build-essential clang clang-format clang-tidy lld libc++-dev libc++abi-dev
+          version: 1.0
 
       - name: Install xmake
         uses: xmake-io/github-action-setup-xmake@v1
         with:
           xmake-version: latest
 
+      - name: Cache xmake packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.xmake
+          key: xmake-packages-${{ runner.os }}-${{ hashFiles('xmake.lua') }}
+          restore-keys: xmake-packages-${{ runner.os }}-
+
       - name: Configure
         run: xmake f -c -y --toolchain=clang
+
+      - name: Cache build
+        uses: actions/cache@v4
+        with:
+          path: .xmake
+          key: xmake-build-${{ runner.os }}-${{ hashFiles('xmake.lua', 'src/**', 'include/**') }}
+          restore-keys: xmake-build-${{ runner.os }}-
 
       - name: Run quality checks
         run: xmake check
