@@ -1,5 +1,16 @@
 # 开发记录
 
+### 2026-07-31 修复评审 P1 问题
+
+- **变更类型**: fix / docs
+- **涉及文件**: src/parser/execution.cpp, docs/design/data_model/storage.md, docs/design/data_model/raw_store.md, docs/devlog.md
+- **变更内容**:
+  1. execution.cpp: `container` 环境变量非 docker 值不再一律归为 Podman；新增 `podman` → Podman、`lxc` → Lxc 显式匹配，未知值 → Other（附带原始值）
+  2. storage.md: mount_point/fs_type 类型声明从 `std::optional<std::string>` 更新为 `std::optional<MountPoint>`/`std::optional<FilesystemType>`（与代码一致）
+  3. raw_store.md: 新增 SysHypervisor 枚举项，条目顺序与代码 enums.hpp 对齐
+- **原因**: v0.0.5 代码质量评审 3 项 P1 问题
+- **验证**: `xmake -r` 构建成功；18/18 测试通过
+
 ### 2026-07-31 v0.0.5 代码质量评审（脚手架迁移后）
 
 - **变更类型**: docs

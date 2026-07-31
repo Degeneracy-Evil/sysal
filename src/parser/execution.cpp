@@ -352,12 +352,19 @@ namespace sysal::detail
             {
                 if(key == "container")
                 {
-                    // "container=docker" 或 "container=podman" 等
                     if(value == "docker")
                     {
                         return Container{ContainerKind::Docker, "", ""};
                     }
-                    return Container{ContainerKind::Podman, "", ""};
+                    if(value == "podman")
+                    {
+                        return Container{ContainerKind::Podman, "", ""};
+                    }
+                    if(value == "lxc")
+                    {
+                        return Container{ContainerKind::Lxc, "", ""};
+                    }
+                    return Container{ContainerKind::Other, value, ""};
                 }
                 if(key == "KUBERNETES_SERVICE_HOST")
                 {

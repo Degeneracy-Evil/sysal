@@ -5,21 +5,21 @@
 ```cpp
 enum class RawSource
 {
-    // Linux procfs（v0.0.1）
+    // Linux procfs
     ProcCpuInfo,
     ProcMemInfo,
     ProcVersion,
     ProcSelfCgroup,
     ProcSelfStatus,
     ProcOneCgroup,
-    // Linux sysfs（v0.0.1）
+    // Linux sysfs
     SysfsCpu,
     SysfsNuma,
     SysfsNet,
     SysfsPci,
     SysfsBlock,
     SysfsDmi,
-    // Linux 文件 / 命令（v0.0.1）
+    // Linux 文件 / 命令
     EtcOsRelease,
     RootDockerenv,
     Uname,
@@ -27,19 +27,19 @@ enum class RawSource
     NvidiaSmi,
     Nvcc,
     Lsblk,
-    IfAddrs,        ///< getifaddrs() 网络接口地址
-    DfTh,           ///< df -Th 文件系统挂载信息
-    Udevadm,        ///< udevadm info -e 硬件数据库
-    // 环境变量（v0.0.1）
+    // 环境变量
     Environment,
     // 外部库后端（未来支持）
     Nvml,
     Ibverbs,
     HwinfoOutput,
-    // Linux sysfs（v0.0.4）
-    SysfsEdac,      ///< /sys/devices/system/edac 内存 DIMM 信息
-    // Windows / macOS — 未来支持
+    // 新增来源（追加在末尾以保持枚举值稳定性）
     ProcHostname,   ///< /proc/sys/kernel/hostname
+    IfAddrs,        ///< getifaddrs() 网络接口地址
+    DfTh,           ///< df -Th 文件系统挂载信息
+    Udevadm,        ///< udevadm info -e 硬件数据库
+    SysfsEdac,      ///< /sys/devices/system/edac 内存 DIMM 信息
+    SysHypervisor,  ///< /sys/hypervisor/type
 };
 
 enum class CollectStatus
