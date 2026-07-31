@@ -33,13 +33,6 @@ jobs:
       - name: Configure
         run: xmake f -c -y --toolchain=clang
 
-      - name: Cache build
-        uses: actions/cache@v4
-        with:
-          path: .xmake
-          key: xmake-build-${{ runner.os }}-${{ hashFiles('xmake.lua', 'src/**', 'include/**') }}
-          restore-keys: xmake-build-${{ runner.os }}-
-
       - name: Run quality checks
         run: xmake check
 
