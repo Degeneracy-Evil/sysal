@@ -349,7 +349,7 @@ namespace
     },
     "meta": {
         "collect_time": 0,
-        "sysal_version": "0.0.5",
+        "sysal_version": "0.0.6",
         "collect_duration": 0.0,
         "requested_flags": 0,
         "succeeded_collectors": [],

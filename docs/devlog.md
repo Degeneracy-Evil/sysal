@@ -1,5 +1,13 @@
 # 开发记录
 
+### 2026-07-31 v0.0.6 收口
+
+- **变更类型**: build / chore
+- **涉及文件**: include/sysal/version.hpp, tests/unit/test_serialization.cpp, docs/devlog.md
+- **变更内容**: 版本号 0.0.5 → 0.0.6
+- **原因**: v0.0.6 发布收口。主要交付：脚手架迁移（check.sh → xmake check/test，autoupdate compile_commands，自包含 pre-commit）、clang-format 全量 reformat（ColumnLimit 120, PointerAlignment Right）、clang-tidy 新增 4 项 modernize 检查、删除 set_version、3 项 P1 修复
+- **验证**: `xmake -r` 构建成功；18/18 测试通过
+
 ### 2026-07-31 修复评审 P1 问题
 
 - **变更类型**: fix / docs
