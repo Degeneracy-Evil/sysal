@@ -10,7 +10,7 @@ inline int g_test_fail = 0;
 #define CHECK(expr)                                                                                                    \
     do                                                                                                                 \
     {                                                                                                                  \
-        if(!(expr))                                                                                                    \
+        if(!static_cast<bool>(expr))                                                                                   \
         {                                                                                                              \
             std::fprintf(stderr, "FAIL line %d: %s\n", __LINE__, #expr);                                               \
             ++g_test_fail;                                                                                             \
