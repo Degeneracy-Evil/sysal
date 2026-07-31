@@ -22,13 +22,9 @@ jobs:
         uses: xmake-io/github-action-setup-xmake@v1
         with:
           xmake-version: latest
-
-      - name: Cache xmake packages
-        uses: actions/cache@v4
-        with:
-          path: ~/.xmake
-          key: xmake-packages-${{ runner.os }}-${{ hashFiles('xmake.lua') }}
-          restore-keys: xmake-packages-${{ runner.os }}-
+          actions-cache-folder: .xmake-install
+          package-cache: true
+          build-cache: true
 
       - name: Configure
         run: xmake f -c -y --toolchain=clang
