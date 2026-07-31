@@ -24,7 +24,6 @@ jobs:
           xmake-version: latest
           actions-cache-folder: .xmake-install
           package-cache: true
-          build-cache: true
 
       - name: Configure
         run: xmake f -c -y --toolchain=clang
