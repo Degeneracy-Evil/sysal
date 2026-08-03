@@ -19,8 +19,12 @@ docker build \
     "$SCRIPT_DIR"
 
 echo "=== Running build in container ==="
+DOCKER_NET="--network host"
+if [ "${CI:-}" = "true" ]; then
+    DOCKER_NET=""   # GitHub Actions 禁用 host 网络；容器直接走 bridge（默认）公网
+fi
 docker run --rm \
-    --network host \
+    $DOCKER_NET \
     -e http_proxy="${http_proxy:-}" \
     -e https_proxy="${https_proxy:-}" \
     -v "$PROJECT_ROOT:/workspace" \

@@ -1,0 +1,65 @@
+name: release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-24.04
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Pull centos7 build image
+        run: docker pull ghcr.io/degeneracy-evil/sysal/sysal-centos7-build:latest
+
+      - name: Build glibc-2.17 artifacts in container
+        run: |
+          set -euo pipefail
+          docker run --rm \
+            -v "$PWD:/workspace" \
+            -w /workspace \
+            ghcr.io/degeneracy-evil/sysal/sysal-centos7-build:latest \
+            bash -lc 'unset http_proxy https_proxy ALL_PROXY; set -euo pipefail; \
+              xmake f -c -y --toolchain=gcc && \
+              xmake -r && \
+              xmake run sysal_info'
+
+      - name: Stage and package release assets
+        run: |
+          set -euo pipefail
+          VER=${GITHUB_REF_NAME#v}
+          PKG=sysal-${VER}-linux-x86_64
+          mkdir -p dist/${PKG}/include/sysal dist/${PKG}/lib
+          cp build/linux/x86_64/release/libsysal.so  dist/${PKG}/lib/
+          cp build/linux/x86_64/release/static/libsysal.a dist/${PKG}/lib/
+          cp -r include/sysal/. dist/${PKG}/include/sysal/
+          cat > dist/${PKG}/sysal.pc <<EOF
+          prefix=/usr/local
+          includedir=\${prefix}/include
+          libdir=\${prefix}/lib
+          Name: sysal
+          Description: System information abstraction library
+          Version: ${VER}
+          Libs: -L\${libdir} -lsysal
+          Cflags: -I\${includedir}
+          EOF
+          tar -czf ${PKG}.tar.gz -C dist ${PKG}
+          ls -la *.tar.gz
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: sysal-*-linux-x86_64.tar.gz
