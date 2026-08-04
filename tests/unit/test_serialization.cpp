@@ -349,7 +349,7 @@ namespace
     },
     "meta": {
         "collect_time": 0,
-        "sysal_version": "0.0.6",
+        "sysal_version": "0.0.7",
         "collect_duration": 0.0,
         "requested_flags": 0,
         "succeeded_collectors": [],
@@ -360,7 +360,8 @@ namespace
 
         System sys = from_json(good_json);
         CHECK(sys.info.platform.host.hostname == "h");
-        CHECK(sys.meta.sysal_version == sysal::VERSION_STRING);
+        // 该 fixture 用于测试 0.0.x 兼容性解析，版本号固定，不与当前版本绑定
+        CHECK(sys.meta.sysal_version == "0.0.7");
     }
 
 } // namespace

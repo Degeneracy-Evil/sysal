@@ -1,5 +1,13 @@
 # 开发记录
 
+### 2026-08-03 v0.0.7 收口
+
+- **变更类型**: build / chore
+- **涉及文件**: include/sysal/version.hpp, tests/unit/test_serialization.cpp, docs/devlog.md
+- **变更内容**: 版本号 0.0.6 → 0.0.7
+- **原因**: v0.0.7 发布收口。主要交付：CI 提速（cache 优化）、CHECK 宏 clang-tidy 误报修复、GHCR 镜像构建 + 自动化 Release（glibc 2.17 产物）
+- **验证**: `xmake -r` 构建成功
+
 ### 2026-07-31 v0.0.6 收口
 
 - **变更类型**: build / chore
