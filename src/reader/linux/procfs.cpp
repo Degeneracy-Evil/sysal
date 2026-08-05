@@ -271,6 +271,11 @@ namespace sysal::reader
                 read_cmd(raw, RawSource::CompilerPath, "command -v " + std::string(cc));
                 read_cmd(raw, RawSource::CompilerTarget, std::string(cc) + " -dumpmachine");
             }
+
+            // MPI 探测：OpenMPI/MPICH/MVAPICH2 均提供 mpirun 命令
+            // 缺失的命令 read_cmd 静默记 Failed，不产生 warning
+            read_cmd(raw, RawSource::MpiVersion, "mpirun --version");
+            read_cmd(raw, RawSource::MpiPath, "command -v mpirun");
         }
 
         // ---- Execution 域 ----

@@ -1,5 +1,17 @@
 # 开发记录
 
+### 2026-08-05 软件栈：MPI 填充
+
+- **变更类型**: src / tests
+- **涉及文件**: include/sysal/types/enums.hpp, src/reader/linux/procfs.cpp, src/parser/software.cpp, examples/sysal_info.cpp, tests/unit/test_parse_software.cpp, docs/devlog.md
+- **变更内容**:
+  1. enums.hpp 追加 `MpiVersion`（mpirun --version）、`MpiPath`（command -v）两枚 RawSource，追加在末尾保持枚举值稳定
+  2. procfs.cpp Software 域：探测 `mpirun --version` 与 `command -v mpirun`；缺失时静默记 Failed
+  3. software.cpp：新增 `extract_mpi_info`（从首行括号提取实现名、末 token 提取版本，兼容 OpenMPI/MPICH/MVAPICH2）；已就绪时填充 `stack.mpi`
+  4. 空栈 nullopt 判定与无数据告警条件补充 MPI 维度
+- **原因**: 软件栈逐个子域的第二个（MPI）
+- **验证**: `xmake` 构建通过；18/18 测试套件通过（software 78）；`sysal_info` 实测 Open MPI 4.1.9a1；clang-tidy `--warnings-as-errors` 无告警
+
 ### 2026-08-05 软件栈：编译器填充
 
 - **变更类型**: src / tests

@@ -317,6 +317,10 @@ namespace
             return "CompilerPath";
         case sysal::RawSource::CompilerTarget:
             return "CompilerTarget";
+        case sysal::RawSource::MpiVersion:
+            return "MpiVersion";
+        case sysal::RawSource::MpiPath:
+            return "MpiPath";
         }
         return "?";
     }

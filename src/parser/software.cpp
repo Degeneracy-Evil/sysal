@@ -135,6 +135,48 @@ namespace sysal::detail
             return std::nullopt;
         }
 
+        /// @brief 从 MPI --version 首行提取实现名与版本
+        /// @param payload mpirun --version 命令输出
+        /// @return (实现名, 版本) 二元组；若无法提取返回 nullopt
+        /// @details 兼容格式：
+        ///          OpenMPI:  "mpirun (Open MPI) 4.1.9a1"
+        ///          MPICH:    "mpiexec (MPICH) 4.3.0"
+        ///          MVAPICH2: "mpirun (MVAPICH2) 2.3.8"
+        ///          实现名取括号内内容，版本取首行最后一个 token。
+        std::optional<std::pair<std::string, std::string>> extract_mpi_info(std::string_view payload)
+        {
+            auto lines = split(payload, '\n');
+            if(lines.empty())
+            {
+                return std::nullopt;
+            }
+            auto first_line = trim(lines.front());
+            if(first_line.empty())
+            {
+                return std::nullopt;
+            }
+
+            // 实现名：括号内内容
+            auto open_paren = first_line.find('(');
+            auto close_paren = first_line.find(')');
+            std::string implementation;
+            if(open_paren != std::string_view::npos && close_paren != std::string_view::npos &&
+               close_paren > open_paren)
+            {
+                implementation = trim(first_line.substr(open_paren + 1, close_paren - open_paren - 1));
+            }
+
+            // 版本：首行最后一个 token（first_line 已 trim，末空格之后即版本）
+            auto last_space = first_line.rfind(' ');
+            auto version = (last_space == std::string_view::npos) ? first_line : first_line.substr(last_space + 1);
+
+            if(implementation.empty() || version.empty())
+            {
+                return std::nullopt;
+            }
+            return std::make_pair(std::move(implementation), std::string(version));
+        }
+
         /// @brief 从 RawStore 中取某来源的首条 Success 记录
         /// @param raw 原始证据存储
         /// @param source 原始数据来源
@@ -205,6 +247,8 @@ namespace sysal::detail
         static const char *const compiler_names[] = {"gcc", "g++", "clang", "clang++", "gfortran"};
         auto compiler_version_records = raw.get_all(RawSource::CompilerVersion);
         const bool has_compiler_data = !compiler_version_records.empty();
+        auto mpi_recs = raw.get_all(RawSource::MpiVersion);
+        const bool has_mpi_data = !mpi_recs.empty();
         for(const char *cc : compiler_names)
         {
             auto ver_rec = first_success(raw, RawSource::CompilerVersion, cc);
@@ -230,6 +274,23 @@ namespace sysal::detail
                 compiler.target = trim(target_rec->payload);
             }
             stack.compilers.push_back(std::move(compiler));
+        }
+
+        // MPI：探测 mpirun，识别实现名与版本，缺失时静默保持 nullopt
+        auto mpi_ver_rec = first_success(raw, RawSource::MpiVersion, "mpirun");
+        if(mpi_ver_rec != nullptr)
+        {
+            if(auto mpi_info = extract_mpi_info(mpi_ver_rec->payload))
+            {
+                Mpi mpi;
+                mpi.implementation = std::move(mpi_info->first);
+                mpi.version = std::move(mpi_info->second);
+                if(auto mpi_path_rec = first_success(raw, RawSource::MpiPath, "mpirun"))
+                {
+                    mpi.path = trim(mpi_path_rec->payload);
+                }
+                stack.mpi = std::move(mpi);
+            }
         }
         if(driver_version.has_value())
         {
@@ -264,22 +325,21 @@ namespace sysal::detail
             stack.cuda = std::move(cuda);
         }
 
-        // 无任何可解析的软件（无 nvidia-smi、无 nvcc、无编译器）
-        if(stack.drivers.empty() && stack.runtimes.empty() && stack.compilers.empty())
+        // 无任何可解析的软件（无 nvidia-smi、无 nvcc、无编译器、无 MPI）
+        if(stack.drivers.empty() && stack.runtimes.empty() && stack.compilers.empty() && !stack.mpi.has_value())
         {
             // 仅当完全不采集到任何软件数据时才告警；数据存在但解析失败属静默场景不告警
-            if(nvidia_records.empty() && nvcc_records.empty() && !has_compiler_data)
+            if(nvidia_records.empty() && nvcc_records.empty() && !has_compiler_data && !has_mpi_data)
             {
-                warnings.push_back("parse_software: 无 nvidia-smi/nvcc/编译器数据");
+                warnings.push_back("parse_software: 无 nvidia-smi/nvcc/编译器/MPI 数据");
             }
             return std::nullopt;
         }
 
-        // v0.0.1：库、ROCm、Level Zero、MPI、RDMA 均不实现
+        // v0.0.1：库、ROCm、Level Zero、RDMA 均不实现
         // stack.libraries 保持空
         // stack.rocm 保持 nullopt
         // stack.level_zero 保持 nullopt
-        // stack.mpi 保持 nullopt
         // stack.rdma 保持 nullopt
 
         return stack;

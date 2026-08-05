@@ -113,6 +113,8 @@ namespace sysal
         CompilerVersion, ///< 编译器 --version 命令输出
         CompilerPath,    ///< 编译器通用命令查找路径（command -v）
         CompilerTarget,  ///< 编译器 -dumpmachine 目标架构输出
+        MpiVersion,      ///< MPI 实现 --version 命令输出
+        MpiPath,         ///< MPI 可执行文件路径（command -v）
     };
 
     /// @brief 单个原始记录的采集状态

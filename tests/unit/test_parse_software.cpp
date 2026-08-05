@@ -185,6 +185,65 @@ int main()
         CHECK(warnings.empty());
     }
 
+    // ---- 测试 11: OpenMPI 探测 ----
+    {
+        RawStore raw;
+        raw.records.push_back(make_record(RawSource::MpiVersion, "mpirun --version",
+                                          "mpirun (Open MPI) 4.1.9a1\n"
+                                          "Report bugs to http://www.open-mpi.org/community/help/\n"));
+        raw.records.push_back(make_record(RawSource::MpiPath, "command -v mpirun", "/usr/bin/mpirun\n"));
+
+        std::vector<std::string> warnings;
+        auto result = parse_software(raw, warnings);
+        CHECK(result.has_value());
+        CHECK(warnings.empty());
+
+        CHECK(result->mpi.has_value());
+        CHECK(result->mpi->implementation == "Open MPI");
+        CHECK(result->mpi->version == "4.1.9a1");
+        CHECK(result->mpi->path == "/usr/bin/mpirun");
+    }
+
+    // ---- 测试 12: MPICH/MVAPICH2 实现识别 ----
+    {
+        RawStore raw;
+        raw.records.push_back(make_record(RawSource::MpiVersion, "mpirun --version", "mpiexec (MPICH) 4.3.0\n"));
+        raw.records.push_back(make_record(RawSource::MpiVersion, "mpirun --version", "mpirun (MVAPICH2) 2.3.8\n"));
+
+        std::vector<std::string> warnings;
+        auto result = parse_software(raw, warnings);
+        CHECK(result.has_value());
+        CHECK(result->mpi.has_value());
+        // first_success 返回首条 MPICH 记录
+        CHECK(result->mpi->implementation == "MPICH");
+        CHECK(result->mpi->version == "4.3.0");
+    }
+
+    // ---- 测试 13: MPI 格式异常 → 静默 nullopt，不告警 ----
+    {
+        RawStore raw;
+        raw.records.push_back(make_record(RawSource::MpiVersion, "mpirun --version", "garbled output\n"));
+
+        std::vector<std::string> warnings;
+        auto result = parse_software(raw, warnings);
+        CHECK(!result.has_value());
+        CHECK(warnings.empty());
+    }
+
+    // ---- 测试 14: 仅 MPI，无其他软件 → 返回 MPI 栈 ----
+    {
+        RawStore raw;
+        raw.records.push_back(make_record(RawSource::MpiVersion, "mpirun --version", "mpirun (Open MPI) 5.0.0\n"));
+
+        std::vector<std::string> warnings;
+        auto result = parse_software(raw, warnings);
+        CHECK(result.has_value());
+        CHECK(result->mpi.has_value());
+        CHECK(result->mpi->implementation == "Open MPI");
+        CHECK(result->mpi->version == "5.0.0");
+        CHECK(warnings.empty());
+    }
+
     // ---- 测试 5: nvidia-smi 格式异常 → 警告 ----
     {
         RawStore raw;
