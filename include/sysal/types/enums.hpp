@@ -104,12 +104,15 @@ namespace sysal
         HwinfoOutput, ///< hwinfo 命令输出
 
         // 新增来源（追加在末尾以保持枚举值稳定性）
-        ProcHostname, ///< /proc/sys/kernel/hostname
-        IfAddrs,      ///< getifaddrs() 网络接口地址
-        DfTh,         ///< df -Th 文件系统挂载信息
-        Udevadm,      ///< udevadm info -e 硬件数据库
-        SysfsEdac,    ///< /sys/devices/system/edac 内存 DIMM 信息
-        SysHypervisor ///< /sys/hypervisor/type
+        ProcHostname,    ///< /proc/sys/kernel/hostname
+        IfAddrs,         ///< getifaddrs() 网络接口地址
+        DfTh,            ///< df -Th 文件系统挂载信息
+        Udevadm,         ///< udevadm info -e 硬件数据库
+        SysfsEdac,       ///< /sys/devices/system/edac 内存 DIMM 信息
+        SysHypervisor,   ///< /sys/hypervisor/type
+        CompilerVersion, ///< 编译器 --version 命令输出
+        CompilerPath,    ///< 编译器通用命令查找路径（command -v）
+        CompilerTarget,  ///< 编译器 -dumpmachine 目标架构输出
     };
 
     /// @brief 单个原始记录的采集状态

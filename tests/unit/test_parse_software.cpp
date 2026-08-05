@@ -103,6 +103,88 @@ int main()
         CHECK(!result.has_value());
     }
 
+    // ---- 测试 6: 单编译器探测（gcc）----
+    {
+        RawStore raw;
+        raw.records.push_back(make_record(RawSource::CompilerVersion, "gcc --version",
+                                          "gcc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0\n"
+                                          "Copyright (C) 2023 Free Software Foundation, Inc.\n"));
+        raw.records.push_back(make_record(RawSource::CompilerPath, "command -v gcc", "/usr/bin/gcc\n"));
+        raw.records.push_back(make_record(RawSource::CompilerTarget, "gcc -dumpmachine", "x86_64-linux-gnu\n"));
+
+        // 缺失的 clang 等不产生记录 → 静默跳过
+        std::vector<std::string> warnings;
+        auto result = parse_software(raw, warnings);
+        CHECK(result.has_value());
+        CHECK(warnings.empty());
+        CHECK(result->drivers.empty());
+        CHECK(result->runtimes.empty());
+
+        CHECK(result->compilers.size() == 1);
+        CHECK(result->compilers[0].name == "gcc");
+        CHECK(result->compilers[0].version == "13.3.0");
+        CHECK(result->compilers[0].path == "/usr/bin/gcc");
+        CHECK(result->compilers[0].target == "x86_64-linux-gnu");
+    }
+
+    // ---- 测试 7: 多编译器混合格式（clang 格式不同）----
+    {
+        RawStore raw;
+        raw.records.push_back(
+            make_record(RawSource::CompilerVersion, "gcc --version", "gcc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0\n"));
+        raw.records.push_back(make_record(RawSource::CompilerVersion, "clang --version",
+                                          "Ubuntu clang version 18.1.3 (1ubuntu1)\nTarget: x86_64-pc-linux-gnu\n"));
+
+        std::vector<std::string> warnings;
+        auto result = parse_software(raw, warnings);
+        CHECK(result.has_value());
+
+        CHECK(result->compilers.size() == 2);
+        CHECK(result->compilers[0].name == "gcc");
+        CHECK(result->compilers[0].version == "13.3.0");
+        CHECK(result->compilers[1].name == "clang");
+        CHECK(result->compilers[1].version == "18.1.3");
+    }
+
+    // ---- 测试 8: gfortran 版本提取 ----
+    {
+        RawStore raw;
+        raw.records.push_back(make_record(RawSource::CompilerVersion, "gfortran --version",
+                                          "GNU Fortran (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0\n"));
+
+        std::vector<std::string> warnings;
+        auto result = parse_software(raw, warnings);
+        CHECK(result.has_value());
+        CHECK(result->compilers.size() == 1);
+        CHECK(result->compilers[0].name == "gfortran");
+        CHECK(result->compilers[0].version == "13.3.0");
+    }
+
+    // ---- 测试 9: 编译器版本格式异常 → 静默跳过，不产生警告 ----
+    {
+        RawStore raw;
+        raw.records.push_back(make_record(RawSource::CompilerVersion, "gcc --version", "garbled output\n"));
+
+        std::vector<std::string> warnings;
+        auto result = parse_software(raw, warnings);
+        CHECK(!result.has_value());
+        CHECK(warnings.empty());
+    }
+
+    // ---- 测试 10: 仅编译器，无 nvidia/nvcc → 返回编译器栈 ----
+    {
+        RawStore raw;
+        raw.records.push_back(
+            make_record(RawSource::CompilerVersion, "g++ --version", "g++ (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0\n"));
+
+        std::vector<std::string> warnings;
+        auto result = parse_software(raw, warnings);
+        CHECK(result.has_value());
+        CHECK(result->compilers.size() == 1);
+        CHECK(result->compilers[0].name == "g++");
+        CHECK(warnings.empty());
+    }
+
     // ---- 测试 5: nvidia-smi 格式异常 → 警告 ----
     {
         RawStore raw;

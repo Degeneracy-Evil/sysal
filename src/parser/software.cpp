@@ -6,7 +6,11 @@
 
 #include "parse_utils.hpp"
 
+#include <cctype>
+#include <optional>
+#include <string>
 #include <string_view>
+#include <vector>
 
 namespace sysal::detail
 {
@@ -73,6 +77,81 @@ namespace sysal::detail
             return std::nullopt;
         }
 
+        /// @brief 从编译器 --version 首行提取 X.Y.Z 版本号
+        /// @param payload 编译器 --version 命令输出
+        /// @return 版本号字符串（若找到）
+        /// @details 兼容 gcc/g++/clang/gfortran 格式：
+        ///          gcc:    "gcc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0"
+        ///          clang:  "Ubuntu clang version 18.1.3 (1ubuntu1)"
+        ///          gfortran: "GNU Fortran (Ubuntu 13.3.0) 13.3.0"
+        ///          统一策略：首个形如 X.Y.Z（纯数字段）的 token 即为版本。
+        std::optional<std::string> extract_compiler_version(std::string_view payload)
+        {
+            auto lines = split(payload, '\n');
+            if(lines.empty())
+            {
+                return std::nullopt;
+            }
+            const auto first_line = split(trim(lines.front()), ' ');
+            for(const auto &token : first_line)
+            {
+                auto t = trim(token);
+                if(t.empty())
+                {
+                    continue;
+                }
+                // 按 '.' 拆分，验证段数=3 且每段为纯数字
+                auto parts = split(t, '.');
+                if(parts.size() != 3)
+                {
+                    continue;
+                }
+                bool valid = true;
+                for(const auto &part : parts)
+                {
+                    if(part.empty())
+                    {
+                        valid = false;
+                        break;
+                    }
+                    for(char ch : part)
+                    {
+                        if(!std::isdigit(static_cast<unsigned char>(ch)))
+                        {
+                            valid = false;
+                            break;
+                        }
+                    }
+                    if(!valid)
+                    {
+                        break;
+                    }
+                }
+                if(valid)
+                {
+                    return std::string(t);
+                }
+            }
+            return std::nullopt;
+        }
+
+        /// @brief 从 RawStore 中取某来源的首条 Success 记录
+        /// @param raw 原始证据存储
+        /// @param source 原始数据来源
+        /// @param match 次级键前缀（命令字符串），用于区分同来源多个命令
+        /// @return 匹配的首条 Success 记录；无则返回 nullopt
+        const RawRecord *first_success(const RawStore &raw, RawSource source, std::string_view match)
+        {
+            for(const auto *rec : raw.get_all(source))
+            {
+                if(rec->status == CollectStatus::Success && rec->path_or_command.find(match) != std::string::npos)
+                {
+                    return rec;
+                }
+            }
+            return nullptr;
+        }
+
     } // namespace
 
     std::optional<SoftwareStack> parse_software(const RawStore &raw, std::vector<std::string> &warnings)
@@ -119,22 +198,39 @@ namespace sysal::detail
             }
         }
 
-        // 若既无 nvidia-smi 也无 nvcc 数据源，则无软件栈可解析
-        if(nvidia_records.empty() && nvcc_records.empty())
-        {
-            warnings.push_back("parse_software: 无 nvidia-smi/nvcc 数据");
-            return std::nullopt;
-        }
-
-        // 数据源存在但驱动版本与 CUDA 版本均解析失败
-        if(!driver_version.has_value() && !cuda_version.has_value())
-        {
-            return std::nullopt;
-        }
-
         SoftwareStack stack;
 
-        // NVIDIA 驱动
+        // 编译器：逐个探测 gcc/g++/clang/clang++/gfortran
+        // 缺失的命令在 reader 层静默记 Failed，此处仅收集 Success 记录，不产生 warning
+        static const char *const compiler_names[] = {"gcc", "g++", "clang", "clang++", "gfortran"};
+        auto compiler_version_records = raw.get_all(RawSource::CompilerVersion);
+        const bool has_compiler_data = !compiler_version_records.empty();
+        for(const char *cc : compiler_names)
+        {
+            auto ver_rec = first_success(raw, RawSource::CompilerVersion, cc);
+            if(ver_rec == nullptr)
+            {
+                continue;
+            }
+            auto version = extract_compiler_version(ver_rec->payload);
+            if(!version.has_value())
+            {
+                continue;
+            }
+
+            Compiler compiler;
+            compiler.name = cc;
+            compiler.version = *version;
+            if(auto path_rec = first_success(raw, RawSource::CompilerPath, cc))
+            {
+                compiler.path = trim(path_rec->payload);
+            }
+            if(auto target_rec = first_success(raw, RawSource::CompilerTarget, cc))
+            {
+                compiler.target = trim(target_rec->payload);
+            }
+            stack.compilers.push_back(std::move(compiler));
+        }
         if(driver_version.has_value())
         {
             Driver nvidia_driver;
@@ -168,8 +264,18 @@ namespace sysal::detail
             stack.cuda = std::move(cuda);
         }
 
-        // v0.0.1：编译器、库、ROCm、Level Zero、MPI、RDMA 均不实现
-        // stack.compilers 保持空
+        // 无任何可解析的软件（无 nvidia-smi、无 nvcc、无编译器）
+        if(stack.drivers.empty() && stack.runtimes.empty() && stack.compilers.empty())
+        {
+            // 仅当完全不采集到任何软件数据时才告警；数据存在但解析失败属静默场景不告警
+            if(nvidia_records.empty() && nvcc_records.empty() && !has_compiler_data)
+            {
+                warnings.push_back("parse_software: 无 nvidia-smi/nvcc/编译器数据");
+            }
+            return std::nullopt;
+        }
+
+        // v0.0.1：库、ROCm、Level Zero、MPI、RDMA 均不实现
         // stack.libraries 保持空
         // stack.rocm 保持 nullopt
         // stack.level_zero 保持 nullopt

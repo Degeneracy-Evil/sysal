@@ -76,17 +76,18 @@ int main()
         const auto &stor = *result;
         CHECK(stor.devices.size() == 2);
 
-        const auto &nvme = stor.devices[0];
+        // 设备按名称字典序输出：loop0 在前，nvme0n1 在后
+        const auto &loop = stor.devices[0];
+        CHECK(loop.name.value == "loop0");
+        CHECK(!loop.pci_address.has_value());
+
+        const auto &nvme = stor.devices[1];
         CHECK(nvme.name.value == "nvme0n1");
         CHECK(nvme.pci_address.has_value());
         CHECK(nvme.pci_address->domain == 0);
         CHECK(nvme.pci_address->bus == 0xe4);
         CHECK(nvme.pci_address->device == 0);
         CHECK(nvme.pci_address->function == 0);
-
-        const auto &loop = stor.devices[1];
-        CHECK(loop.name.value == "loop0");
-        CHECK(!loop.pci_address.has_value());
     }
 
     // ---- 测试 3: 未知设备类型 → Other ----

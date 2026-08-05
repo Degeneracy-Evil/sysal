@@ -1,5 +1,18 @@
 # 开发记录
 
+### 2026-08-05 软件栈：编译器填充
+
+- **变更类型**: src / tests
+- **涉及文件**: include/sysal/types/enums.hpp, src/reader/linux/procfs.cpp, src/parser/software.cpp, examples/sysal_info.cpp, tests/unit/test_parse_software.cpp, tests/unit/test_parse_storage.cpp, docs/devlog.md
+- **变更内容**:
+  1. enums.hpp 追加三枚 RawSource：`CompilerVersion`（--version 输出）、`CompilerPath`（command -v）、`CompilerTarget`（-dumpmachine），追加在末尾保持枚举值稳定
+  2. procfs.cpp Software 域：遍历 gcc/g++/clang/clang++/gfortran 逐个探测三条命令；缺失的命令静默记 Failed
+  3. software.cpp：新增 `extract_compiler_version`（从 --version 首行提取 X.Y.Z 纯数字 token，兼容 gcc/clang/gfortran 格式）、`first_success`（按来源+命令取首条 Success 记录）；填充 `stack.compilers`，缺失编译器不产生 warning
+  4. 空栈 nullopt 判定修正：仅在完全不采集到任何软件数据时告警，数据存在但解析失败属静默场景
+- **原因**: 软件栈逐个填充分阶段的第一项（编译器）；遵循"缺失工具不刷 warning"的静默设计原则
+- **验证**: `xmake` 构建通过；18/18 测试套件通过；`sysal_info` 实测识别本机 5 个编译器（gcc/g++/clang/clang++/gfortran）；clang-tidy `--warnings-as-errors` 无告警
+- **其他**: 清理了 Aug 03-04 遗留的孤儿 docker/xmake 构建进程（持有 project.lock 导致本地 xmake 增量构建卡死）；修正 storage 测试 2.5 的设备字典序断言
+
 ### 2026-08-05 修复块设备 PCI 地址缺失
 
 - **变更类型**: fix / src / tests

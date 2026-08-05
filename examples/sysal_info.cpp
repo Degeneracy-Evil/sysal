@@ -311,6 +311,12 @@ namespace
             return "SysfsEdac";
         case sysal::RawSource::SysHypervisor:
             return "SysHypervisor";
+        case sysal::RawSource::CompilerVersion:
+            return "CompilerVersion";
+        case sysal::RawSource::CompilerPath:
+            return "CompilerPath";
+        case sysal::RawSource::CompilerTarget:
+            return "CompilerTarget";
         }
         return "?";
     }

@@ -262,6 +262,15 @@ namespace sysal::reader
                          "pci.bus_id,driver_version --format=csv,noheader");
                 read_cmd(raw, RawSource::Nvcc, "nvcc --version");
             }
+
+            // 编译器探测：缺失的命令 read_cmd 静默记 Failed，不产生 warning
+            static const char *const compilers[] = {"gcc", "g++", "clang", "clang++", "gfortran"};
+            for(const char *cc : compilers)
+            {
+                read_cmd(raw, RawSource::CompilerVersion, std::string(cc) + " --version");
+                read_cmd(raw, RawSource::CompilerPath, "command -v " + std::string(cc));
+                read_cmd(raw, RawSource::CompilerTarget, std::string(cc) + " -dumpmachine");
+            }
         }
 
         // ---- Execution 域 ----
