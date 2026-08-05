@@ -211,6 +211,31 @@ int main()
         CHECK(!result->devices[0].fs_type.has_value());
     }
 
+    // ---- 测试 11: NVMe 分区挂载匹配（nvme0n1p1 等 p+数字后缀）----
+    {
+        RawStore raw;
+        raw.records.push_back(make_record(RawSource::SysfsBlock, "/sys/block/nvme0n1/size", "3750924672\n"));
+        raw.records.push_back(make_record(RawSource::SysfsBlock, "/sys/block/nvme0n1/queue/rotational", "0\n"));
+        raw.records.push_back(make_record(RawSource::DfTh, "df -Th",
+                                          "Filesystem     Type      Size  Used Avail Use% Mounted on\n"
+                                          "/dev/nvme0n1p1 vfat      1.1G  6.1M  1.1G   1% /boot/efi\n"
+                                          "/dev/nvme0n1p2 ext4      1.7T  1.2T  442G  73% /\n"));
+
+        std::vector<std::string> warnings;
+        auto result = parse_storage(raw, warnings);
+        CHECK(result.has_value());
+
+        const auto &stor = *result;
+        CHECK(stor.devices.size() == 1);
+        const auto &dev = stor.devices[0];
+        CHECK(dev.name.value == "nvme0n1");
+        // 分区匹配应命中根分区（/dev/nvme0n1p2 → ext4, /）
+        CHECK(dev.mount_point.has_value());
+        CHECK(dev.mount_point->value == "/");
+        CHECK(dev.fs_type.has_value());
+        CHECK(dev.fs_type->value == "ext4");
+    }
+
     // ---- 测试 10: df -Th 畸形输入（字段不足）不崩溃且产生警告 ----
     {
         RawStore raw;

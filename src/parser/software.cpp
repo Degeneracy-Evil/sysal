@@ -213,6 +213,25 @@ namespace sysal::detail
             return nullptr;
         }
 
+        /// @brief 从 RawStore 中取某来源中命令完全相同（整串相等）的首条 Success 记录
+        /// @param raw 原始证据存储
+        /// @param source 原始数据来源
+        /// @param cmd 命令字符串（须与 path_or_command 完全相等）
+        /// @return 匹配的首条 Success 记录；无则返回 nullptr
+        /// @details 与 first_success 的子串匹配不同，此处用于区分同来源下前缀相近的
+        ///          命令（如 "clang --version" 与 "clang++ --version"）。
+        const RawRecord *first_success_cmd(const RawStore &raw, RawSource source, std::string_view cmd)
+        {
+            for(const auto *rec : raw.get_all(source))
+            {
+                if(rec->status == CollectStatus::Success && rec->path_or_command == cmd)
+                {
+                    return rec;
+                }
+            }
+            return nullptr;
+        }
+
     } // namespace
 
     std::optional<SoftwareStack> parse_software(const RawStore &raw, std::vector<std::string> &warnings)
@@ -272,7 +291,7 @@ namespace sysal::detail
         const bool has_rdma_data = !rdma_recs.empty();
         for(const char *cc : compiler_names)
         {
-            auto ver_rec = first_success(raw, RawSource::CompilerVersion, cc);
+            auto ver_rec = first_success_cmd(raw, RawSource::CompilerVersion, std::string(cc) + " --version");
             if(ver_rec == nullptr)
             {
                 continue;
@@ -286,11 +305,11 @@ namespace sysal::detail
             Compiler compiler;
             compiler.name = cc;
             compiler.version = *version;
-            if(auto path_rec = first_success(raw, RawSource::CompilerPath, cc))
+            if(auto path_rec = first_success_cmd(raw, RawSource::CompilerPath, "command -v " + std::string(cc)))
             {
                 compiler.path = trim(path_rec->payload);
             }
-            if(auto target_rec = first_success(raw, RawSource::CompilerTarget, cc))
+            if(auto target_rec = first_success_cmd(raw, RawSource::CompilerTarget, std::string(cc) + " -dumpmachine"))
             {
                 compiler.target = trim(target_rec->payload);
             }

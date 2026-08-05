@@ -114,7 +114,7 @@ namespace sysal
         [[nodiscard]] RawRecord raw_record_from_json(const json &j)
         {
             RawRecord rec;
-            rec.source = validate_enum(j.at("source").get<std::uint32_t>(), RawSource::SysHypervisor, "source");
+            rec.source = validate_enum(j.at("source").get<std::uint32_t>(), RawSource::SysfsThermal, "source");
             j.at("path_or_command").get_to(rec.path_or_command);
             j.at("payload").get_to(rec.payload);
             rec.status = validate_enum(j.at("status").get<std::uint32_t>(), CollectStatus::NotCollected, "status");

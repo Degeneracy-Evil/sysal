@@ -1,5 +1,18 @@
 # 开发记录
 
+### 2026-08-05 修复 v0.0.7 评审 3 项 P1 问题
+
+- **变更类型**: fix / docs / tests
+- **涉及文件**: src/serialization/serialize.cpp, src/parser/software.cpp, src/parser/storage.cpp, tests/unit/test_serialization.cpp, tests/unit/test_parse_software.cpp, tests/unit/test_parse_storage.cpp, docs/design/data_model/raw_store.md, docs/quality_reports/v007_review.md, docs/devlog.md
+- **变更内容**:
+  1. **P1-1 反序列化枚举上界**：`raw_record_from_json` 的 `validate_enum` 上界从旧的 `SysHypervisor` 更新为当前末枚举 `SysfsThermal`，使新增的 11 个 RawSource（CompilerVersion…SysfsThermal）在 raw round-trip 反序列化时不再抛"枚举值越界"
+  2. **P1-2 clang/clang++ 子串碰撞**：新增 `first_success_cmd`（整串精确匹配）；编译器探测改用精确命令串（`clang --version` / `command -v clang` / `clang -dumpmachine`），避免 bare name 子串匹配把 `clang++` 误标为 `clang`
+  3. **P1-3 NVMe 分区挂载匹配**：新增 `is_partition_of`（支持 SATA 数字后缀 `sda1` 与 NVMe `p+数字` 后缀 `nvme0n1p1`），使分区 NVMe 设备能匹配 df 挂载点
+  4. 补测试：raw 新源 round-trip（test_serialization）、clang/clang++ 分派（test_parse_software）、NVMe 分区挂载（test_parse_storage）
+  5. raw_store.md 补录 11 个新增 RawSource 枚举
+- **原因**: v0.0.7 代码质量评审的 3 项 P1 正确性缺陷
+- **验证**: `xmake` 构建通过；`xmake test` 全绿（software 含新测试）；clang-tidy `--warnings-as-errors` 无告警
+
 ### 2026-08-05 CPU：缓存 / 调频策略 / 温度传感器采集
 
 - **变更类型**: src / docs / tests

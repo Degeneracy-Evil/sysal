@@ -82,6 +82,26 @@ namespace sysal::detail
             return result;
         }
 
+        /// @brief 判断 df 设备名是否为某块设备的子分区
+        /// @param dev_name 块设备名，如 "sda" 或 "nvme0n1"
+        /// @param df_name df -Th 输出的设备名，如 "sda1"、"sda2"、"nvme0n1p1"
+        /// @return 当 df_name 以 dev_name 开头且后缀符合分区命名（数字，或 NVMe 的 p+数字）时返回 true
+        /// @details SATA 分区后缀为纯数字（sda1），NVMe 分区后缀为 p+数字（nvme0n1p1）。
+        bool is_partition_of(std::string_view dev_name, std::string_view df_name)
+        {
+            if(df_name.size() <= dev_name.size() || !df_name.starts_with(dev_name))
+            {
+                return false;
+            }
+            auto suffix = df_name.substr(dev_name.size());
+            if(std::isdigit(static_cast<unsigned char>(suffix[0])))
+            {
+                return true;
+            }
+            // NVMe 分区：p 后接数字（nvme0n1p1）
+            return suffix.size() > 1 && suffix[0] == 'p' && std::isdigit(static_cast<unsigned char>(suffix[1]));
+        }
+
     } // namespace
 
     std::optional<Storage> parse_storage(const RawStore &raw, std::vector<std::string> &warnings)
@@ -219,13 +239,11 @@ namespace sysal::detail
             }
             else
             {
-                // 分区匹配：df 显示 sda1/sda2，sysfs 显示 sda
+                // 分区匹配：df 显示 sda1/sda2 或 nvme0n1p1，sysfs 显示 sda/nvme0n1
                 // 遍历所有匹配分区，优先选择挂载点为 "/" 的根分区
                 for(const auto &[df_name, df_info] : df_map)
                 {
-                    if(df_name.starts_with(dev_name) &&
-                       (df_name.size() == dev_name.size() ||
-                        std::isdigit(static_cast<unsigned char>(df_name[dev_name.size()]))))
+                    if(is_partition_of(dev_name, df_name))
                     {
                         if(!dev.mount_point.has_value() || df_info.first == "/")
                         {

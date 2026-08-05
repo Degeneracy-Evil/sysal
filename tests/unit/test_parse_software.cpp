@@ -351,5 +351,29 @@ int main()
         CHECK(!warnings.empty());
     }
 
+    // ---- 测试 21: clang/clang++ 分派无歧义 ----
+    {
+        RawStore raw;
+        raw.records.push_back(
+            make_record(RawSource::CompilerVersion, "clang --version", "Ubuntu clang version 18.1.3\n"));
+        raw.records.push_back(
+            make_record(RawSource::CompilerVersion, "clang++ --version", "Ubuntu clang++ version 17.0.6\n"));
+        raw.records.push_back(make_record(RawSource::CompilerPath, "command -v clang", "/usr/lib/llvm-18/bin/clang\n"));
+        raw.records.push_back(
+            make_record(RawSource::CompilerPath, "command -v clang++", "/usr/lib/llvm-18/bin/clang++\n"));
+
+        std::vector<std::string> warnings;
+        auto result = parse_software(raw, warnings);
+        CHECK(result.has_value());
+
+        CHECK(result->compilers.size() == 2);
+        CHECK(result->compilers[0].name == "clang");
+        CHECK(result->compilers[0].version == "18.1.3");
+        CHECK(result->compilers[0].path == "/usr/lib/llvm-18/bin/clang");
+        CHECK(result->compilers[1].name == "clang++");
+        CHECK(result->compilers[1].version == "17.0.6");
+        CHECK(result->compilers[1].path == "/usr/lib/llvm-18/bin/clang++");
+    }
+
     TEST_SUMMARY();
 }

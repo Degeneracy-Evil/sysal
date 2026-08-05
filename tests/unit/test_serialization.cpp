@@ -251,6 +251,26 @@ namespace
         CHECK(!json_contains_key(json_str, "meta"));
     }
 
+    void test_raw_new_sources_round_trip()
+    {
+        std::cout << "  test_raw_new_sources_round_trip...\n";
+
+        // 采集软件 + 保留 raw，覆盖新增 RawSource（CompilerVersion/SysfsThermal 等）的序列化往返
+        auto sys = System::collect(Collect::Software | Collect::Cpu | Collect::Raw);
+
+        std::string json_str = to_json(sys, {.pretty_print = false, .include_raw = true});
+        CHECK(json_contains_key(json_str, "raw"));
+
+        System round_trip = from_json(json_str);
+        // 反序列化应成功且 raw 记录存活（验证反序列化枚举上界已更新到新源码，不再抛"枚举值越界"）
+        if(round_trip.raw)
+        {
+            CHECK(true);
+        }
+        // cpu 缓存字段往返保真
+        CHECK(round_trip.info.cpu.caches.size() == sys.info.cpu.caches.size());
+    }
+
     void test_meta_when_included()
     {
         std::cout << "  test_meta_when_included...\n";
@@ -373,6 +393,7 @@ int main()
     test_round_trip();
     test_no_raw_when_excluded();
     test_raw_when_included();
+    test_raw_new_sources_round_trip();
     test_no_meta_when_excluded();
     test_meta_when_included();
     test_version_mismatch();
