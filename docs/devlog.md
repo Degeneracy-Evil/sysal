@@ -1,5 +1,20 @@
 # 开发记录
 
+### 2026-08-05 CPU：缓存 / 调频策略 / 温度传感器采集
+
+- **变更类型**: src / docs / tests
+- **涉及文件**: include/sysal/types/units.hpp, include/sysal/types/enums.hpp, include/sysal/model/cpu.hpp, src/reader/linux/sysfs.cpp, src/parser/cpu.cpp, src/serialization/serialize.cpp, examples/sysal_info.cpp, tests/unit/test_parse_cpu.cpp, docs/design/data_model/cpu.md, docs/devlog.md
+- **变更内容**:
+  1. units.hpp 新增温度量纲 `Temperature`（毫摄氏度）
+  2. enums.hpp 新增 `CacheType` 枚举（Data/Instruction/Unified/Other）、`SysfsThermal` RawSource
+  3. cpu.hpp 模型扩展：`CpuCache`（level/type/size/ways/line_size/cpu_number）、`ThermalZone`（name/type/temp）；`Cpu` 增加 `caches`、`governor`、`thermal_zones`
+  4. sysfs reader：`read_cpu_sysfs` 采集 `cache/index*/{level,type,size,ways,coherency}` 与 `scaling_governor`；新增 `read_thermal_sysfs`（遍历 thermal_zoneN），挂到 Cpu 域
+  5. cpu parser：新增 `parse_cache_size`（K/M/G 解析）、`parse_cache_type`、`extract_cache_key`（路径抽 CPU+index）、`read_cpu_caches`、`read_cpu_governor`、`read_thermal_zones`（按 zone 名配对 type/temp）；填充 `cpu.caches/governor/thermal_zones`
+  6. serialization：新增 cache/thermal 的 to/from_json，扩展 cpu 聚合序列化（向后兼容：`contains` 守卫）
+  7. 设计文档 cpu.md 补 CpuCache/ThermalZone 与设计说明
+- **原因**: 补全 CPU 模型第二优先级项（缓存拓扑、调频策略、温度），服务 HPC 性能调度场景
+- **验证**: `xmake` 构建通过；18/18 测试套件通过（cpu 90 断言）；`sysal_info` 实测：governor performance、L1/L2/L3 缓存 size+ways+line、3 个热区温度
+
 ### 2026-08-05 软件栈：CUDA 路径填充
 
 - **变更类型**: src / tests

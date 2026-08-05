@@ -77,6 +77,17 @@ namespace
         return std::to_string(hz) + " Hz";
     }
 
+    /// @brief 格式化温度（毫摄氏度）为摄氏度字符串
+    /// @param millicelsius 毫摄氏度值
+    /// @return 格式化字符串（如 "40.0 C"）
+    std::string format_temperature_celsius(std::uint64_t millicelsius)
+    {
+        double celsius = static_cast<double>(millicelsius) / 1000.0;
+        char buf[32];
+        std::snprintf(buf, sizeof(buf), "%.1f C", celsius);
+        return buf;
+    }
+
     /// @brief 格式化 PCI 地址为十六进制零填充
     /// @param addr PCI 地址
     /// @return 格式化字符串（如 "0000:65:00.0"）
@@ -143,6 +154,22 @@ namespace
             return "F16C";
         case sysal::IsaExtension::Pclmulqdq:
             return "PCLMULQDQ";
+        }
+        return "?";
+    }
+
+    const char *cache_type_str(sysal::CacheType t)
+    {
+        switch(t)
+        {
+        case sysal::CacheType::Data:
+            return "Data";
+        case sysal::CacheType::Instruction:
+            return "Instruction";
+        case sysal::CacheType::Unified:
+            return "Unified";
+        case sysal::CacheType::Other:
+            return "Other";
         }
         return "?";
     }
@@ -331,6 +358,8 @@ namespace
             return "NvccPath";
         case sysal::RawSource::CudaHome:
             return "CudaHome";
+        case sysal::RawSource::SysfsThermal:
+            return "SysfsThermal";
         }
         return "?";
     }
@@ -500,6 +529,22 @@ int main()
             std::cout << " " << cpu_id;
         }
         std::cout << "\n";
+    }
+
+    if(!sys.info.cpu.governor.empty())
+    {
+        label("Governor", sys.info.cpu.governor);
+    }
+    for(const auto &cache : sys.info.cpu.caches)
+    {
+        std::cout << "  Cache L" << cache.level << " [" << cache_type_str(cache.type) << "] cpu" << cache.cpu_number
+                  << ": " << format_memory(cache.size.value) << " " << cache.ways << "-way, line " << cache.line_size
+                  << "\n";
+    }
+    for(const auto &zone : sys.info.cpu.thermal_zones)
+    {
+        std::cout << "  Thermal " << zone.name << " [" << zone.type
+                  << "]: " << format_temperature_celsius(zone.temp.value) << "\n";
     }
 
     // ── 4. Memory ───────────────────────────────────────────────────────

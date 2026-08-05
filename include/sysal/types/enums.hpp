@@ -67,6 +67,15 @@ namespace sysal
         Pclmulqdq
     };
 
+    /// @brief CPU 缓存类型
+    enum class CacheType
+    {
+        Data,        ///< 数据缓存
+        Instruction, ///< 指令缓存
+        Unified,     ///< 统一缓存
+        Other        ///< 其他或未知
+    };
+
     /// @brief 原始数据来源
     enum class RawSource
     {
@@ -120,6 +129,7 @@ namespace sysal
         UcxVersion,      ///< UCX 版本（pkg-config）
         NvccPath,        ///< nvcc 可执行文件路径（command -v nvcc）
         CudaHome,        ///< CUDA_HOME 环境变量
+        SysfsThermal,    ///< /sys/class/thermal 温度传感器
     };
 
     /// @brief 单个原始记录的采集状态

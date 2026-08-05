@@ -305,5 +305,89 @@ int main()
         CHECK(cpu.isa_extensions[16] == IsaExtension::Pclmulqdq);
     }
 
+    // ---- 测试 9: 缓存、调频策略与温度传感器采集 ----
+    {
+        RawStore raw;
+        raw.records.push_back(make_record(RawSource::ProcCpuInfo, "/proc/cpuinfo",
+                                          "processor\t: 0\n"
+                                          "physical id\t: 0\n"
+                                          "core id\t\t: 0\n"
+                                          "flags\t\t: fpu\n"));
+        // 缓存记录：cpu0 的 L1D/L1I/L2，cpu1 的 L3
+        raw.records.push_back(make_record(RawSource::SysfsCpu, "cpu/cpu0/cache/index0/level", "1\n"));
+        raw.records.push_back(make_record(RawSource::SysfsCpu, "cpu/cpu0/cache/index0/type", "Data\n"));
+        raw.records.push_back(make_record(RawSource::SysfsCpu, "cpu/cpu0/cache/index0/size", "48K\n"));
+        raw.records.push_back(make_record(RawSource::SysfsCpu, "cpu/cpu0/cache/index0/ways_of_associativity", "12\n"));
+        raw.records.push_back(make_record(RawSource::SysfsCpu, "cpu/cpu0/cache/index0/coherency_line_size", "64\n"));
+        raw.records.push_back(make_record(RawSource::SysfsCpu, "cpu/cpu0/cache/index1/level", "1\n"));
+        raw.records.push_back(make_record(RawSource::SysfsCpu, "cpu/cpu0/cache/index1/type", "Instruction\n"));
+        raw.records.push_back(make_record(RawSource::SysfsCpu, "cpu/cpu0/cache/index1/size", "32K\n"));
+        raw.records.push_back(make_record(RawSource::SysfsCpu, "cpu/cpu0/cache/index2/level", "2\n"));
+        raw.records.push_back(make_record(RawSource::SysfsCpu, "cpu/cpu0/cache/index2/type", "Unified\n"));
+        raw.records.push_back(make_record(RawSource::SysfsCpu, "cpu/cpu0/cache/index2/size", "1280K\n"));
+        raw.records.push_back(make_record(RawSource::SysfsCpu, "cpu/cpu1/cache/index3/level", "3\n"));
+        raw.records.push_back(make_record(RawSource::SysfsCpu, "cpu/cpu1/cache/index3/type", "Unified\n"));
+        raw.records.push_back(make_record(RawSource::SysfsCpu, "cpu/cpu1/cache/index3/size", "39936K\n"));
+        // 调频策略
+        raw.records.push_back(make_record(RawSource::SysfsCpu, "cpu/cpu0/cpufreq/scaling_governor", "performance\n"));
+        // 温度传感器
+        raw.records.push_back(make_record(RawSource::SysfsThermal, "thermal_zone0/type", "x86_pkg_temp\n"));
+        raw.records.push_back(make_record(RawSource::SysfsThermal, "thermal_zone0/temp", "75000\n"));
+
+        std::vector<std::string> warnings;
+        auto result = parse_cpu(raw, warnings);
+        CHECK(result.has_value());
+
+        const auto &cpu = *result;
+        // 缓存数量：cpu0(cpu0/cpu1)共 4 个 index；因 map 按键磁盘序，size 经 grouping
+        CHECK(cpu.caches.size() >= 4);
+
+        // governor
+        CHECK(cpu.governor == "performance");
+
+        // 温度传感器
+        CHECK(cpu.thermal_zones.size() == 1);
+        CHECK(cpu.thermal_zones[0].name == "thermal_zone0");
+        CHECK(cpu.thermal_zones[0].type == "x86_pkg_temp");
+        CHECK(cpu.thermal_zones[0].temp.value == 75000);
+
+        // 验证大小解析（48K = 49152, 1280K = 1310720, 39936K = 40894464）
+        bool has_l1d = false, has_l3 = false;
+        for(const auto &cache : cpu.caches)
+        {
+            if(cache.level == 1 && cache.type == CacheType::Data)
+            {
+                has_l1d = true;
+                CHECK(cache.size.value == 48ULL * 1024);
+                CHECK(cache.ways == 12);
+                CHECK(cache.line_size == 64);
+            }
+            if(cache.level == 3)
+            {
+                has_l3 = true;
+                CHECK(cache.size.value == 39936ULL * 1024);
+                CHECK(cache.cpu_number == 1);
+            }
+        }
+        CHECK(has_l1d);
+        CHECK(has_l3);
+    }
+
+    // ---- 测试 10: 无缓存/调频/热区 → 空且不崩溃 ----
+    {
+        RawStore raw;
+        raw.records.push_back(make_record(RawSource::ProcCpuInfo, "/proc/cpuinfo",
+                                          "processor\t: 0\n"
+                                          "physical id\t: 0\n"
+                                          "core id\t\t: 0\n"));
+
+        std::vector<std::string> warnings;
+        auto result = parse_cpu(raw, warnings);
+        CHECK(result.has_value());
+        CHECK(result->caches.empty());
+        CHECK(result->governor.empty());
+        CHECK(result->thermal_zones.empty());
+    }
+
     TEST_SUMMARY();
 }

@@ -75,6 +75,29 @@ namespace sysal::reader
                 // cpufreq 文件
                 read_sysfs_file(raw, RawSource::SysfsCpu, (dir / "cpufreq" / "base_frequency").string());
                 read_sysfs_file(raw, RawSource::SysfsCpu, (dir / "cpufreq" / "scaling_max_freq").string());
+                read_sysfs_file(raw, RawSource::SysfsCpu, (dir / "cpufreq" / "scaling_governor").string());
+
+                // 缓存目录：cpuN/cache/indexM/{level,type,size,ways_of_associativity,line_size}
+                std::error_code cache_ec;
+                const auto cache_dir = dir / "cache";
+                if(fs::is_directory(cache_dir, cache_ec))
+                {
+                    for(const auto &cache_entry : fs::directory_iterator(cache_dir, cache_ec))
+                    {
+                        const auto &cache_name = cache_entry.path().filename().string();
+                        if(cache_name.size() < 6 || cache_name.substr(0, 5) != "index")
+                        {
+                            continue;
+                        }
+                        read_sysfs_file(raw, RawSource::SysfsCpu, (cache_entry.path() / "level").string());
+                        read_sysfs_file(raw, RawSource::SysfsCpu, (cache_entry.path() / "type").string());
+                        read_sysfs_file(raw, RawSource::SysfsCpu, (cache_entry.path() / "size").string());
+                        read_sysfs_file(raw, RawSource::SysfsCpu,
+                                        (cache_entry.path() / "ways_of_associativity").string());
+                        read_sysfs_file(raw, RawSource::SysfsCpu,
+                                        (cache_entry.path() / "coherency_line_size").string());
+                    }
+                }
             }
 
             if(!found_any)
@@ -359,6 +382,35 @@ namespace sysal::reader
             }
         }
 
+        /// @brief 采集温度传感器信息
+        /// @param raw 原始证据存储
+        /// @details 遍历 /sys/class/thermal/thermal_zoneN/，读取 type 与 temp
+        ///          （temp 单位为毫摄氏度）。无热区（容器/虚拟化）时静默跳过。
+        void read_thermal_sysfs(RawStore &raw)
+        {
+            const fs::path thermal_base = "/sys/class/thermal";
+            if(!fs::exists(thermal_base))
+            {
+                return;
+            }
+
+            std::error_code ec;
+            for(const auto &entry : fs::directory_iterator(thermal_base, ec))
+            {
+                if(!entry.is_directory())
+                {
+                    continue;
+                }
+                const auto &name = entry.path().filename().string();
+                if(name.size() < 12 || name.substr(0, 12) != "thermal_zone")
+                {
+                    continue;
+                }
+                read_sysfs_file(raw, RawSource::SysfsThermal, (entry.path() / "type").string());
+                read_sysfs_file(raw, RawSource::SysfsThermal, (entry.path() / "temp").string());
+            }
+        }
+
     } // namespace
 
     void read_sysfs(RawStore &raw, Collect flags)
@@ -378,6 +430,7 @@ namespace sysal::reader
             {Collect::Platform, read_dmi_sysfs},
             {Collect::Platform, read_hypervisor_type},
             {Collect::Memory, read_edac_sysfs},
+            {Collect::Cpu, read_thermal_sysfs},
         };
 
         for(const auto &entry : reader_dispatch)

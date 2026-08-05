@@ -247,6 +247,259 @@ namespace sysal::detail
             return {base_freq, max_freq};
         }
 
+        /// @brief 解析 sysfs 缓存大小字符串为字节
+        /// @param s 形如 "48K"、"1280K"、"4M" 的字符串
+        /// @return 字节数，解析失败返回 nullopt
+        std::optional<std::uint64_t> parse_cache_size(std::string_view s)
+        {
+            auto trimmed_str = trim(s);
+            if(trimmed_str.empty())
+            {
+                return std::nullopt;
+            }
+            std::string_view trimmed = trimmed_str;
+            std::uint64_t multiplier = 1;
+            auto last = trimmed.back();
+            switch(last)
+            {
+            case 'K':
+            case 'k':
+                multiplier = 1024;
+                trimmed.remove_suffix(1);
+                break;
+            case 'M':
+            case 'm':
+                multiplier = 1024ULL * 1024;
+                trimmed.remove_suffix(1);
+                break;
+            case 'G':
+            case 'g':
+                multiplier = 1024ULL * 1024 * 1024;
+                trimmed.remove_suffix(1);
+                break;
+            default:
+                break;
+            }
+            auto v = parse_uint(trimmed);
+            if(!v.has_value())
+            {
+                return std::nullopt;
+            }
+            return *v * multiplier;
+        }
+
+        /// @brief 解析缓存类型字符串
+        /// @param s sysfs cache/type 内容（Data/Instruction/Unified）
+        /// @return CacheType 枚举
+        CacheType parse_cache_type(std::string_view s)
+        {
+            auto t = trim(s);
+            if(t == "Data")
+            {
+                return CacheType::Data;
+            }
+            if(t == "Instruction")
+            {
+                return CacheType::Instruction;
+            }
+            if(t == "Unified")
+            {
+                return CacheType::Unified;
+            }
+            return CacheType::Other;
+        }
+
+        /// @brief 从缓存记录路径中提取 CPU 编号和 index 编号
+        /// @param path sysfs 路径，如 "/sys/devices/system/cpu/cpu0/cache/index2/size"
+        /// @return pair<cpu_number, index>, 提取失败返回 nullopt
+        std::optional<std::pair<std::uint32_t, std::uint32_t>> extract_cache_key(std::string_view path)
+        {
+            auto cpu_pos = path.find("cpu/cpu");
+            if(cpu_pos == std::string_view::npos)
+            {
+                return std::nullopt;
+            }
+            auto d1 = cpu_pos + 7; // "cpu/cpu" 长度
+            auto end1 = d1;
+            while(end1 < path.size() && std::isdigit(static_cast<unsigned char>(path[end1])))
+            {
+                ++end1;
+            }
+            auto cpu_str = path.substr(d1, end1 - d1);
+            if(cpu_str.empty())
+            {
+                return std::nullopt;
+            }
+
+            auto idx_pos = path.find("/cache/index");
+            if(idx_pos == std::string_view::npos)
+            {
+                return std::nullopt;
+            }
+            auto d2 = idx_pos + 12; // "/cache/index" 长度
+            auto end2 = d2;
+            while(end2 < path.size() && std::isdigit(static_cast<unsigned char>(path[end2])))
+            {
+                ++end2;
+            }
+            auto idx_str = path.substr(d2, end2 - d2);
+            if(idx_str.empty())
+            {
+                return std::nullopt;
+            }
+
+            auto cpu = parse_uint(cpu_str);
+            auto idx = parse_uint(idx_str);
+            if(!cpu.has_value() || !idx.has_value())
+            {
+                return std::nullopt;
+            }
+            return std::make_pair(static_cast<std::uint32_t>(*cpu), static_cast<std::uint32_t>(*idx));
+        }
+
+        /// @brief 收集 CPU 缓存信息
+        /// @param raw 原始证据存储
+        /// @return CpuCache 列表
+        std::vector<CpuCache> read_cpu_caches(const RawStore &raw)
+        {
+            std::map<std::pair<std::uint32_t, std::uint32_t>, CpuCache> cache_map;
+            auto cpu_records = raw.get_all(RawSource::SysfsCpu);
+            for(const auto *rec : cpu_records)
+            {
+                if(rec->status != CollectStatus::Success)
+                {
+                    continue;
+                }
+                auto key = extract_cache_key(rec->path_or_command);
+                if(!key.has_value())
+                {
+                    continue;
+                }
+                auto &cache = cache_map[*key];
+                cache.cpu_number = key->first;
+                const auto &path = rec->path_or_command;
+                if(path.find("cache/index") == std::string_view::npos)
+                {
+                    continue;
+                }
+                if(path.rfind("/level") != std::string_view::npos)
+                {
+                    if(auto v = parse_uint(rec->payload))
+                    {
+                        cache.level = static_cast<std::uint32_t>(*v);
+                    }
+                }
+                else if(path.rfind("/type") != std::string_view::npos)
+                {
+                    cache.type = parse_cache_type(rec->payload);
+                }
+                else if(path.rfind("/size") != std::string_view::npos)
+                {
+                    if(auto v = parse_cache_size(rec->payload))
+                    {
+                        cache.size = MemorySize{*v};
+                    }
+                }
+                else if(path.rfind("ways_of_associativity") != std::string_view::npos)
+                {
+                    if(auto v = parse_uint(rec->payload))
+                    {
+                        cache.ways = static_cast<std::uint32_t>(*v);
+                    }
+                }
+                else if(path.rfind("coherency_line_size") != std::string_view::npos)
+                {
+                    if(auto v = parse_uint(rec->payload))
+                    {
+                        cache.line_size = static_cast<std::uint32_t>(*v);
+                    }
+                }
+            }
+
+            std::vector<CpuCache> caches;
+            caches.reserve(cache_map.size());
+            for(const auto &[key, cache] : cache_map)
+            {
+                (void)key;
+                caches.push_back(cache);
+            }
+            return caches;
+        }
+
+        /// @brief 读取 cpufreq 调频策略
+        /// @param raw 原始证据存储
+        /// @return 调频策略字符串（如 "performance"），缺失返回空串
+        std::string read_cpu_governor(const RawStore &raw)
+        {
+            auto cpu_records = raw.get_all(RawSource::SysfsCpu);
+            for(const auto *rec : cpu_records)
+            {
+                if(rec->status != CollectStatus::Success)
+                {
+                    continue;
+                }
+                if(rec->path_or_command.find("scaling_governor") != std::string::npos)
+                {
+                    return trim(rec->payload);
+                }
+            }
+            return {};
+        }
+
+        /// @brief 读取温度传感器信息
+        /// @param raw 原始证据存储
+        /// @return ThermalZone 列表
+        /// @brief 读取温度传感器信息
+        /// @param raw 原始证据存储
+        /// @return ThermalZone 列表
+        std::vector<ThermalZone> read_thermal_zones(const RawStore &raw)
+        {
+            // 按 zone 名称分组：zone_name → {type, temp}
+            std::map<std::string, ThermalZone> zone_map;
+            auto thermal_records = raw.get_all(RawSource::SysfsThermal);
+            for(const auto *rec : thermal_records)
+            {
+                if(rec->status != CollectStatus::Success)
+                {
+                    continue;
+                }
+                const auto &path = rec->path_or_command;
+                auto slash = path.find_last_of('/');
+                auto filename = (slash == std::string_view::npos) ? path : path.substr(slash + 1);
+
+                auto zone_start = path.rfind("thermal_zone");
+                if(zone_start == std::string_view::npos)
+                {
+                    continue;
+                }
+                auto name_start = zone_start;
+                auto name_end = path.find('/', name_start);
+                auto zone_name = std::string(path.substr(name_start, name_end - name_start));
+                auto &zone = zone_map[zone_name];
+                zone.name = zone_name;
+
+                if(filename == "type")
+                {
+                    zone.type = trim(rec->payload);
+                }
+                else if(filename == "temp")
+                {
+                    if(auto v = parse_uint(rec->payload))
+                    {
+                        zone.temp = Temperature{*v};
+                    }
+                }
+            }
+
+            std::vector<ThermalZone> zones;
+            zones.reserve(zone_map.size());
+            for(auto &[name, zone] : zone_map)
+            {
+                zones.push_back(std::move(zone));
+            }
+            return zones;
+        }
+
         /// @brief 从 sysfs NUMA 记录中构建 CPU → NUMA 节点映射
         /// @param raw 原始证据存储
         /// @param warnings 警告列表
@@ -562,6 +815,11 @@ namespace sysal::detail
 
         // 构建 NumaNode 列表
         cpu.numa_nodes = build_numa_nodes(cpu_to_numa);
+
+        // 收集 CPU 缓存、调频策略与温度传感器
+        cpu.caches = read_cpu_caches(raw);
+        cpu.governor = read_cpu_governor(raw);
+        cpu.thermal_zones = read_thermal_zones(raw);
 
         // 设置架构（从第一个条目的 vendor_id 推断，或默认 Other）
         if(!entries.empty())

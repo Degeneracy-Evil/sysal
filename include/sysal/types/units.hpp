@@ -42,10 +42,15 @@ namespace sysal
     struct TransferRateTag
     {
     };
+    /// @brief 温度量纲标签
+    struct TemperatureTag
+    {
+    };
 
     using MemorySize = ScalarUnit<MemorySizeTag>;     ///< 内存大小（字节）
     using Frequency = ScalarUnit<FrequencyTag>;       ///< 频率（赫兹）
     using Bandwidth = ScalarUnit<BandwidthTag>;       ///< 带宽（比特每秒）
     using TransferRate = ScalarUnit<TransferRateTag>; ///< 传输速率（MT/s）
+    using Temperature = ScalarUnit<TemperatureTag>;   ///< 温度（摄氏度的毫摄氏度）
 
 } // namespace sysal

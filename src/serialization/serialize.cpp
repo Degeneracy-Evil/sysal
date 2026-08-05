@@ -414,6 +414,45 @@ namespace sysal
             return n;
         }
 
+        [[nodiscard]] json cpu_cache_to_json(const CpuCache &c)
+        {
+            return json{
+                {"level", c.level},         {"type", static_cast<std::uint32_t>(c.type)},
+                {"size", c.size.value},     {"ways", c.ways},
+                {"line_size", c.line_size}, {"cpu_number", c.cpu_number},
+            };
+        }
+
+        [[nodiscard]] CpuCache cpu_cache_from_json(const json &j)
+        {
+            CpuCache c;
+            c.level = j.at("level").get<std::uint32_t>();
+            c.type = validate_enum(j.at("type").get<std::uint32_t>(), CacheType::Other, "cache.type");
+            c.size = MemorySize{j.at("size").get<std::uint64_t>()};
+            c.ways = j.at("ways").get<std::uint32_t>();
+            c.line_size = j.at("line_size").get<std::uint32_t>();
+            c.cpu_number = j.at("cpu_number").get<std::uint32_t>();
+            return c;
+        }
+
+        [[nodiscard]] json thermal_zone_to_json(const ThermalZone &t)
+        {
+            return json{
+                {"name", t.name},
+                {"type", t.type},
+                {"temp", t.temp.value},
+            };
+        }
+
+        [[nodiscard]] ThermalZone thermal_zone_from_json(const json &j)
+        {
+            ThermalZone t;
+            t.name = j.at("name").get<std::string>();
+            t.type = j.at("type").get<std::string>();
+            t.temp = Temperature{j.at("temp").get<std::uint64_t>()};
+            return t;
+        }
+
         [[nodiscard]] json cpu_to_json(const Cpu &c)
         {
             json packages = json::array();
@@ -441,6 +480,16 @@ namespace sysal
             {
                 isa.push_back(static_cast<std::uint32_t>(ext));
             }
+            json caches = json::array();
+            for(const auto &cache : c.caches)
+            {
+                caches.push_back(cpu_cache_to_json(cache));
+            }
+            json thermal = json::array();
+            for(const auto &zone : c.thermal_zones)
+            {
+                thermal.push_back(thermal_zone_to_json(zone));
+            }
             return json{
                 {"arch", static_cast<std::uint32_t>(c.arch)},
                 {"packages", std::move(packages)},
@@ -448,6 +497,9 @@ namespace sysal
                 {"logical_cpus", std::move(logical_cpus)},
                 {"numa_nodes", std::move(numa_nodes)},
                 {"isa_extensions", std::move(isa)},
+                {"caches", std::move(caches)},
+                {"governor", c.governor},
+                {"thermal_zones", std::move(thermal)},
             };
         }
 
@@ -475,6 +527,24 @@ namespace sysal
             {
                 c.isa_extensions.push_back(
                     validate_enum(elem.get<std::uint32_t>(), IsaExtension::Pclmulqdq, "isa_extensions"));
+            }
+            if(j.contains("caches"))
+            {
+                for(const auto &elem : j.at("caches"))
+                {
+                    c.caches.push_back(cpu_cache_from_json(elem));
+                }
+            }
+            if(j.contains("governor"))
+            {
+                c.governor = j.at("governor").get<std::string>();
+            }
+            if(j.contains("thermal_zones"))
+            {
+                for(const auto &elem : j.at("thermal_zones"))
+                {
+                    c.thermal_zones.push_back(thermal_zone_from_json(elem));
+                }
             }
             return c;
         }

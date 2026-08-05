@@ -54,6 +54,25 @@ namespace sysal
         std::vector<LogicalCpuId> cpus; ///< 该节点包含的逻辑 CPU 列表
     };
 
+    /// @brief CPU 缓存
+    struct CpuCache
+    {
+        std::uint32_t level{};      ///< 缓存层级（1 = L1, 2 = L2, ...）
+        CacheType type{};           ///< 缓存类型
+        MemorySize size{};          ///< 缓存大小（字节）
+        std::uint32_t ways{};       ///< 相联度
+        std::uint32_t line_size{};  ///< 缓存行大小（字节）
+        std::uint32_t cpu_number{}; ///< 采样来源的逻辑 CPU 编号
+    };
+
+    /// @brief 温度传感器
+    struct ThermalZone
+    {
+        std::string name; ///< 传感器名称（如 thermal_zone0）
+        std::string type; ///< 类型（如 x86_pkg_temp）
+        Temperature temp; ///< 当前温度（毫摄氏度）
+    };
+
     /// @brief CPU 子系统聚合
     /// @details 持有封装、物理核、逻辑 CPU、NUMA 节点与 ISA 扩展列表，
     ///          并提供层级关系查询与可见性筛选接口。
@@ -65,6 +84,9 @@ namespace sysal
         std::vector<LogicalCpu> logical_cpus;     ///< 逻辑 CPU 列表
         std::vector<NumaNode> numa_nodes;         ///< NUMA 节点列表
         std::vector<IsaExtension> isa_extensions; ///< 支持的 ISA 扩展列表
+        std::vector<CpuCache> caches;             ///< CPU 缓存实例列表（按层级/类型）
+        std::string governor;                     ///< cpufreq 调频策略（如 performance）
+        std::vector<ThermalZone> thermal_zones;   ///< 温度传感器列表
 
         /// @brief 按封装 ID 查找封装
         /// @param id 封装 ID

@@ -95,6 +95,9 @@ struct Cpu
     std::vector<LogicalCpu> logical_cpus;     // 逻辑 CPU 列表
     std::vector<NumaNode> numa_nodes;         // NUMA 节点列表
     std::vector<IsaExtension> isa_extensions; // 支持的 ISA 扩展列表
+    std::vector<CpuCache> caches;             // CPU 缓存实例列表（按层级/类型）
+    std::string governor;                     // cpufreq 调频策略（如 performance）
+    std::vector<ThermalZone> thermal_zones;   // 温度传感器列表
 
     // 按封装 ID 查找封装
     const CpuPackage* find_package(CpuPackageId id) const;
@@ -113,6 +116,35 @@ struct Cpu
 };
 ```
 
+### CpuCache
+
+单个缓存实例，按层级（L1/L2/L3）与类型（Data/Instruction/Unified）区分。
+
+```cpp
+struct CpuCache
+{
+    std::uint32_t level;     // 缓存层级（1 = L1, 2 = L2, ...）
+    CacheType type;          // 缓存类型
+    MemorySize size;         // 缓存大小（字节）
+    std::uint32_t ways;      // 相联度
+    std::uint32_t line_size; // 缓存行大小（字节）
+    std::uint32_t cpu_number; // 采样来源的逻辑 CPU 编号
+};
+```
+
+### ThermalZone
+
+单个温度传感器。
+
+```cpp
+struct ThermalZone
+{
+    std::string name; // 传感器名称（如 thermal_zone0）
+    std::string type; // 类型（如 x86_pkg_temp）
+    Temperature temp; // 当前温度（毫摄氏度）
+};
+```
+
 ## 设计说明
 
 - **`LogicalCpu::package_id` 反范式化**：逻辑 CPU 已持有 `core_id`，理论上
@@ -122,3 +154,6 @@ struct Cpu
 - **`numa_node` 直接从 sysfs 读取**：`CpuCore::numa_node` 与
   `LogicalCpu::numa_node` 直接来自 `/sys/devices/system/node` 下的映射
   （如 `cpulist`），不经过额外的拓扑解析层。
+- **缓存与热区按采样 CPU 记录**：`CpuCache` 带 `cpu_number` 标注来源逻辑 CPU，
+  `ThermalZone` 逐一列出全部热区。两者均来自 sysfs，读取不到时静默为空，
+  不产生 warning。
