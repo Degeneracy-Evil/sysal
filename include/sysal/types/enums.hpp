@@ -115,6 +115,9 @@ namespace sysal
         CompilerTarget,  ///< 编译器 -dumpmachine 目标架构输出
         MpiVersion,      ///< MPI 实现 --version 命令输出
         MpiPath,         ///< MPI 可执行文件路径（command -v）
+        IbverbsVersion,  ///< libibverbs 版本（pkg-config）
+        IbverbsLibdir,   ///< libibverbs 库目录（pkg-config）
+        UcxVersion,      ///< UCX 版本（pkg-config）
     };
 
     /// @brief 单个原始记录的采集状态

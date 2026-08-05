@@ -229,7 +229,6 @@ int main()
         CHECK(!result.has_value());
         CHECK(warnings.empty());
     }
-
     // ---- 测试 14: 仅 MPI，无其他软件 → 返回 MPI 栈 ----
     {
         RawStore raw;
@@ -241,6 +240,54 @@ int main()
         CHECK(result->mpi.has_value());
         CHECK(result->mpi->implementation == "Open MPI");
         CHECK(result->mpi->version == "5.0.0");
+        CHECK(warnings.empty());
+    }
+
+    // ---- 测试 15: RDMA 栈探测 ----
+    {
+        RawStore raw;
+        raw.records.push_back(
+            make_record(RawSource::IbverbsVersion, "pkg-config --modversion libibverbs", "1.14.58.0\n"));
+        raw.records.push_back(make_record(RawSource::IbverbsLibdir, "pkg-config --variable=libdir libibverbs",
+                                          "/usr/lib/x86_64-linux-gnu\n"));
+        raw.records.push_back(make_record(RawSource::UcxVersion, "pkg-config --modversion ucx", "1.19.0\n"));
+
+        std::vector<std::string> warnings;
+        auto result = parse_software(raw, warnings);
+        CHECK(result.has_value());
+        CHECK(warnings.empty());
+
+        CHECK(result->rdma.has_value());
+        CHECK(result->rdma->rdma_core_version == "1.14.58.0");
+        CHECK(result->rdma->ibverbs_path == "/usr/lib/x86_64-linux-gnu");
+        CHECK(result->rdma->ucx_version == "1.19.0");
+    }
+
+    // ---- 测试 16: 仅 libibverbs，无 UCX → 部分 RDMA 栈 ----
+    {
+        RawStore raw;
+        raw.records.push_back(
+            make_record(RawSource::IbverbsVersion, "pkg-config --modversion libibverbs", "1.14.58.0\n"));
+
+        std::vector<std::string> warnings;
+        auto result = parse_software(raw, warnings);
+        CHECK(result.has_value());
+        CHECK(result->rdma.has_value());
+        CHECK(result->rdma->rdma_core_version == "1.14.58.0");
+        CHECK(result->rdma->ibverbs_path.empty());
+        CHECK(result->rdma->ucx_version.empty());
+    }
+
+    // ---- 测试 17: 仅 RDMA，无其他软件 → 返回 RDMA 栈 ----
+    {
+        RawStore raw;
+        raw.records.push_back(make_record(RawSource::IbverbsVersion, "pkg-config --modversion libibverbs", "50.0\n"));
+
+        std::vector<std::string> warnings;
+        auto result = parse_software(raw, warnings);
+        CHECK(result.has_value());
+        CHECK(result->rdma.has_value());
+        CHECK(result->rdma->rdma_core_version == "50.0");
         CHECK(warnings.empty());
     }
 

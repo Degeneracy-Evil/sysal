@@ -321,6 +321,12 @@ namespace
             return "MpiVersion";
         case sysal::RawSource::MpiPath:
             return "MpiPath";
+        case sysal::RawSource::IbverbsVersion:
+            return "IbverbsVersion";
+        case sysal::RawSource::IbverbsLibdir:
+            return "IbverbsLibdir";
+        case sysal::RawSource::UcxVersion:
+            return "UcxVersion";
         }
         return "?";
     }
@@ -740,6 +746,8 @@ int main()
     if(sys.info.software.rdma.has_value())
     {
         label("RDMA core version", sys.info.software.rdma->rdma_core_version);
+        label("ibverbs path", sys.info.software.rdma->ibverbs_path);
+        label("UCX version", sys.info.software.rdma->ucx_version);
     }
 
     // ── 10. Execution Context ───────────────────────────────────────────

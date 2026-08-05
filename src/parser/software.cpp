@@ -249,6 +249,8 @@ namespace sysal::detail
         const bool has_compiler_data = !compiler_version_records.empty();
         auto mpi_recs = raw.get_all(RawSource::MpiVersion);
         const bool has_mpi_data = !mpi_recs.empty();
+        auto rdma_recs = raw.get_all(RawSource::IbverbsVersion);
+        const bool has_rdma_data = !rdma_recs.empty();
         for(const char *cc : compiler_names)
         {
             auto ver_rec = first_success(raw, RawSource::CompilerVersion, cc);
@@ -292,6 +294,23 @@ namespace sysal::detail
                 stack.mpi = std::move(mpi);
             }
         }
+
+        // RDMA：经 pkg-config 探测 libibverbs 与 UCX，缺失时静默保持 nullopt
+        auto rdma_ver_rec = first_success(raw, RawSource::IbverbsVersion, "pkg-config");
+        if(rdma_ver_rec != nullptr)
+        {
+            RdmaStack rdma;
+            rdma.rdma_core_version = trim(rdma_ver_rec->payload);
+            if(auto libdir_rec = first_success(raw, RawSource::IbverbsLibdir, "pkg-config"))
+            {
+                rdma.ibverbs_path = trim(libdir_rec->payload);
+            }
+            if(auto ucx_rec = first_success(raw, RawSource::UcxVersion, "pkg-config"))
+            {
+                rdma.ucx_version = trim(ucx_rec->payload);
+            }
+            stack.rdma = std::move(rdma);
+        }
         if(driver_version.has_value())
         {
             Driver nvidia_driver;
@@ -325,22 +344,22 @@ namespace sysal::detail
             stack.cuda = std::move(cuda);
         }
 
-        // 无任何可解析的软件（无 nvidia-smi、无 nvcc、无编译器、无 MPI）
-        if(stack.drivers.empty() && stack.runtimes.empty() && stack.compilers.empty() && !stack.mpi.has_value())
+        // 无任何可解析的软件（无 nvidia-smi、无 nvcc、无编译器、无 MPI、无 RDMA）
+        if(stack.drivers.empty() && stack.runtimes.empty() && stack.compilers.empty() && !stack.mpi.has_value() &&
+           !stack.rdma.has_value())
         {
             // 仅当完全不采集到任何软件数据时才告警；数据存在但解析失败属静默场景不告警
-            if(nvidia_records.empty() && nvcc_records.empty() && !has_compiler_data && !has_mpi_data)
+            if(nvidia_records.empty() && nvcc_records.empty() && !has_compiler_data && !has_mpi_data && !has_rdma_data)
             {
-                warnings.push_back("parse_software: 无 nvidia-smi/nvcc/编译器/MPI 数据");
+                warnings.push_back("parse_software: 无 nvidia-smi/nvcc/编译器/MPI/RDMA 数据");
             }
             return std::nullopt;
         }
 
-        // v0.0.1：库、ROCm、Level Zero、RDMA 均不实现
+        // v0.0.1：库、ROCm、Level Zero 均不实现
         // stack.libraries 保持空
         // stack.rocm 保持 nullopt
         // stack.level_zero 保持 nullopt
-        // stack.rdma 保持 nullopt
 
         return stack;
     }

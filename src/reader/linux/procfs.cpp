@@ -276,6 +276,12 @@ namespace sysal::reader
             // 缺失的命令 read_cmd 静默记 Failed，不产生 warning
             read_cmd(raw, RawSource::MpiVersion, "mpirun --version");
             read_cmd(raw, RawSource::MpiPath, "command -v mpirun");
+
+            // RDMA 探测：经 pkg-config 查询 libibverbs 与 UCX
+            // 缺失的命令 read_cmd 静默记 Failed，不产生 warning
+            read_cmd(raw, RawSource::IbverbsVersion, "pkg-config --modversion libibverbs");
+            read_cmd(raw, RawSource::IbverbsLibdir, "pkg-config --variable=libdir libibverbs");
+            read_cmd(raw, RawSource::UcxVersion, "pkg-config --modversion ucx");
         }
 
         // ---- Execution 域 ----

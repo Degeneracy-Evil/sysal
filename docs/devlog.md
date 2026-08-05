@@ -1,5 +1,17 @@
 # 开发记录
 
+### 2026-08-05 软件栈：RDMA 填充
+
+- **变更类型**: src / tests
+- **涉及文件**: include/sysal/types/enums.hpp, src/reader/linux/procfs.cpp, src/parser/software.cpp, examples/sysal_info.cpp, tests/unit/test_parse_software.cpp, docs/devlog.md
+- **变更内容**:
+  1. enums.hpp 追加 `IbverbsVersion`、`IbverbsLibdir`、`UcxVersion` 三枚 RawSource（均经 pkg-config 查询），追加在末尾保持枚举值稳定
+  2. procfs.cpp Software 域：探测 `pkg-config --modversion libibverbs`、`--variable=libdir libibverbs`、`--modversion ucx`；缺失时静默记 Failed
+  3. software.cpp：探测到 libibverbs 版本即填充 `stack.rdma`（rdma_core_version、ibverbs_path、ucx_version）
+  4. 空栈 nullopt 判定与无数据告警条件补充 RDMA 维度
+- **原因**: 软件栈逐个子域的第三个（RDMA）
+- **验证**: `xmake` 构建通过；18/18 测试套件通过（software 93）；`sysal_info` 实测 RDMA core 1.14.58.0、ibverbs /usr/lib/x86_64-linux-gnu、UCX 1.19.0；clang-tidy `--warnings-as-errors` 无告警
+
 ### 2026-08-05 软件栈：MPI 填充
 
 - **变更类型**: src / tests
