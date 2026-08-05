@@ -1,5 +1,16 @@
 # 开发记录
 
+### 2026-08-05 软件栈：CUDA 路径填充
+
+- **变更类型**: src / tests
+- **涉及文件**: include/sysal/types/enums.hpp, src/reader/linux/procfs.cpp, src/parser/software.cpp, examples/sysal_info.cpp, tests/unit/test_parse_software.cpp, docs/devlog.md
+- **变更内容**:
+  1. enums.hpp 追加 `NvccPath`（readlink -f nvcc 真实路径）、`CudaHome`（printenv CUDA_HOME）两枚 RawSource，追加在末尾保持枚举值稳定
+  2. procfs.cpp Software 域：探测 nvcc 真实路径与 CUDA_HOME；缺失时静默记 Failed
+  3. software.cpp：新增 `derive_cuda_home`（从 nvcc 路径上溯两级推导 CUDA 根目录）；填充 `cuda.nvcc_path`、`cuda.home`（优先 CUDA_HOME 环境变量，其次从 nvcc 路径推导，均缺失则保持空）
+- **原因**: 软件栈逐个子域的第四项（CUDA 补齐 nvcc_path / home 两个此前硬编码为空的字段）
+- **验证**: `xmake` 构建通过；18/18 测试套件通过（software 107）；`sysal_info` 实测 nvcc path /usr/local/cuda-13.2/bin/nvcc、CUDA_HOME /usr/local/cuda-13.2；clang-tidy `--warnings-as-errors` 无告警
+
 ### 2026-08-05 软件栈：RDMA 填充
 
 - **变更类型**: src / tests

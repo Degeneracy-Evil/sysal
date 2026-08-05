@@ -177,6 +177,25 @@ namespace sysal::detail
             return std::make_pair(std::move(implementation), std::string(version));
         }
 
+        /// @brief 从 nvcc 路径推导 CUDA 安装根目录
+        /// @param nvcc_path nvcc 可执行文件路径，如 "/usr/local/cuda-13.2/bin/nvcc"
+        /// @return CUDA 根目录（nvcc_path 的上上级目录），如 "/usr/local/cuda-13.2"
+        /// @details 常见布局：/usr/local/cuda*/bin/nvcc；若 nvcc_path 不含两级目录则返回原路径。
+        std::string derive_cuda_home(std::string_view nvcc_path)
+        {
+            auto parent = nvcc_path.rfind('/');
+            if(parent == std::string_view::npos)
+            {
+                return std::string(nvcc_path);
+            }
+            auto grandparent = nvcc_path.substr(0, parent).rfind('/');
+            if(grandparent == std::string_view::npos)
+            {
+                return std::string(nvcc_path.substr(0, parent));
+            }
+            return std::string(nvcc_path.substr(0, grandparent));
+        }
+
         /// @brief 从 RawStore 中取某来源的首条 Success 记录
         /// @param raw 原始证据存储
         /// @param source 原始数据来源
@@ -339,8 +358,19 @@ namespace sysal::detail
             Cuda cuda;
             cuda.version = cuda_version.value_or("");
             cuda.driver_version = driver_version.value_or("");
-            cuda.nvcc_path = "";
-            cuda.home = "";
+            if(auto nvcc_path_rec = first_success(raw, RawSource::NvccPath, "readlink"))
+            {
+                cuda.nvcc_path = trim(nvcc_path_rec->payload);
+            }
+            // CUDA 根目录：优先 CUDA_HOME 环境变量，其次从 nvcc 路径推导
+            if(auto home_rec = first_success(raw, RawSource::CudaHome, "printenv"))
+            {
+                cuda.home = trim(home_rec->payload);
+            }
+            else if(!cuda.nvcc_path.empty())
+            {
+                cuda.home = derive_cuda_home(cuda.nvcc_path);
+            }
             stack.cuda = std::move(cuda);
         }
 

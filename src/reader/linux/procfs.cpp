@@ -263,6 +263,10 @@ namespace sysal::reader
                 read_cmd(raw, RawSource::Nvcc, "nvcc --version");
             }
 
+            // CUDA 路径探测：缺失时 read_cmd 静默记 Failed，不产生 warning
+            read_cmd(raw, RawSource::NvccPath, "readlink -f $(command -v nvcc 2>/dev/null)");
+            read_cmd(raw, RawSource::CudaHome, "printenv CUDA_HOME");
+
             // 编译器探测：缺失的命令 read_cmd 静默记 Failed，不产生 warning
             static const char *const compilers[] = {"gcc", "g++", "clang", "clang++", "gfortran"};
             for(const char *cc : compilers)

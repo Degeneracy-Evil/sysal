@@ -327,6 +327,10 @@ namespace
             return "IbverbsLibdir";
         case sysal::RawSource::UcxVersion:
             return "UcxVersion";
+        case sysal::RawSource::NvccPath:
+            return "NvccPath";
+        case sysal::RawSource::CudaHome:
+            return "CudaHome";
         }
         return "?";
     }

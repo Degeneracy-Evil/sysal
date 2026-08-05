@@ -291,6 +291,55 @@ int main()
         CHECK(warnings.empty());
     }
 
+    // ---- 测试 18: CUDA 路径填充（nvcc 解析 + home 推导）----
+    {
+        RawStore raw;
+        raw.records.push_back(
+            make_record(RawSource::Nvcc, "nvcc --version", "Cuda compilation tools, release 13.2, V13.2.0\n"));
+        raw.records.push_back(
+            make_record(RawSource::NvccPath, "readlink -f $(command -v nvcc)", "/usr/local/cuda-13.2/bin/nvcc\n"));
+        raw.records.push_back(make_record(RawSource::CudaHome, "printenv CUDA_HOME", "/usr/local/cuda-13.2\n"));
+
+        std::vector<std::string> warnings;
+        auto result = parse_software(raw, warnings);
+        CHECK(result.has_value());
+        CHECK(result->cuda.has_value());
+        CHECK(result->cuda->version == "13.2");
+        CHECK(result->cuda->nvcc_path == "/usr/local/cuda-13.2/bin/nvcc");
+        CHECK(result->cuda->home == "/usr/local/cuda-13.2");
+    }
+
+    // ---- 测试 19: CUDA 无 CUDA_HOME → 从 nvcc 路径推导 home ----
+    {
+        RawStore raw;
+        raw.records.push_back(
+            make_record(RawSource::Nvcc, "nvcc --version", "Cuda compilation tools, release 11.8, V11.8.89\n"));
+        raw.records.push_back(
+            make_record(RawSource::NvccPath, "readlink -f $(command -v nvcc)", "/usr/local/cuda-11.8/bin/nvcc\n"));
+
+        std::vector<std::string> warnings;
+        auto result = parse_software(raw, warnings);
+        CHECK(result.has_value());
+        CHECK(result->cuda.has_value());
+        CHECK(result->cuda->nvcc_path == "/usr/local/cuda-11.8/bin/nvcc");
+        CHECK(result->cuda->home == "/usr/local/cuda-11.8");
+    }
+
+    // ---- 测试 20: CUDA 无 nvcc 路径记录 → home 为空 ----
+    {
+        RawStore raw;
+        raw.records.push_back(
+            make_record(RawSource::Nvcc, "nvcc --version", "Cuda compilation tools, release 12.0, V12.0.0\n"));
+
+        std::vector<std::string> warnings;
+        auto result = parse_software(raw, warnings);
+        CHECK(result.has_value());
+        CHECK(result->cuda.has_value());
+        CHECK(result->cuda->version == "12.0");
+        CHECK(result->cuda->nvcc_path.empty());
+        CHECK(result->cuda->home.empty());
+    }
+
     // ---- 测试 5: nvidia-smi 格式异常 → 警告 ----
     {
         RawStore raw;

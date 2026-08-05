@@ -118,6 +118,8 @@ namespace sysal
         IbverbsVersion,  ///< libibverbs 版本（pkg-config）
         IbverbsLibdir,   ///< libibverbs 库目录（pkg-config）
         UcxVersion,      ///< UCX 版本（pkg-config）
+        NvccPath,        ///< nvcc 可执行文件路径（command -v nvcc）
+        CudaHome,        ///< CUDA_HOME 环境变量
     };
 
     /// @brief 单个原始记录的采集状态
