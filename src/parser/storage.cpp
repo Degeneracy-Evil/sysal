@@ -66,6 +66,22 @@ namespace sysal::detail
             return std::string(after_block.substr(0, slash_pos));
         }
 
+        /// @brief 从块设备符号链接目标中提取 PCI 地址
+        /// @param target 符号链接目标，如 "../devices/pci0000:e2/0000:e2:04.0/0000:e4:00.0/nvme/nvme0/nvme0n1"
+        /// @return 最后一个合法 PCI 地址段（即设备所属的 PCI 控制器）；虚拟设备返回 nullopt
+        std::optional<PciAddress> extract_pci_address_from_block(std::string_view target)
+        {
+            std::optional<PciAddress> result;
+            for(const auto &segment : split(target, '/'))
+            {
+                if(auto addr = parse_pci_address(segment))
+                {
+                    result = addr;
+                }
+            }
+            return result;
+        }
+
     } // namespace
 
     std::optional<Storage> parse_storage(const RawStore &raw, std::vector<std::string> &warnings)
@@ -181,6 +197,16 @@ namespace sysal::detail
                 {
                     warnings.push_back("parse_storage: 块设备 " + dev_name +
                                        " 的 size 解析失败: " + trim(size_it->second));
+                }
+            }
+
+            // 从设备入口符号链接目标提取 PCI 地址（虚拟设备无，保持 nullopt）
+            auto dev_pci_it = attrs.find("device");
+            if(dev_pci_it != attrs.end())
+            {
+                if(auto pci = extract_pci_address_from_block(dev_pci_it->second))
+                {
+                    dev.pci_address = pci;
                 }
             }
 

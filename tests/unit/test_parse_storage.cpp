@@ -57,6 +57,38 @@ int main()
         CHECK(!result.has_value());
     }
 
+    // ---- 测试 2.5: 块设备 PCI 地址提取 ----
+    {
+        RawStore raw;
+        // nvme0n1 符号链接目标含多个 PCI 段，取最后一个（控制器）
+        raw.records.push_back(make_record(RawSource::SysfsBlock, "/sys/block/nvme0n1/size", "3750924672\n"));
+        raw.records.push_back(make_record(RawSource::SysfsBlock, "/sys/block/nvme0n1/device",
+                                          "../devices/pci0000:e2/0000:e2:04.0/0000:e4:00.0/nvme/nvme0/nvme0n1\n"));
+        // 虚拟设备 loop0 无 PCI 段
+        raw.records.push_back(make_record(RawSource::SysfsBlock, "/sys/block/loop0/size", "0\n"));
+        raw.records.push_back(
+            make_record(RawSource::SysfsBlock, "/sys/block/loop0/device", "../devices/virtual/block/loop0\n"));
+
+        std::vector<std::string> warnings;
+        auto result = parse_storage(raw, warnings);
+        CHECK(result.has_value());
+
+        const auto &stor = *result;
+        CHECK(stor.devices.size() == 2);
+
+        const auto &nvme = stor.devices[0];
+        CHECK(nvme.name.value == "nvme0n1");
+        CHECK(nvme.pci_address.has_value());
+        CHECK(nvme.pci_address->domain == 0);
+        CHECK(nvme.pci_address->bus == 0xe4);
+        CHECK(nvme.pci_address->device == 0);
+        CHECK(nvme.pci_address->function == 0);
+
+        const auto &loop = stor.devices[1];
+        CHECK(loop.name.value == "loop0");
+        CHECK(!loop.pci_address.has_value());
+    }
+
     // ---- 测试 3: 未知设备类型 → Other ----
     {
         RawStore raw;

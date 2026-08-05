@@ -247,10 +247,23 @@ namespace sysal::reader
                 // queue/rotational: "0"=SSD, "1"=HDD
                 read_sysfs_file(raw, RawSource::SysfsBlock, (dir / "queue" / "rotational").string());
 
-                // device/ 子目录下的型号等信息
+                // device/ 子目录下的型号设备
                 if(fs::exists(dir / "device"))
                 {
                     read_sysfs_file(raw, RawSource::SysfsBlock, (dir / "device" / "model").string());
+                }
+
+                // 块设备入口本身是符号链接，目标指向 PCI 设备树，如
+                //   /sys/block/nvme0n1 -> ../devices/pci0000:e2/0000:e2:04.0/0000:e4:00.0/nvme/nvme0/nvme0n1
+                // 该目标的最后一个 PCI 地址段（如 0000:e4:00.0）即设备所属的 PCI 控制器。
+                // 虚拟设备（loop/ram）目标为 ../devices/virtual/...，无 PCI 段，静默跳过。
+                std::error_code link_ec;
+                auto entry_target = fs::read_symlink(dir, link_ec);
+                if(!link_ec)
+                {
+                    // 路径含分设备名，便于解析器提取设备名与文件名 "device"
+                    add_record(raw, RawSource::SysfsBlock, (dir / "device").string(), entry_target.string(),
+                               CollectStatus::Success);
                 }
             }
 

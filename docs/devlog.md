@@ -1,5 +1,15 @@
 # 开发记录
 
+### 2026-08-05 修复块设备 PCI 地址缺失
+
+- **变更类型**: fix / src / tests
+- **涉及文件**: src/reader/linux/sysfs.cpp, src/parser/storage.cpp, tests/unit/test_parse_storage.cpp, docs/devlog.md
+- **变更内容**:
+  1. `read_block_sysfs`: 采集块设备入口符号链接目标（如 `/sys/block/nvme0n1 -> ../devices/pci0000:e2/0000:e2:04.0/0000:e4:00.0/nvme/nvme0/nvme0n1`）
+  2. `parse_storage`: 新增 `extract_pci_address_from_block`，从符号链接目标中取最后一个合法 PCI 地址段（即设备所属的 PCI 控制器）赋给 `dev.pci_address`；虚拟设备（loop/ram）无 PCI 段，静默保持 nullopt
+- **原因**: `StorageDevice.pci_address` 字段从未被赋值。与网络设备不同，块设备的 `device` 符号链接（`../../nvme0`）不含 PCI 地址，需从入口符号链接本身提取
+- **验证**: `xmake check`（format + tidy + rebuild + test）通过；57/57 存储解析断言通过；本机实测 sda→0000:e3:00.0、nvme1n1→0000:e5:00.0 与真实控制器一致
+
 ### 2026-08-03 v0.0.7 收口
 
 - **变更类型**: build / chore
