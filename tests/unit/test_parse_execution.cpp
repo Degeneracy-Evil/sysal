@@ -3,8 +3,8 @@
 #include "sysal/model/raw_store.hpp"
 #include "sysal/types/enums.hpp"
 
-#include "test_macros.hpp"
 #include <chrono>
+#include <doctest/doctest.h>
 #include <string>
 #include <vector>
 
@@ -16,7 +16,7 @@ static RawRecord make_record(RawSource source, const std::string &path, const st
     return RawRecord{source, path, payload, CollectStatus::Success, std::chrono::system_clock::now()};
 }
 
-int main()
+TEST_CASE("test_parse_execution")
 {
     // ---- 测试 1: 完整执行上下文解析 ----
     {
@@ -39,7 +39,11 @@ int main()
 
         std::vector<std::string> warnings;
         auto result = parse_execution(raw, warnings);
-        CHECK(result.has_value());
+        REQUIRE(result.has_value());
+        if(!result.has_value())
+        {
+            return;
+        }
 
         const auto &ctx = *result;
 
@@ -79,7 +83,11 @@ int main()
         CHECK(ctx.permission.capabilities[7] == "CAP_SETPCAP");
 
         // 容器
-        CHECK(ctx.container.has_value());
+        REQUIRE(ctx.container.has_value());
+        if(!ctx.container.has_value())
+        {
+            return;
+        }
         CHECK(ctx.container->kind == ContainerKind::Docker);
 
         // 环境变量
@@ -108,7 +116,11 @@ int main()
 
         std::vector<std::string> warnings;
         auto result = parse_execution(raw, warnings);
-        CHECK(result.has_value());
+        REQUIRE(result.has_value());
+        if(!result.has_value())
+        {
+            return;
+        }
 
         const auto &ctx = *result;
         CHECK(ctx.process.pid == 5678);
@@ -132,7 +144,11 @@ int main()
 
         std::vector<std::string> warnings;
         auto result = parse_execution(raw, warnings);
-        CHECK(result.has_value());
+        REQUIRE(result.has_value());
+        if(!result.has_value())
+        {
+            return;
+        }
         CHECK(result->cgroup.version == CgroupVersion::V1);
         CHECK(result->cgroup.path == "/user.slice");
         CHECK(result->cgroup.controllers.size() == 2);
@@ -151,8 +167,16 @@ int main()
 
         std::vector<std::string> warnings;
         auto result = parse_execution(raw, warnings);
-        CHECK(result.has_value());
-        CHECK(result->container.has_value());
+        REQUIRE(result.has_value());
+        if(!result.has_value())
+        {
+            return;
+        }
+        REQUIRE(result->container.has_value());
+        if(!result->container.has_value())
+        {
+            return;
+        }
         CHECK(result->container->kind == ContainerKind::Kubernetes);
     }
 
@@ -175,10 +199,16 @@ int main()
 
         std::vector<std::string> warnings;
         auto result = parse_execution(raw, warnings);
-        CHECK(result.has_value());
-        CHECK(result->container.has_value());
+        REQUIRE(result.has_value());
+        if(!result.has_value())
+        {
+            return;
+        }
+        REQUIRE(result->container.has_value());
+        if(!result->container.has_value())
+        {
+            return;
+        }
         CHECK(result->container->kind == ContainerKind::Podman);
     }
-
-    TEST_SUMMARY();
 }

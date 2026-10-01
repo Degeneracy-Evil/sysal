@@ -3,8 +3,8 @@
 #include "sysal/model/raw_store.hpp"
 #include "sysal/types/enums.hpp"
 
-#include "test_macros.hpp"
 #include <chrono>
+#include <doctest/doctest.h>
 #include <string>
 #include <vector>
 
@@ -17,7 +17,7 @@ static RawRecord make_record(RawSource source, const std::string &path, const st
     return RawRecord{source, path, payload, CollectStatus::Success, std::chrono::system_clock::now()};
 }
 
-int main()
+TEST_CASE("test_parse_memory")
 {
     // ---- 测试 1: 基本内存信息解析 ----
     {
@@ -31,12 +31,20 @@ int main()
 
         std::vector<std::string> warnings;
         auto result = parse_memory(raw, warnings);
-        CHECK(result.has_value());
+        REQUIRE(result.has_value());
+        if(!result.has_value())
+        {
+            return;
+        }
 
         const auto &mem = *result;
         // 395617072 kB → 395617072 * 1024 bytes
         CHECK(mem.total_memory.value == 395617072ULL * 1024);
-        CHECK(mem.available_memory.has_value());
+        REQUIRE(mem.available_memory.has_value());
+        if(!mem.available_memory.has_value())
+        {
+            return;
+        }
         CHECK(mem.available_memory->value == 360924620ULL * 1024);
     }
 
@@ -55,14 +63,23 @@ int main()
 
         std::vector<std::string> warnings;
         auto result = parse_memory(raw, warnings);
-        CHECK(result.has_value());
+        REQUIRE(result.has_value());
+        if(!result.has_value())
+        {
+            return;
+        }
 
         const auto &mem = *result;
         CHECK(mem.numa_memory.size() == 2);
         CHECK(mem.numa_memory[0].node == NumaNodeId{0});
         CHECK(mem.numa_memory[0].total.value == 197808536ULL * 1024);
-        CHECK(mem.numa_memory[0].available.has_value());
-        CHECK(mem.numa_memory[0].available->value == 180462310ULL * 1024);
+        const auto &available_1 = mem.numa_memory[0].available;
+        REQUIRE(available_1.has_value());
+        if(!available_1.has_value())
+        {
+            return;
+        }
+        CHECK(available_1->value == 180462310ULL * 1024);
         CHECK(mem.numa_memory[1].node == NumaNodeId{1});
     }
 
@@ -75,7 +92,11 @@ int main()
 
         std::vector<std::string> warnings;
         auto result = parse_memory(raw, warnings);
-        CHECK(result.has_value());
+        REQUIRE(result.has_value());
+        if(!result.has_value())
+        {
+            return;
+        }
         CHECK(!result->available_memory.has_value());
     }
 
@@ -127,13 +148,25 @@ int main()
 
         std::vector<std::string> warnings;
         auto result = parse_memory(raw, warnings);
-        CHECK(result.has_value());
+        REQUIRE(result.has_value());
+        if(!result.has_value())
+        {
+            return;
+        }
 
         const auto &mem = *result;
         CHECK(mem.dimms.size() == 2);
-        CHECK(mem.dimm_count.has_value());
+        REQUIRE(mem.dimm_count.has_value());
+        if(!mem.dimm_count.has_value())
+        {
+            return;
+        }
         CHECK(*mem.dimm_count == 2);
-        CHECK(mem.populated_dimms.has_value());
+        REQUIRE(mem.populated_dimms.has_value());
+        if(!mem.populated_dimms.has_value())
+        {
+            return;
+        }
         CHECK(*mem.populated_dimms == 1);
 
         const auto &d0 = mem.dimms[0];
@@ -142,21 +175,53 @@ int main()
         CHECK(d0.locator == "CPU0_C0D0");
         CHECK(d0.bank_locator == "NODE 0");
         CHECK(d0.size.value == 34359738368ULL);
-        CHECK(d0.speed_mts.has_value());
+        REQUIRE(d0.speed_mts.has_value());
+        if(!d0.speed_mts.has_value())
+        {
+            return;
+        }
         CHECK(d0.speed_mts->value == 3200);
-        CHECK(mem.configured_speed_mts.has_value());
+        REQUIRE(mem.configured_speed_mts.has_value());
+        if(!mem.configured_speed_mts.has_value())
+        {
+            return;
+        }
         CHECK(mem.configured_speed_mts->value == 2933);
-        CHECK(d0.manufacturer.has_value());
+        REQUIRE(d0.manufacturer.has_value());
+        if(!d0.manufacturer.has_value())
+        {
+            return;
+        }
         CHECK(d0.manufacturer->value == "Samsung");
-        CHECK(d0.part_number.has_value());
+        REQUIRE(d0.part_number.has_value());
+        if(!d0.part_number.has_value())
+        {
+            return;
+        }
         CHECK(*d0.part_number == "M393A4K40EB3-CWE");
-        CHECK(d0.rank.has_value());
+        REQUIRE(d0.rank.has_value());
+        if(!d0.rank.has_value())
+        {
+            return;
+        }
         CHECK(*d0.rank == 2);
-        CHECK(d0.total_width.has_value());
+        REQUIRE(d0.total_width.has_value());
+        if(!d0.total_width.has_value())
+        {
+            return;
+        }
         CHECK(*d0.total_width == 72);
-        CHECK(d0.data_width.has_value());
+        REQUIRE(d0.data_width.has_value());
+        if(!d0.data_width.has_value())
+        {
+            return;
+        }
         CHECK(*d0.data_width == 64);
-        CHECK(d0.form_factor.has_value());
+        REQUIRE(d0.form_factor.has_value());
+        if(!d0.form_factor.has_value())
+        {
+            return;
+        }
         CHECK(*d0.form_factor == "DIMM");
 
         const auto &d1 = mem.dimms[1];
@@ -191,13 +256,25 @@ int main()
 
         std::vector<std::string> warnings;
         auto result = parse_memory(raw, warnings);
-        CHECK(result.has_value());
+        REQUIRE(result.has_value());
+        if(!result.has_value())
+        {
+            return;
+        }
 
         const auto &mem = *result;
         CHECK(mem.dimms.size() == 2);
-        CHECK(mem.dimm_count.has_value());
+        REQUIRE(mem.dimm_count.has_value());
+        if(!mem.dimm_count.has_value())
+        {
+            return;
+        }
         CHECK(*mem.dimm_count == 2);
-        CHECK(mem.populated_dimms.has_value());
+        REQUIRE(mem.populated_dimms.has_value());
+        if(!mem.populated_dimms.has_value())
+        {
+            return;
+        }
         CHECK(*mem.populated_dimms == 2);
 
         const auto &d0 = mem.dimms[0];
@@ -222,7 +299,11 @@ int main()
 
         std::vector<std::string> warnings;
         auto result = parse_memory(raw, warnings);
-        CHECK(result.has_value());
+        REQUIRE(result.has_value());
+        if(!result.has_value())
+        {
+            return;
+        }
 
         const auto &mem = *result;
         CHECK(mem.dimms.empty());
@@ -248,13 +329,25 @@ int main()
 
         std::vector<std::string> warnings;
         auto result = parse_memory(raw, warnings);
-        CHECK(result.has_value());
+        REQUIRE(result.has_value());
+        if(!result.has_value())
+        {
+            return;
+        }
 
         const auto &mem = *result;
         CHECK(mem.dimms.size() == 1);
-        CHECK(mem.dimm_count.has_value());
+        REQUIRE(mem.dimm_count.has_value());
+        if(!mem.dimm_count.has_value())
+        {
+            return;
+        }
         CHECK(*mem.dimm_count == 1);
-        CHECK(mem.populated_dimms.has_value());
+        REQUIRE(mem.populated_dimms.has_value());
+        if(!mem.populated_dimms.has_value())
+        {
+            return;
+        }
         CHECK(*mem.populated_dimms == 1);
         CHECK(mem.memory_type == "DDR4");
         CHECK(mem.dimms[0].size.value == 34359738368ULL);
@@ -270,6 +363,4 @@ int main()
         }
         CHECK(has_warning);
     }
-
-    TEST_SUMMARY();
 }

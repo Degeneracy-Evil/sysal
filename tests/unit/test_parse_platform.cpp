@@ -3,8 +3,8 @@
 #include "sysal/model/raw_store.hpp"
 #include "sysal/types/enums.hpp"
 
-#include "test_macros.hpp"
 #include <chrono>
+#include <doctest/doctest.h>
 #include <string>
 #include <vector>
 
@@ -17,7 +17,7 @@ static RawRecord make_record(RawSource source, const std::string &path, const st
     return RawRecord{source, path, payload, CollectStatus::Success, std::chrono::system_clock::now()};
 }
 
-int main()
+TEST_CASE("test_parse_platform")
 {
     // ---- 测试 1: 完整平台信息解析 ----
     {
@@ -41,7 +41,11 @@ int main()
 
         std::vector<std::string> warnings;
         auto result = parse_platform(raw, warnings);
-        CHECK(result.has_value());
+        REQUIRE(result.has_value());
+        if(!result.has_value())
+        {
+            return;
+        }
 
         const auto &p = *result;
 
@@ -68,7 +72,11 @@ int main()
         CHECK(p.host.serial == "ABCD1234");
 
         // Firmware
-        CHECK(p.firmware.has_value());
+        REQUIRE(p.firmware.has_value());
+        if(!p.firmware.has_value())
+        {
+            return;
+        }
         CHECK(p.firmware->bios_vendor.value == "American Megatrends Inc.");
         CHECK(p.firmware->bios_version == "1.0.0");
         CHECK(p.firmware->bios_date == "01/01/2023");
@@ -88,7 +96,11 @@ int main()
 
         std::vector<std::string> warnings;
         auto result = parse_platform(raw, warnings);
-        CHECK(result.has_value());
+        REQUIRE(result.has_value());
+        if(!result.has_value())
+        {
+            return;
+        }
         // detect_virtualization 仅检测硬件虚拟化，容器不再产生 Virtualization
         CHECK(!result->virtualization.has_value());
     }
@@ -105,8 +117,16 @@ int main()
 
         std::vector<std::string> warnings;
         auto result = parse_platform(raw, warnings);
-        CHECK(result.has_value());
-        CHECK(result->virtualization.has_value());
+        REQUIRE(result.has_value());
+        if(!result.has_value())
+        {
+            return;
+        }
+        REQUIRE(result->virtualization.has_value());
+        if(!result->virtualization.has_value())
+        {
+            return;
+        }
         CHECK(result->virtualization->kind == VirtualizationKind::Kvm);
         CHECK(result->virtualization->hypervisor == "KVM");
     }
@@ -121,8 +141,16 @@ int main()
 
         std::vector<std::string> warnings;
         auto result = parse_platform(raw, warnings);
-        CHECK(result.has_value());
-        CHECK(result->virtualization.has_value());
+        REQUIRE(result.has_value());
+        if(!result.has_value())
+        {
+            return;
+        }
+        REQUIRE(result->virtualization.has_value());
+        if(!result->virtualization.has_value())
+        {
+            return;
+        }
         CHECK(result->virtualization->kind == VirtualizationKind::Xen);
         CHECK(result->virtualization->hypervisor == "Xen");
     }
@@ -138,8 +166,16 @@ int main()
 
         std::vector<std::string> warnings;
         auto result = parse_platform(raw, warnings);
-        CHECK(result.has_value());
-        CHECK(result->virtualization.has_value());
+        REQUIRE(result.has_value());
+        if(!result.has_value())
+        {
+            return;
+        }
+        REQUIRE(result->virtualization.has_value());
+        if(!result->virtualization.has_value())
+        {
+            return;
+        }
         CHECK(result->virtualization->kind == VirtualizationKind::Vmware);
         CHECK(result->virtualization->hypervisor == "VMware");
     }
@@ -156,8 +192,16 @@ int main()
 
         std::vector<std::string> warnings;
         auto result = parse_platform(raw, warnings);
-        CHECK(result.has_value());
-        CHECK(result->virtualization.has_value());
+        REQUIRE(result.has_value());
+        if(!result.has_value())
+        {
+            return;
+        }
+        REQUIRE(result->virtualization.has_value());
+        if(!result->virtualization.has_value())
+        {
+            return;
+        }
         CHECK(result->virtualization->kind == VirtualizationKind::HyperV);
         CHECK(result->virtualization->hypervisor == "Hyper-V");
     }
@@ -172,8 +216,16 @@ int main()
 
         std::vector<std::string> warnings;
         auto result = parse_platform(raw, warnings);
-        CHECK(result.has_value());
-        CHECK(result->virtualization.has_value());
+        REQUIRE(result.has_value());
+        if(!result.has_value())
+        {
+            return;
+        }
+        REQUIRE(result->virtualization.has_value());
+        if(!result->virtualization.has_value())
+        {
+            return;
+        }
         CHECK(result->virtualization->kind == VirtualizationKind::Qemu);
         CHECK(result->virtualization->hypervisor == "QEMU");
     }
@@ -189,8 +241,16 @@ int main()
 
         std::vector<std::string> warnings;
         auto result = parse_platform(raw, warnings);
-        CHECK(result.has_value());
-        CHECK(result->virtualization.has_value());
+        REQUIRE(result.has_value());
+        if(!result.has_value())
+        {
+            return;
+        }
+        REQUIRE(result->virtualization.has_value());
+        if(!result->virtualization.has_value())
+        {
+            return;
+        }
         CHECK(result->virtualization->kind == VirtualizationKind::VirtualBox);
         CHECK(result->virtualization->hypervisor == "VirtualBox");
     }
@@ -206,8 +266,16 @@ int main()
 
         std::vector<std::string> warnings;
         auto result = parse_platform(raw, warnings);
-        CHECK(result.has_value());
-        CHECK(result->virtualization.has_value());
+        REQUIRE(result.has_value());
+        if(!result.has_value())
+        {
+            return;
+        }
+        REQUIRE(result->virtualization.has_value());
+        if(!result->virtualization.has_value())
+        {
+            return;
+        }
         CHECK(result->virtualization->kind == VirtualizationKind::Parallels);
         CHECK(result->virtualization->hypervisor == "Parallels");
     }
@@ -223,8 +291,16 @@ int main()
 
         std::vector<std::string> warnings;
         auto result = parse_platform(raw, warnings);
-        CHECK(result.has_value());
-        CHECK(result->virtualization.has_value());
+        REQUIRE(result.has_value());
+        if(!result.has_value())
+        {
+            return;
+        }
+        REQUIRE(result->virtualization.has_value());
+        if(!result->virtualization.has_value())
+        {
+            return;
+        }
         CHECK(result->virtualization->kind == VirtualizationKind::Xen);
         CHECK(result->virtualization->hypervisor == "Xen");
     }
@@ -241,8 +317,16 @@ int main()
 
         std::vector<std::string> warnings;
         auto result = parse_platform(raw, warnings);
-        CHECK(result.has_value());
-        CHECK(result->virtualization.has_value());
+        REQUIRE(result.has_value());
+        if(!result.has_value())
+        {
+            return;
+        }
+        REQUIRE(result->virtualization.has_value());
+        if(!result->virtualization.has_value())
+        {
+            return;
+        }
         CHECK(result->virtualization->kind == VirtualizationKind::Other);
         CHECK(result->virtualization->hypervisor == "Unknown");
         bool has_virt_warning = false;
@@ -270,7 +354,11 @@ int main()
 
         std::vector<std::string> warnings;
         auto result = parse_platform(raw, warnings);
-        CHECK(result.has_value());
+        REQUIRE(result.has_value());
+        if(!result.has_value())
+        {
+            return;
+        }
         CHECK(!result->virtualization.has_value());
     }
 
@@ -285,8 +373,16 @@ int main()
 
         std::vector<std::string> warnings;
         auto result = parse_platform(raw, warnings);
-        CHECK(result.has_value());
-        CHECK(result->virtualization.has_value());
+        REQUIRE(result.has_value());
+        if(!result.has_value())
+        {
+            return;
+        }
+        REQUIRE(result->virtualization.has_value());
+        if(!result->virtualization.has_value())
+        {
+            return;
+        }
         CHECK(result->virtualization->kind == VirtualizationKind::Xen);
     }
 
@@ -299,7 +395,11 @@ int main()
 
         std::vector<std::string> warnings;
         auto result = parse_platform(raw, warnings);
-        CHECK(result.has_value());
+        REQUIRE(result.has_value());
+        if(!result.has_value())
+        {
+            return;
+        }
         CHECK(result->architecture.name == "aarch64");
         CHECK(result->architecture.bits == 64);
     }
@@ -313,7 +413,11 @@ int main()
 
         std::vector<std::string> warnings;
         auto result = parse_platform(raw, warnings);
-        CHECK(result.has_value());
+        REQUIRE(result.has_value());
+        if(!result.has_value())
+        {
+            return;
+        }
         CHECK(result->architecture.name == "riscv64");
         CHECK(result->architecture.bits == 64);
     }
@@ -326,10 +430,12 @@ int main()
         std::vector<std::string> warnings;
         auto result = parse_platform(raw, warnings);
         // 即使缺少数据，仍返回默认 Platform
-        CHECK(result.has_value());
+        REQUIRE(result.has_value());
+        if(!result.has_value())
+        {
+            return;
+        }
         // 应有警告
         CHECK(!warnings.empty());
     }
-
-    TEST_SUMMARY();
 }

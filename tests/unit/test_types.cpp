@@ -6,10 +6,10 @@
 #include "sysal/types/units.hpp"
 #include "sysal/types/value_types.hpp"
 
-#include "test_macros.hpp"
 #include <cstdint>
+#include <doctest/doctest.h>
 
-int main()
+TEST_CASE("test_types")
 {
     // Collect 位掩码
     static_assert(sysal::has(sysal::full, sysal::Collect::Cpu));
@@ -57,6 +57,4 @@ int main()
     // SysalError
     sysal::SysalError err(sysal::ErrorKind::CollectionFailed, "test error");
     CHECK(err.kind() == sysal::ErrorKind::CollectionFailed);
-
-    TEST_SUMMARY();
 }

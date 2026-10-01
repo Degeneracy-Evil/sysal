@@ -6,7 +6,7 @@
 #include "sysal/serialization/serialization.hpp"
 #include "sysal/version.hpp"
 
-#include "test_macros.hpp"
+#include <doctest/doctest.h>
 
 #include <cstdlib>
 #include <iostream>
@@ -46,7 +46,7 @@ namespace
         System round_trip = from_json(json_str);
 
         // 比较关键字段
-        CHECK(round_trip.info.cpu.logical_cpus.size() == sys.info.cpu.logical_cpus.size());
+        REQUIRE(round_trip.info.cpu.logical_cpus.size() == sys.info.cpu.logical_cpus.size());
         CHECK(round_trip.info.memory.total_memory.value == sys.info.memory.total_memory.value);
         CHECK(round_trip.info.platform.os.name == sys.info.platform.os.name);
         CHECK(round_trip.info.platform.os.version == sys.info.platform.os.version);
@@ -54,22 +54,37 @@ namespace
         CHECK(round_trip.info.platform.virtualization.has_value() == sys.info.platform.virtualization.has_value());
         if(sys.info.platform.virtualization.has_value())
         {
+            REQUIRE(round_trip.info.platform.virtualization.has_value());
+            if(!round_trip.info.platform.virtualization.has_value())
+            {
+                return;
+            }
             CHECK(round_trip.info.platform.virtualization->kind == sys.info.platform.virtualization->kind);
             CHECK(round_trip.info.platform.virtualization->hypervisor == sys.info.platform.virtualization->hypervisor);
         }
         CHECK(round_trip.info.execution.process.pid == sys.info.execution.process.pid);
 
         // Memory: v0.0.4 DIMM 字段
-        CHECK(round_trip.info.memory.dimms.size() == sys.info.memory.dimms.size());
+        REQUIRE(round_trip.info.memory.dimms.size() == sys.info.memory.dimms.size());
         CHECK(round_trip.info.memory.dimm_count.has_value() == sys.info.memory.dimm_count.has_value());
         if(sys.info.memory.dimm_count.has_value())
         {
+            REQUIRE(round_trip.info.memory.dimm_count.has_value());
+            if(!round_trip.info.memory.dimm_count.has_value())
+            {
+                return;
+            }
             CHECK(round_trip.info.memory.dimm_count.value() > 0);
             CHECK(round_trip.info.memory.dimm_count.value() == sys.info.memory.dimm_count.value());
         }
         CHECK(round_trip.info.memory.populated_dimms.has_value() == sys.info.memory.populated_dimms.has_value());
         if(sys.info.memory.populated_dimms.has_value())
         {
+            REQUIRE(round_trip.info.memory.populated_dimms.has_value());
+            if(!round_trip.info.memory.populated_dimms.has_value())
+            {
+                return;
+            }
             CHECK(round_trip.info.memory.populated_dimms.value() > 0);
             CHECK(round_trip.info.memory.populated_dimms.value() == sys.info.memory.populated_dimms.value());
         }
@@ -79,6 +94,11 @@ namespace
               sys.info.memory.configured_speed_mts.has_value());
         if(sys.info.memory.configured_speed_mts.has_value())
         {
+            REQUIRE(round_trip.info.memory.configured_speed_mts.has_value());
+            if(!round_trip.info.memory.configured_speed_mts.has_value())
+            {
+                return;
+            }
             CHECK(round_trip.info.memory.configured_speed_mts->value == sys.info.memory.configured_speed_mts->value);
         }
         if(!sys.info.memory.dimms.empty())
@@ -89,17 +109,27 @@ namespace
             CHECK(b.speed_mts.has_value() == a.speed_mts.has_value());
             if(a.speed_mts.has_value())
             {
+                REQUIRE(b.speed_mts.has_value());
+                if(!b.speed_mts.has_value())
+                {
+                    return;
+                }
                 CHECK(b.speed_mts->value == a.speed_mts->value);
             }
             CHECK(b.manufacturer.has_value() == a.manufacturer.has_value());
             if(a.manufacturer.has_value())
             {
+                REQUIRE(b.manufacturer.has_value());
+                if(!b.manufacturer.has_value())
+                {
+                    return;
+                }
                 CHECK(b.manufacturer->value == a.manufacturer->value);
             }
         }
 
         // Accelerator
-        CHECK(round_trip.info.accelerators.devices.size() == sys.info.accelerators.devices.size());
+        REQUIRE(round_trip.info.accelerators.devices.size() == sys.info.accelerators.devices.size());
         if(!sys.info.accelerators.devices.empty())
         {
             const auto &a = sys.info.accelerators.devices[0];
@@ -109,12 +139,17 @@ namespace
             CHECK(b.memory_size.has_value() == a.memory_size.has_value());
             if(a.memory_size.has_value())
             {
+                REQUIRE(b.memory_size.has_value());
+                if(!b.memory_size.has_value())
+                {
+                    return;
+                }
                 CHECK(b.memory_size->value == a.memory_size->value);
             }
         }
 
         // Storage
-        CHECK(round_trip.info.storage.devices.size() == sys.info.storage.devices.size());
+        REQUIRE(round_trip.info.storage.devices.size() == sys.info.storage.devices.size());
         if(!sys.info.storage.devices.empty())
         {
             const auto &a = sys.info.storage.devices[0];
@@ -124,6 +159,11 @@ namespace
             CHECK(b.capacity.has_value() == a.capacity.has_value());
             if(a.capacity.has_value())
             {
+                REQUIRE(b.capacity.has_value());
+                if(!b.capacity.has_value())
+                {
+                    return;
+                }
                 CHECK(b.capacity->value == a.capacity->value);
             }
         }
@@ -135,11 +175,20 @@ namespace
             if(a.mount_point.has_value())
             {
                 const auto &b = round_trip.info.storage.devices[i];
-                CHECK(b.mount_point.has_value());
+                REQUIRE(b.mount_point.has_value());
+                if(!b.mount_point.has_value())
+                {
+                    return;
+                }
                 CHECK(b.mount_point->value == a.mount_point->value);
                 CHECK(b.fs_type.has_value() == a.fs_type.has_value());
                 if(a.fs_type.has_value())
                 {
+                    REQUIRE(b.fs_type.has_value());
+                    if(!b.fs_type.has_value())
+                    {
+                        return;
+                    }
                     CHECK(b.fs_type->value == a.fs_type->value);
                 }
                 break;
@@ -147,7 +196,7 @@ namespace
         }
 
         // PCI
-        CHECK(round_trip.info.pci.devices.size() == sys.info.pci.devices.size());
+        REQUIRE(round_trip.info.pci.devices.size() == sys.info.pci.devices.size());
         if(!sys.info.pci.devices.empty())
         {
             const auto &a = sys.info.pci.devices[0];
@@ -158,7 +207,7 @@ namespace
         }
 
         // Network
-        CHECK(round_trip.info.network.interfaces.size() == sys.info.network.interfaces.size());
+        REQUIRE(round_trip.info.network.interfaces.size() == sys.info.network.interfaces.size());
         if(!sys.info.network.interfaces.empty())
         {
             const auto &a = sys.info.network.interfaces[0];
@@ -174,7 +223,7 @@ namespace
             if(!a.addresses.empty())
             {
                 const auto &b = round_trip.info.network.interfaces[i];
-                CHECK(b.addresses.size() == a.addresses.size());
+                REQUIRE(b.addresses.size() == a.addresses.size());
                 for(std::size_t j = 0; j < a.addresses.size(); ++j)
                 {
                     CHECK(b.addresses[j].value == a.addresses[j].value);
@@ -190,7 +239,11 @@ namespace
             if(a.pci_address.has_value())
             {
                 const auto &b = round_trip.info.network.interfaces[i];
-                CHECK(b.pci_address.has_value());
+                REQUIRE(b.pci_address.has_value());
+                if(!b.pci_address.has_value())
+                {
+                    return;
+                }
                 CHECK(b.pci_address->domain == a.pci_address->domain);
                 CHECK(b.pci_address->bus == a.pci_address->bus);
                 CHECK(b.pci_address->device == a.pci_address->device);
@@ -268,7 +321,7 @@ namespace
             CHECK(true);
         }
         // cpu 缓存字段往返保真
-        CHECK(round_trip.info.cpu.caches.size() == sys.info.cpu.caches.size());
+        REQUIRE(round_trip.info.cpu.caches.size() == sys.info.cpu.caches.size());
     }
 
     void test_meta_when_included()
@@ -386,7 +439,7 @@ namespace
 
 } // namespace
 
-int main()
+TEST_CASE("test_serialization")
 {
     std::cout << "test_serialization:\n";
 
@@ -398,6 +451,4 @@ int main()
     test_meta_when_included();
     test_version_mismatch();
     test_compatible_version();
-
-    TEST_SUMMARY();
 }

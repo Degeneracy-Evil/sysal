@@ -3,8 +3,8 @@
 #include "sysal/model/raw_store.hpp"
 #include "sysal/types/enums.hpp"
 
-#include "test_macros.hpp"
 #include <chrono>
+#include <doctest/doctest.h>
 #include <string>
 #include <vector>
 
@@ -17,7 +17,7 @@ static RawRecord make_record(RawSource source, const std::string &path, const st
     return RawRecord{source, path, payload, CollectStatus::Success, std::chrono::system_clock::now()};
 }
 
-int main()
+TEST_CASE("test_parse_network")
 {
     // ---- 测试 1: 两个网络接口 ----
     {
@@ -32,7 +32,11 @@ int main()
 
         std::vector<std::string> warnings;
         auto result = parse_network(raw, warnings);
-        CHECK(result.has_value());
+        REQUIRE(result.has_value());
+        if(!result.has_value())
+        {
+            return;
+        }
 
         const auto &net = *result;
         CHECK(net.interfaces.size() == 2);
@@ -41,8 +45,13 @@ int main()
         CHECK(net.interfaces[0].name == InterfaceName{"eth0"});
         CHECK(net.interfaces[0].mac == MacAddress{"aa:bb:cc:dd:ee:ff"});
         CHECK(net.interfaces[0].state == InterfaceState::Up);
-        CHECK(net.interfaces[0].speed.has_value());
-        CHECK(net.interfaces[0].speed->value == 10000ULL * 1'000'000);
+        const auto &speed_1 = net.interfaces[0].speed;
+        REQUIRE(speed_1.has_value());
+        if(!speed_1.has_value())
+        {
+            return;
+        }
+        CHECK(speed_1->value == 10000ULL * 1'000'000);
         CHECK(net.interfaces[0].visible_to_current_process == true);
 
         CHECK(net.interfaces[1].name == InterfaceName{"lo"});
@@ -60,11 +69,20 @@ int main()
 
         std::vector<std::string> warnings;
         auto result = parse_network(raw, warnings);
-        CHECK(result.has_value());
+        REQUIRE(result.has_value());
+        if(!result.has_value())
+        {
+            return;
+        }
         CHECK(result->interfaces.size() == 1);
         CHECK(result->interfaces[0].state == InterfaceState::Down);
-        CHECK(result->interfaces[0].speed.has_value());
-        CHECK(result->interfaces[0].speed->value == 1000ULL * 1'000'000);
+        const auto &speed_2 = result->interfaces[0].speed;
+        REQUIRE(speed_2.has_value());
+        if(!speed_2.has_value())
+        {
+            return;
+        }
+        CHECK(speed_2->value == 1000ULL * 1'000'000);
     }
 
     // ---- 测试 3: 无 SysfsNet 数据 → nullopt ----
@@ -83,7 +101,11 @@ int main()
 
         std::vector<std::string> warnings;
         auto result = parse_network(raw, warnings);
-        CHECK(result.has_value());
+        REQUIRE(result.has_value());
+        if(!result.has_value())
+        {
+            return;
+        }
         CHECK(result->interfaces.size() == 1);
         CHECK(!result->interfaces[0].speed.has_value());
     }
@@ -103,7 +125,11 @@ int main()
 
         std::vector<std::string> warnings;
         auto result = parse_network(raw, warnings);
-        CHECK(result.has_value());
+        REQUIRE(result.has_value());
+        if(!result.has_value())
+        {
+            return;
+        }
         CHECK(result->interfaces.size() == 2);
 
         // eth0 在前（字典序）
@@ -127,13 +153,22 @@ int main()
 
         std::vector<std::string> warnings;
         auto result = parse_network(raw, warnings);
-        CHECK(result.has_value());
+        REQUIRE(result.has_value());
+        if(!result.has_value())
+        {
+            return;
+        }
         CHECK(result->interfaces.size() == 1);
-        CHECK(result->interfaces[0].pci_address.has_value());
-        CHECK(result->interfaces[0].pci_address->domain == 0x0000);
-        CHECK(result->interfaces[0].pci_address->bus == 0x41);
-        CHECK(result->interfaces[0].pci_address->device == 0x00);
-        CHECK(result->interfaces[0].pci_address->function == 0x0);
+        const auto &pci_address_3 = result->interfaces[0].pci_address;
+        REQUIRE(pci_address_3.has_value());
+        if(!pci_address_3.has_value())
+        {
+            return;
+        }
+        CHECK(pci_address_3->domain == 0x0000);
+        CHECK(pci_address_3->bus == 0x41);
+        CHECK(pci_address_3->device == 0x00);
+        CHECK(pci_address_3->function == 0x0);
     }
 
     // ---- 测试 7: 无 IfAddrs → addresses 为空（不崩溃） ----
@@ -144,7 +179,11 @@ int main()
 
         std::vector<std::string> warnings;
         auto result = parse_network(raw, warnings);
-        CHECK(result.has_value());
+        REQUIRE(result.has_value());
+        if(!result.has_value())
+        {
+            return;
+        }
         CHECK(result->interfaces.size() == 1);
         CHECK(result->interfaces[0].addresses.empty());
     }
@@ -156,7 +195,11 @@ int main()
 
         std::vector<std::string> warnings;
         auto result = parse_network(raw, warnings);
-        CHECK(result.has_value());
+        REQUIRE(result.has_value());
+        if(!result.has_value())
+        {
+            return;
+        }
         CHECK(result->interfaces.size() == 1);
         CHECK(!result->interfaces[0].pci_address.has_value());
     }
@@ -176,7 +219,11 @@ int main()
 
         std::vector<std::string> warnings;
         auto result = parse_network(raw, warnings);
-        CHECK(result.has_value());
+        REQUIRE(result.has_value());
+        if(!result.has_value())
+        {
+            return;
+        }
         CHECK(result->interfaces.size() == 1);
         CHECK(result->interfaces[0].addresses.size() == 2);
         CHECK(result->interfaces[0].addresses[0] == IpAddress{"192.168.1.10"});
@@ -192,6 +239,4 @@ int main()
         }
         CHECK(has_warning);
     }
-
-    TEST_SUMMARY();
 }

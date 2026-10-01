@@ -1,31 +1,36 @@
 #!/usr/bin/env bash
-# pre-commit: auto-fix format + whitespace on staged files, then stage fixes.
+# Validate whitespace and formatting in the staged snapshot without modifying it.
 set -euo pipefail
 
-mapfile -d '' STAGED < <(git diff --cached --name-only -z --diff-filter=ACMR)
-[ "${#STAGED[@]}" -gt 0 ] || exit 0
+git diff --cached --check
 
-# Fix whitespace/EOF on staged text files (sed replaces perl)
-for f in "${STAGED[@]}"; do
-    [ -f "$f" ] || continue
-    file --mime-type "$f" 2>/dev/null | grep -q ': text/' || continue
-    sed -i 's/[[:blank:]]*$//' "$f"
-    if [ -s "$f" ] && [ "$(tail -c 1 "$f" | wc -l)" -eq 0 ]; then
-        printf '\n' >> "$f"
-    fi
+mapfile -d '' STAGED < <(git diff --cached --name-only -z --diff-filter=ACMR)
+CPP_FILES=()
+for path in "${STAGED[@]}"; do
+    case "$path" in
+        *.h|*.hpp|*.cpp) CPP_FILES+=("$path") ;;
+    esac
 done
 
-# Auto-format staged C/C++ files
-if command -v clang-format >/dev/null 2>&1; then
-    for f in "${STAGED[@]}"; do
-        case "$f" in
-            *.h|*.hpp|*.c|*.cpp) ;;
-            *) continue ;;
-        esac
-        [ -f "$f" ] || continue
-        clang-format -i "$f"
-    done
+[ "${#CPP_FILES[@]}" -gt 0 ] || exit 0
+
+if ! command -v clang-format >/dev/null 2>&1; then
+    echo "pre-commit: clang-format is required to validate staged C/C++ files." >&2
+    echo "Install clang-format and retry the commit." >&2
+    exit 1
 fi
 
-# Stage any modifications from the fixes above
-git add -- "${STAGED[@]}"
+TEMP_DIR=$(mktemp -d)
+trap 'rm -rf -- "$TEMP_DIR"' EXIT
+
+for path in "${CPP_FILES[@]}"; do
+    staged_file="$TEMP_DIR/staged"
+    formatted_file="$TEMP_DIR/formatted"
+    git cat-file blob ":$path" >"$staged_file"
+    clang-format --assume-filename="$path" <"$staged_file" >"$formatted_file"
+    if ! cmp -s -- "$staged_file" "$formatted_file"; then
+        echo "pre-commit: staged C/C++ formatting validation failed: $path" >&2
+        echo "Run 'xmake format', review the result, and stage the intended changes." >&2
+        exit 1
+    fi
+done

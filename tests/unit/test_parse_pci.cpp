@@ -3,8 +3,8 @@
 #include "sysal/model/raw_store.hpp"
 #include "sysal/types/enums.hpp"
 
-#include "test_macros.hpp"
 #include <chrono>
+#include <doctest/doctest.h>
 #include <string>
 #include <vector>
 
@@ -17,7 +17,7 @@ static RawRecord make_record(RawSource source, const std::string &path, const st
     return RawRecord{source, path, payload, CollectStatus::Success, std::chrono::system_clock::now()};
 }
 
-int main()
+TEST_CASE("test_parse_pci")
 {
     // ---- 测试 1: 两个 PCI 设备 ----
     {
@@ -36,7 +36,11 @@ int main()
 
         std::vector<std::string> warnings;
         auto result = parse_pci(raw, warnings);
-        CHECK(result.has_value());
+        REQUIRE(result.has_value());
+        if(!result.has_value())
+        {
+            return;
+        }
 
         const auto &pci = *result;
         CHECK(pci.devices.size() == 2);
@@ -46,15 +50,25 @@ int main()
         CHECK(pci.devices[0].vendor == Vendor{"0x10de"});
         CHECK(pci.devices[0].device_name == DeviceName{"0x2322"});
         CHECK(pci.devices[0].device_class == PciClass{"0x030000"});
-        CHECK(pci.devices[0].numa_node.has_value());
-        CHECK(pci.devices[0].numa_node == NumaNodeId{0});
+        const auto &numa_node_1 = pci.devices[0].numa_node;
+        REQUIRE(numa_node_1.has_value());
+        if(!numa_node_1.has_value())
+        {
+            return;
+        }
+        CHECK(numa_node_1 == NumaNodeId{0});
 
         CHECK((pci.devices[1].address == PciAddress{0x0000, 0x65, 0x00, 0x0}));
         CHECK(pci.devices[1].vendor == Vendor{"0x15b3"});
         CHECK(pci.devices[1].device_name == DeviceName{"0x158b"});
         CHECK(pci.devices[1].device_class == PciClass{"0x020000"});
-        CHECK(pci.devices[1].numa_node.has_value());
-        CHECK(pci.devices[1].numa_node == NumaNodeId{1});
+        const auto &numa_node_2 = pci.devices[1].numa_node;
+        REQUIRE(numa_node_2.has_value());
+        if(!numa_node_2.has_value())
+        {
+            return;
+        }
+        CHECK(numa_node_2 == NumaNodeId{1});
     }
 
     // ---- 测试 2: numa_node 为 -1 → nullopt ----
@@ -67,7 +81,11 @@ int main()
 
         std::vector<std::string> warnings;
         auto result = parse_pci(raw, warnings);
-        CHECK(result.has_value());
+        REQUIRE(result.has_value());
+        if(!result.has_value())
+        {
+            return;
+        }
         CHECK(result->devices.size() == 1);
         CHECK(!result->devices[0].numa_node.has_value());
     }
@@ -87,7 +105,11 @@ int main()
 
         std::vector<std::string> warnings;
         auto result = parse_pci(raw, warnings);
-        CHECK(result.has_value());
+        REQUIRE(result.has_value());
+        if(!result.has_value())
+        {
+            return;
+        }
         CHECK(result->devices.empty());
         CHECK(!warnings.empty());
     }
@@ -106,7 +128,11 @@ int main()
 
         std::vector<std::string> warnings;
         auto result = parse_pci(raw, warnings);
-        CHECK(result.has_value());
+        REQUIRE(result.has_value());
+        if(!result.has_value())
+        {
+            return;
+        }
         CHECK(result->devices.size() == 1);
         CHECK(result->devices[0].device_name == DeviceName{"NVIDIA Corporation GP102 [GeForce GTX 1080 Ti]"});
         CHECK(result->devices[0].vendor == Vendor{"0x10de"});
@@ -126,7 +152,11 @@ int main()
 
         std::vector<std::string> warnings;
         auto result = parse_pci(raw, warnings);
-        CHECK(result.has_value());
+        REQUIRE(result.has_value());
+        if(!result.has_value())
+        {
+            return;
+        }
         CHECK(result->devices.size() == 1);
         CHECK(result->devices[0].device_name == DeviceName{"Intel Corporation Ice Lake Memory Map/VT-d"});
         CHECK(result->devices[0].vendor == Vendor{"0x8086"});
@@ -148,7 +178,11 @@ int main()
 
         std::vector<std::string> warnings;
         auto result = parse_pci(raw, warnings);
-        CHECK(result.has_value());
+        REQUIRE(result.has_value());
+        if(!result.has_value())
+        {
+            return;
+        }
         CHECK(result->devices.size() == 2);
 
         // 41:00.0 来自 sysfs，名称被 lspci 覆盖
@@ -174,10 +208,12 @@ int main()
 
         std::vector<std::string> warnings;
         auto result = parse_pci(raw, warnings);
-        CHECK(result.has_value());
+        REQUIRE(result.has_value());
+        if(!result.has_value())
+        {
+            return;
+        }
         CHECK(result->devices.size() == 1);
         CHECK(result->devices[0].device_name == DeviceName{"NVIDIA Corporation GP102 [GeForce GTX 1080 Ti]"});
     }
-
-    TEST_SUMMARY();
 }

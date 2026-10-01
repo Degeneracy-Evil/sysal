@@ -6,9 +6,9 @@
 #include "sysal/test/replay.hpp"
 #include "sysal/types/enums.hpp"
 
-#include "test_macros.hpp"
 #include <chrono>
 #include <cstdio>
+#include <doctest/doctest.h>
 #include <fstream>
 #include <iostream>
 #include <string>
@@ -83,7 +83,7 @@ void test_load_nonexistent()
     try
     {
         sysal::test::load_raw_store("/tmp/sysal_nonexistent_file_12345.json");
-        CHECK(false && "expected SysalError");
+        CHECK((false && "expected SysalError"));
     }
     catch(const sysal::SysalError &e)
     {
@@ -105,7 +105,7 @@ void test_load_invalid_json()
     try
     {
         sysal::test::load_raw_store(path);
-        CHECK(false && "expected SysalError");
+        CHECK((false && "expected SysalError"));
     }
     catch(const sysal::SysalError &e)
     {
@@ -131,13 +131,11 @@ void test_empty_store()
     std::cout << "  empty store: OK\n";
 }
 
-int main()
+TEST_CASE("test_raw_store_io")
 {
     std::cout << "test_raw_store_io:\n";
     test_roundtrip();
     test_load_nonexistent();
     test_load_invalid_json();
     test_empty_store();
-    std::cout << "  all passed!\n";
-    TEST_SUMMARY();
 }

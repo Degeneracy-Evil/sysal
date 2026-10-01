@@ -1,11 +1,11 @@
 #include "parser/parse_utils.hpp"
 
-#include "test_macros.hpp"
+#include <doctest/doctest.h>
 #include <string>
 
 using namespace sysal::detail;
 
-int main()
+TEST_CASE("test_parse_utils")
 {
     // trim
     CHECK(trim("  hello  ") == "hello");
@@ -41,8 +41,8 @@ int main()
     CHECK(v3 == "Intel(R) Xeon(R)");
 
     // parse_uint
-    CHECK(parse_uint("42").has_value() && *parse_uint("42") == 42);
-    CHECK(parse_uint("  123  ").has_value() && *parse_uint("  123  ") == 123);
+    CHECK(parse_uint("42") == 42);
+    CHECK(parse_uint("  123  ") == 123);
     CHECK(!parse_uint("abc").has_value());
     CHECK(!parse_uint("").has_value());
 
@@ -52,9 +52,9 @@ int main()
     CHECK(!parse_uint("0x10").has_value());
 
     // parse_hex
-    CHECK(parse_hex("0a").has_value() && *parse_hex("0a") == 10);
-    CHECK(parse_hex("ff").has_value() && *parse_hex("ff") == 255);
-    CHECK(parse_hex("41").has_value() && *parse_hex("41") == 65);
+    CHECK(parse_hex("0a") == 10);
+    CHECK(parse_hex("ff") == 255);
+    CHECK(parse_hex("41") == 65);
     CHECK(!parse_hex("xyz").has_value());
 
     // parse_hex 拒绝部分消费
@@ -64,14 +64,22 @@ int main()
 
     // parse_pci_address (十六进制，修复 B-1 bug)
     auto addr1 = parse_pci_address("0000:41:00.0");
-    CHECK(addr1.has_value());
+    REQUIRE(addr1.has_value());
+    if(!addr1.has_value())
+    {
+        return;
+    }
     CHECK(addr1->domain == 0);
     CHECK(addr1->bus == 0x41);
     CHECK(addr1->device == 0);
     CHECK(addr1->function == 0);
 
     auto addr2 = parse_pci_address("0000:0a:1f.2");
-    CHECK(addr2.has_value());
+    REQUIRE(addr2.has_value());
+    if(!addr2.has_value())
+    {
+        return;
+    }
     CHECK(addr2->domain == 0);
     CHECK(addr2->bus == 0x0a);
     CHECK(addr2->device == 0x1f);
@@ -82,10 +90,12 @@ int main()
 
     // parse_kb_to_bytes
     auto kb1 = parse_kb_to_bytes("1024");
-    CHECK(kb1.has_value());
+    REQUIRE(kb1.has_value());
+    if(!kb1.has_value())
+    {
+        return;
+    }
     CHECK(kb1->value == 1024ULL * 1024ULL);
 
     CHECK(!parse_kb_to_bytes("abc").has_value());
-
-    TEST_SUMMARY();
 }

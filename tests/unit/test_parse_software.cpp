@@ -3,8 +3,8 @@
 #include "sysal/model/raw_store.hpp"
 #include "sysal/types/enums.hpp"
 
-#include "test_macros.hpp"
 #include <chrono>
+#include <doctest/doctest.h>
 #include <string>
 #include <vector>
 
@@ -16,7 +16,7 @@ static RawRecord make_record(RawSource source, const std::string &path, const st
     return RawRecord{source, path, payload, CollectStatus::Success, std::chrono::system_clock::now()};
 }
 
-int main()
+TEST_CASE("test_parse_software")
 {
     // ---- 测试 1: 完整软件栈解析（NVIDIA 驱动 + CUDA） ----
     {
@@ -30,7 +30,11 @@ int main()
 
         std::vector<std::string> warnings;
         auto result = parse_software(raw, warnings);
-        CHECK(result.has_value());
+        REQUIRE(result.has_value());
+        if(!result.has_value())
+        {
+            return;
+        }
 
         const auto &s = *result;
 
@@ -48,7 +52,11 @@ int main()
         CHECK(s.runtimes[0].env_var == "CUDA_HOME");
 
         // CUDA 栈
-        CHECK(s.cuda.has_value());
+        REQUIRE(s.cuda.has_value());
+        if(!s.cuda.has_value())
+        {
+            return;
+        }
         CHECK(s.cuda->version == "12.4");
         CHECK(s.cuda->driver_version == "535.129.03");
 
@@ -69,11 +77,19 @@ int main()
 
         std::vector<std::string> warnings;
         auto result = parse_software(raw, warnings);
-        CHECK(result.has_value());
+        REQUIRE(result.has_value());
+        if(!result.has_value())
+        {
+            return;
+        }
         CHECK(result->drivers.size() == 1);
         CHECK(result->drivers[0].version == "470.42");
         CHECK(result->runtimes.empty());
-        CHECK(result->cuda.has_value());
+        REQUIRE(result->cuda.has_value());
+        if(!result->cuda.has_value())
+        {
+            return;
+        }
         CHECK(result->cuda->version.empty());
         CHECK(result->cuda->driver_version == "470.42");
     }
@@ -86,11 +102,19 @@ int main()
 
         std::vector<std::string> warnings;
         auto result = parse_software(raw, warnings);
-        CHECK(result.has_value());
+        REQUIRE(result.has_value());
+        if(!result.has_value())
+        {
+            return;
+        }
         CHECK(result->drivers.empty());
         CHECK(result->runtimes.size() == 1);
         CHECK(result->runtimes[0].version == "11.8");
-        CHECK(result->cuda.has_value());
+        REQUIRE(result->cuda.has_value());
+        if(!result->cuda.has_value())
+        {
+            return;
+        }
         CHECK(result->cuda->version == "11.8");
         CHECK(result->cuda->driver_version.empty());
     }
@@ -115,7 +139,11 @@ int main()
         // 缺失的 clang 等不产生记录 → 静默跳过
         std::vector<std::string> warnings;
         auto result = parse_software(raw, warnings);
-        CHECK(result.has_value());
+        REQUIRE(result.has_value());
+        if(!result.has_value())
+        {
+            return;
+        }
         CHECK(warnings.empty());
         CHECK(result->drivers.empty());
         CHECK(result->runtimes.empty());
@@ -137,7 +165,11 @@ int main()
 
         std::vector<std::string> warnings;
         auto result = parse_software(raw, warnings);
-        CHECK(result.has_value());
+        REQUIRE(result.has_value());
+        if(!result.has_value())
+        {
+            return;
+        }
 
         CHECK(result->compilers.size() == 2);
         CHECK(result->compilers[0].name == "gcc");
@@ -154,7 +186,11 @@ int main()
 
         std::vector<std::string> warnings;
         auto result = parse_software(raw, warnings);
-        CHECK(result.has_value());
+        REQUIRE(result.has_value());
+        if(!result.has_value())
+        {
+            return;
+        }
         CHECK(result->compilers.size() == 1);
         CHECK(result->compilers[0].name == "gfortran");
         CHECK(result->compilers[0].version == "13.3.0");
@@ -179,7 +215,11 @@ int main()
 
         std::vector<std::string> warnings;
         auto result = parse_software(raw, warnings);
-        CHECK(result.has_value());
+        REQUIRE(result.has_value());
+        if(!result.has_value())
+        {
+            return;
+        }
         CHECK(result->compilers.size() == 1);
         CHECK(result->compilers[0].name == "g++");
         CHECK(warnings.empty());
@@ -195,10 +235,18 @@ int main()
 
         std::vector<std::string> warnings;
         auto result = parse_software(raw, warnings);
-        CHECK(result.has_value());
+        REQUIRE(result.has_value());
+        if(!result.has_value())
+        {
+            return;
+        }
         CHECK(warnings.empty());
 
-        CHECK(result->mpi.has_value());
+        REQUIRE(result->mpi.has_value());
+        if(!result->mpi.has_value())
+        {
+            return;
+        }
         CHECK(result->mpi->implementation == "Open MPI");
         CHECK(result->mpi->version == "4.1.9a1");
         CHECK(result->mpi->path == "/usr/bin/mpirun");
@@ -212,8 +260,16 @@ int main()
 
         std::vector<std::string> warnings;
         auto result = parse_software(raw, warnings);
-        CHECK(result.has_value());
-        CHECK(result->mpi.has_value());
+        REQUIRE(result.has_value());
+        if(!result.has_value())
+        {
+            return;
+        }
+        REQUIRE(result->mpi.has_value());
+        if(!result->mpi.has_value())
+        {
+            return;
+        }
         // first_success 返回首条 MPICH 记录
         CHECK(result->mpi->implementation == "MPICH");
         CHECK(result->mpi->version == "4.3.0");
@@ -236,8 +292,16 @@ int main()
 
         std::vector<std::string> warnings;
         auto result = parse_software(raw, warnings);
-        CHECK(result.has_value());
-        CHECK(result->mpi.has_value());
+        REQUIRE(result.has_value());
+        if(!result.has_value())
+        {
+            return;
+        }
+        REQUIRE(result->mpi.has_value());
+        if(!result->mpi.has_value())
+        {
+            return;
+        }
         CHECK(result->mpi->implementation == "Open MPI");
         CHECK(result->mpi->version == "5.0.0");
         CHECK(warnings.empty());
@@ -254,10 +318,18 @@ int main()
 
         std::vector<std::string> warnings;
         auto result = parse_software(raw, warnings);
-        CHECK(result.has_value());
+        REQUIRE(result.has_value());
+        if(!result.has_value())
+        {
+            return;
+        }
         CHECK(warnings.empty());
 
-        CHECK(result->rdma.has_value());
+        REQUIRE(result->rdma.has_value());
+        if(!result->rdma.has_value())
+        {
+            return;
+        }
         CHECK(result->rdma->rdma_core_version == "1.14.58.0");
         CHECK(result->rdma->ibverbs_path == "/usr/lib/x86_64-linux-gnu");
         CHECK(result->rdma->ucx_version == "1.19.0");
@@ -271,8 +343,16 @@ int main()
 
         std::vector<std::string> warnings;
         auto result = parse_software(raw, warnings);
-        CHECK(result.has_value());
-        CHECK(result->rdma.has_value());
+        REQUIRE(result.has_value());
+        if(!result.has_value())
+        {
+            return;
+        }
+        REQUIRE(result->rdma.has_value());
+        if(!result->rdma.has_value())
+        {
+            return;
+        }
         CHECK(result->rdma->rdma_core_version == "1.14.58.0");
         CHECK(result->rdma->ibverbs_path.empty());
         CHECK(result->rdma->ucx_version.empty());
@@ -285,8 +365,16 @@ int main()
 
         std::vector<std::string> warnings;
         auto result = parse_software(raw, warnings);
-        CHECK(result.has_value());
-        CHECK(result->rdma.has_value());
+        REQUIRE(result.has_value());
+        if(!result.has_value())
+        {
+            return;
+        }
+        REQUIRE(result->rdma.has_value());
+        if(!result->rdma.has_value())
+        {
+            return;
+        }
         CHECK(result->rdma->rdma_core_version == "50.0");
         CHECK(warnings.empty());
     }
@@ -302,8 +390,16 @@ int main()
 
         std::vector<std::string> warnings;
         auto result = parse_software(raw, warnings);
-        CHECK(result.has_value());
-        CHECK(result->cuda.has_value());
+        REQUIRE(result.has_value());
+        if(!result.has_value())
+        {
+            return;
+        }
+        REQUIRE(result->cuda.has_value());
+        if(!result->cuda.has_value())
+        {
+            return;
+        }
         CHECK(result->cuda->version == "13.2");
         CHECK(result->cuda->nvcc_path == "/usr/local/cuda-13.2/bin/nvcc");
         CHECK(result->cuda->home == "/usr/local/cuda-13.2");
@@ -319,8 +415,16 @@ int main()
 
         std::vector<std::string> warnings;
         auto result = parse_software(raw, warnings);
-        CHECK(result.has_value());
-        CHECK(result->cuda.has_value());
+        REQUIRE(result.has_value());
+        if(!result.has_value())
+        {
+            return;
+        }
+        REQUIRE(result->cuda.has_value());
+        if(!result->cuda.has_value())
+        {
+            return;
+        }
         CHECK(result->cuda->nvcc_path == "/usr/local/cuda-11.8/bin/nvcc");
         CHECK(result->cuda->home == "/usr/local/cuda-11.8");
     }
@@ -333,8 +437,16 @@ int main()
 
         std::vector<std::string> warnings;
         auto result = parse_software(raw, warnings);
-        CHECK(result.has_value());
-        CHECK(result->cuda.has_value());
+        REQUIRE(result.has_value());
+        if(!result.has_value())
+        {
+            return;
+        }
+        REQUIRE(result->cuda.has_value());
+        if(!result->cuda.has_value())
+        {
+            return;
+        }
         CHECK(result->cuda->version == "12.0");
         CHECK(result->cuda->nvcc_path.empty());
         CHECK(result->cuda->home.empty());
@@ -364,7 +476,11 @@ int main()
 
         std::vector<std::string> warnings;
         auto result = parse_software(raw, warnings);
-        CHECK(result.has_value());
+        REQUIRE(result.has_value());
+        if(!result.has_value())
+        {
+            return;
+        }
 
         CHECK(result->compilers.size() == 2);
         CHECK(result->compilers[0].name == "clang");
@@ -374,6 +490,4 @@ int main()
         CHECK(result->compilers[1].version == "17.0.6");
         CHECK(result->compilers[1].path == "/usr/lib/llvm-18/bin/clang++");
     }
-
-    TEST_SUMMARY();
 }

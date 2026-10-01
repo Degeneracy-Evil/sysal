@@ -5,18 +5,20 @@ on:
     branches: [main]
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
   check:
     runs-on: ubuntu-24.04
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - name: Cache apt packages
-        uses: awalsh128/cache-apt-pkgs-action@latest
-        with:
-          packages: build-essential clang clang-format clang-tidy lld libc++-dev libc++abi-dev
-          version: 1.0
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes build-essential clang clang-format clang-tidy
 
       - name: Install xmake
         uses: xmake-io/github-action-setup-xmake@v1
@@ -30,6 +32,11 @@ jobs:
 
       - name: Run quality checks
         run: xmake check
+
+      - name: Verify quality checks did not modify tracked files
+        run: |
+          git diff --exit-code
+          git diff --cached --exit-code
 
       - name: Run sysal_info
         run: xmake run sysal_info

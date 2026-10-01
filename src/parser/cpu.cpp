@@ -544,6 +544,8 @@ namespace sysal::detail
                     continue;
                 }
 
+                const auto numa_node = static_cast<std::uint32_t>(*node_id);
+
                 // 解析 cpulist: 格式如 "0-3,8-11" 或 "0,1,2,3"
                 constexpr std::size_t MAX_CPUS = 1024;
                 const auto &cpulist = rec->payload;
@@ -559,11 +561,13 @@ namespace sysal::detail
                         auto end = parse_uint(trimmed.substr(dash_pos + 1));
                         if(start.has_value() && end.has_value())
                         {
-                            for(auto cpu = *start; cpu <= *end && cpu_to_numa.size() < MAX_CPUS; ++cpu)
+                            const auto first_cpu = *start;
+                            const auto last_cpu = *end;
+                            for(auto cpu = first_cpu; cpu <= last_cpu && cpu_to_numa.size() < MAX_CPUS; ++cpu)
                             {
-                                cpu_to_numa[static_cast<std::uint32_t>(cpu)] = static_cast<std::uint32_t>(*node_id);
+                                cpu_to_numa[static_cast<std::uint32_t>(cpu)] = numa_node;
                             }
-                            if(cpu_to_numa.size() >= MAX_CPUS && *end > cpu_to_numa.rbegin()->first)
+                            if(cpu_to_numa.size() >= MAX_CPUS && last_cpu > cpu_to_numa.rbegin()->first)
                             {
                                 break;
                             }
@@ -579,7 +583,7 @@ namespace sysal::detail
                             {
                                 break;
                             }
-                            cpu_to_numa[static_cast<std::uint32_t>(*cpu)] = static_cast<std::uint32_t>(*node_id);
+                            cpu_to_numa[static_cast<std::uint32_t>(*cpu)] = numa_node;
                         }
                     }
                 }

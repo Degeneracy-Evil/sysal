@@ -3,8 +3,8 @@
 #include "sysal/model/raw_store.hpp"
 #include "sysal/types/enums.hpp"
 
-#include "test_macros.hpp"
 #include <chrono>
+#include <doctest/doctest.h>
 #include <string>
 #include <vector>
 
@@ -17,7 +17,7 @@ static RawRecord make_record(RawSource source, const std::string &path, const st
     return RawRecord{source, path, payload, CollectStatus::Success, std::chrono::system_clock::now()};
 }
 
-int main()
+TEST_CASE("test_parse_storage")
 {
     // ---- 测试 1: 2 块设备（nvme0n1 + sda，sda 为 HDD） ----
     {
@@ -29,7 +29,11 @@ int main()
 
         std::vector<std::string> warnings;
         auto result = parse_storage(raw, warnings);
-        CHECK(result.has_value());
+        REQUIRE(result.has_value());
+        if(!result.has_value())
+        {
+            return;
+        }
 
         const auto &stor = *result;
         CHECK(stor.devices.size() == 2);
@@ -38,15 +42,25 @@ int main()
         CHECK(stor.devices[0].id == StorageId{0});
         CHECK(stor.devices[0].name.value == "nvme0n1");
         CHECK(stor.devices[0].kind == StorageKind::Nvme);
-        CHECK(stor.devices[0].capacity.has_value());
-        CHECK(stor.devices[0].capacity->value == 3750924672ULL * 512);
+        const auto &capacity_1 = stor.devices[0].capacity;
+        REQUIRE(capacity_1.has_value());
+        if(!capacity_1.has_value())
+        {
+            return;
+        }
+        CHECK(capacity_1->value == 3750924672ULL * 512);
 
         // sda (rotational=1 → Hdd)
         CHECK(stor.devices[1].id == StorageId{1});
         CHECK(stor.devices[1].name.value == "sda");
         CHECK(stor.devices[1].kind == StorageKind::Hdd);
-        CHECK(stor.devices[1].capacity.has_value());
-        CHECK(stor.devices[1].capacity->value == 976773168ULL * 512);
+        const auto &capacity_2 = stor.devices[1].capacity;
+        REQUIRE(capacity_2.has_value());
+        if(!capacity_2.has_value())
+        {
+            return;
+        }
+        CHECK(capacity_2->value == 976773168ULL * 512);
     }
 
     // ---- 测试 2: 空 SysfsBlock → nullopt ----
@@ -71,7 +85,11 @@ int main()
 
         std::vector<std::string> warnings;
         auto result = parse_storage(raw, warnings);
-        CHECK(result.has_value());
+        REQUIRE(result.has_value());
+        if(!result.has_value())
+        {
+            return;
+        }
 
         const auto &stor = *result;
         CHECK(stor.devices.size() == 2);
@@ -83,7 +101,11 @@ int main()
 
         const auto &nvme = stor.devices[1];
         CHECK(nvme.name.value == "nvme0n1");
-        CHECK(nvme.pci_address.has_value());
+        REQUIRE(nvme.pci_address.has_value());
+        if(!nvme.pci_address.has_value())
+        {
+            return;
+        }
         CHECK(nvme.pci_address->domain == 0);
         CHECK(nvme.pci_address->bus == 0xe4);
         CHECK(nvme.pci_address->device == 0);
@@ -97,7 +119,11 @@ int main()
 
         std::vector<std::string> warnings;
         auto result = parse_storage(raw, warnings);
-        CHECK(result.has_value());
+        REQUIRE(result.has_value());
+        if(!result.has_value())
+        {
+            return;
+        }
 
         const auto &stor = *result;
         CHECK(stor.devices.size() == 1);
@@ -112,11 +138,20 @@ int main()
 
         std::vector<std::string> warnings;
         auto result = parse_storage(raw, warnings);
-        CHECK(result.has_value());
+        REQUIRE(result.has_value());
+        if(!result.has_value())
+        {
+            return;
+        }
         CHECK(result->devices.size() == 1);
         CHECK(result->devices[0].name.value == "nvme0n1");
         CHECK(result->devices[0].kind == StorageKind::Nvme);
-        CHECK(result->devices[0].capacity.has_value());
+        const auto &capacity_3 = result->devices[0].capacity;
+        REQUIRE(capacity_3.has_value());
+        if(!capacity_3.has_value())
+        {
+            return;
+        }
     }
 
     // ---- 测试 5: rotational=0 → Ssd ----
@@ -127,7 +162,11 @@ int main()
 
         std::vector<std::string> warnings;
         auto result = parse_storage(raw, warnings);
-        CHECK(result.has_value());
+        REQUIRE(result.has_value());
+        if(!result.has_value())
+        {
+            return;
+        }
 
         const auto &stor = *result;
         CHECK(stor.devices.size() == 1);
@@ -142,7 +181,11 @@ int main()
 
         std::vector<std::string> warnings;
         auto result = parse_storage(raw, warnings);
-        CHECK(result.has_value());
+        REQUIRE(result.has_value());
+        if(!result.has_value())
+        {
+            return;
+        }
 
         const auto &stor = *result;
         CHECK(stor.devices.size() == 1);
@@ -157,7 +200,11 @@ int main()
 
         std::vector<std::string> warnings;
         auto result = parse_storage(raw, warnings);
-        CHECK(result.has_value());
+        REQUIRE(result.has_value());
+        if(!result.has_value())
+        {
+            return;
+        }
 
         const auto &stor = *result;
         CHECK(stor.devices.size() == 1);
@@ -180,22 +227,46 @@ int main()
 
         std::vector<std::string> warnings;
         auto result = parse_storage(raw, warnings);
-        CHECK(result.has_value());
+        REQUIRE(result.has_value());
+        if(!result.has_value())
+        {
+            return;
+        }
 
         const auto &stor = *result;
         CHECK(stor.devices.size() == 2);
 
         CHECK(stor.devices[0].name.value == "nvme0n1");
-        CHECK(stor.devices[0].mount_point.has_value());
-        CHECK(stor.devices[0].mount_point->value == "/data3");
-        CHECK(stor.devices[0].fs_type.has_value());
-        CHECK(stor.devices[0].fs_type->value == "xfs");
+        const auto &mount_point_4 = stor.devices[0].mount_point;
+        REQUIRE(mount_point_4.has_value());
+        if(!mount_point_4.has_value())
+        {
+            return;
+        }
+        CHECK(mount_point_4->value == "/data3");
+        const auto &fs_type_5 = stor.devices[0].fs_type;
+        REQUIRE(fs_type_5.has_value());
+        if(!fs_type_5.has_value())
+        {
+            return;
+        }
+        CHECK(fs_type_5->value == "xfs");
 
         CHECK(stor.devices[1].name.value == "sda");
-        CHECK(stor.devices[1].mount_point.has_value());
-        CHECK(stor.devices[1].mount_point->value == "/");
-        CHECK(stor.devices[1].fs_type.has_value());
-        CHECK(stor.devices[1].fs_type->value == "ext4");
+        const auto &mount_point_6 = stor.devices[1].mount_point;
+        REQUIRE(mount_point_6.has_value());
+        if(!mount_point_6.has_value())
+        {
+            return;
+        }
+        CHECK(mount_point_6->value == "/");
+        const auto &fs_type_7 = stor.devices[1].fs_type;
+        REQUIRE(fs_type_7.has_value());
+        if(!fs_type_7.has_value())
+        {
+            return;
+        }
+        CHECK(fs_type_7->value == "ext4");
     }
 
     // ---- 测试 9: 无 df -Th 数据 → mount_point/fs_type 为 nullopt ----
@@ -205,7 +276,11 @@ int main()
 
         std::vector<std::string> warnings;
         auto result = parse_storage(raw, warnings);
-        CHECK(result.has_value());
+        REQUIRE(result.has_value());
+        if(!result.has_value())
+        {
+            return;
+        }
         CHECK(result->devices.size() == 1);
         CHECK(!result->devices[0].mount_point.has_value());
         CHECK(!result->devices[0].fs_type.has_value());
@@ -223,16 +298,28 @@ int main()
 
         std::vector<std::string> warnings;
         auto result = parse_storage(raw, warnings);
-        CHECK(result.has_value());
+        REQUIRE(result.has_value());
+        if(!result.has_value())
+        {
+            return;
+        }
 
         const auto &stor = *result;
         CHECK(stor.devices.size() == 1);
         const auto &dev = stor.devices[0];
         CHECK(dev.name.value == "nvme0n1");
         // 分区匹配应命中根分区（/dev/nvme0n1p2 → ext4, /）
-        CHECK(dev.mount_point.has_value());
+        REQUIRE(dev.mount_point.has_value());
+        if(!dev.mount_point.has_value())
+        {
+            return;
+        }
         CHECK(dev.mount_point->value == "/");
-        CHECK(dev.fs_type.has_value());
+        REQUIRE(dev.fs_type.has_value());
+        if(!dev.fs_type.has_value())
+        {
+            return;
+        }
         CHECK(dev.fs_type->value == "ext4");
     }
 
@@ -249,12 +336,26 @@ int main()
 
         std::vector<std::string> warnings;
         auto result = parse_storage(raw, warnings);
-        CHECK(result.has_value());
+        REQUIRE(result.has_value());
+        if(!result.has_value())
+        {
+            return;
+        }
         CHECK(result->devices.size() == 1);
-        CHECK(result->devices[0].mount_point.has_value());
-        CHECK(result->devices[0].mount_point->value == "/");
-        CHECK(result->devices[0].fs_type.has_value());
-        CHECK(result->devices[0].fs_type->value == "ext4");
+        const auto &mount_point_8 = result->devices[0].mount_point;
+        REQUIRE(mount_point_8.has_value());
+        if(!mount_point_8.has_value())
+        {
+            return;
+        }
+        CHECK(mount_point_8->value == "/");
+        const auto &fs_type_9 = result->devices[0].fs_type;
+        REQUIRE(fs_type_9.has_value());
+        if(!fs_type_9.has_value())
+        {
+            return;
+        }
+        CHECK(fs_type_9->value == "ext4");
         bool has_warning = false;
         for(const auto &w : warnings)
         {
@@ -266,6 +367,4 @@ int main()
         }
         CHECK(has_warning);
     }
-
-    TEST_SUMMARY();
 }

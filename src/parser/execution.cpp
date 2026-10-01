@@ -85,11 +85,13 @@ namespace sysal::detail
                     auto hi = parse_uint(trimmed.substr(dash + 1));
                     if(lo.has_value() && hi.has_value())
                     {
-                        for(auto i = *lo; i <= *hi && result.size() < MAX_IDS; ++i)
+                        const auto first_id = *lo;
+                        const auto last_id = *hi;
+                        for(auto i = first_id; i <= last_id && result.size() < MAX_IDS; ++i)
                         {
                             result.push_back(static_cast<std::uint32_t>(i));
                         }
-                        if(result.size() >= MAX_IDS && *hi > result.back())
+                        if(result.size() >= MAX_IDS && last_id > result.back())
                         {
                             break;
                         }

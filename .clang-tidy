@@ -15,15 +15,11 @@ Checks: >
   readability-use-anyofallof,
   -bugprone-easily-swappable-parameters,
   -bugprone-narrowing-conversions,
-  -bugprone-exception-escape,
-  -bugprone-unchecked-optional-access,
-  -bugprone-empty-catch,
-  -clang-analyzer-optin.core.EnumCastOutOfRange,
   -performance-avoid-endl,
   -performance-enum-size
 
 WarningsAsErrors: '*'
 
-HeaderFilterRegex: '^(include|src)/.*\.(hpp|cpp)$'
+HeaderFilterRegex: '(^|/)(include/sysal|src|tests|examples)/.*\.(h|hpp|c|cpp)$'
 
 FormatStyle: file

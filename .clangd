@@ -1,14 +1,8 @@
 CompileFlags:
   CompilationDatabase: build
 
-  Add:
-    - -std=c++23
-    - -stdlib=libc++
-
 Diagnostics:
   UnusedIncludes: Strict
-  Suppress:
-    - pp_file_not_found
 
 InlayHints:
   Enabled: Yes

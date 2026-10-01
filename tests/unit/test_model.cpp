@@ -3,11 +3,11 @@
 #include "sysal/model/pci.hpp"
 #include "sysal/model/raw_store.hpp"
 
-#include "test_macros.hpp"
 #include <chrono>
 #include <cstdint>
+#include <doctest/doctest.h>
 
-int main()
+TEST_CASE("test_model")
 {
     // ---- Cpu 查询方法 ----
 
@@ -160,6 +160,4 @@ int main()
     CHECK(store.count(sysal::RawSource::ProcCpuInfo) == 2);
     CHECK(store.count(sysal::RawSource::ProcMemInfo) == 1);
     CHECK(store.count(sysal::RawSource::SysfsCpu) == 0);
-
-    TEST_SUMMARY();
 }

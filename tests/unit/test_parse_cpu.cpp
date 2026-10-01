@@ -3,8 +3,8 @@
 #include "sysal/model/raw_store.hpp"
 #include "sysal/types/enums.hpp"
 
-#include "test_macros.hpp"
 #include <chrono>
+#include <doctest/doctest.h>
 #include <string>
 #include <vector>
 
@@ -17,7 +17,7 @@ static RawRecord make_record(RawSource source, const std::string &path, const st
     return RawRecord{source, path, payload, CollectStatus::Success, std::chrono::system_clock::now()};
 }
 
-int main()
+TEST_CASE("test_parse_cpu")
 {
     // ---- 测试 1: 4 逻辑 CPU，2 封装，每封装 2 核 ----
     {
@@ -53,7 +53,11 @@ int main()
 
         std::vector<std::string> warnings;
         auto result = parse_cpu(raw, warnings);
-        CHECK(result.has_value());
+        REQUIRE(result.has_value());
+        if(!result.has_value())
+        {
+            return;
+        }
 
         const auto &cpu = *result;
 
@@ -99,7 +103,11 @@ int main()
 
         std::vector<std::string> warnings;
         auto result = parse_cpu(raw, warnings);
-        CHECK(result.has_value());
+        REQUIRE(result.has_value());
+        if(!result.has_value())
+        {
+            return;
+        }
 
         const auto &cpu = *result;
         // 所有 CPU 归入封装 0
@@ -123,7 +131,11 @@ int main()
 
         std::vector<std::string> warnings;
         auto result = parse_cpu(raw, warnings);
-        CHECK(result.has_value());
+        REQUIRE(result.has_value());
+        if(!result.has_value())
+        {
+            return;
+        }
 
         const auto &cpu = *result;
         // core_id 默认为 processor 编号，所以 2 个不同的核
@@ -159,7 +171,11 @@ int main()
 
         std::vector<std::string> warnings;
         auto result = parse_cpu(raw, warnings);
-        CHECK(result.has_value());
+        REQUIRE(result.has_value());
+        if(!result.has_value())
+        {
+            return;
+        }
 
         const auto &cpu = *result;
         // NUMA 节点
@@ -170,14 +186,29 @@ int main()
         CHECK(cpu.numa_nodes[1].cpus.size() == 2);
 
         // LogicalCpu 的 numa_node
-        CHECK(cpu.logical_cpus[0].numa_node.has_value());
-        CHECK(*cpu.logical_cpus[0].numa_node == NumaNodeId{0});
-        CHECK(cpu.logical_cpus[2].numa_node.has_value());
-        CHECK(*cpu.logical_cpus[2].numa_node == NumaNodeId{1});
+        const auto &numa_node_1 = cpu.logical_cpus[0].numa_node;
+        REQUIRE(numa_node_1.has_value());
+        if(!numa_node_1.has_value())
+        {
+            return;
+        }
+        CHECK(*numa_node_1 == NumaNodeId{0});
+        const auto &numa_node_2 = cpu.logical_cpus[2].numa_node;
+        REQUIRE(numa_node_2.has_value());
+        if(!numa_node_2.has_value())
+        {
+            return;
+        }
+        CHECK(*numa_node_2 == NumaNodeId{1});
 
         // CpuCore 的 numa_node
-        CHECK(cpu.cores[0].numa_node.has_value());
-        CHECK(*cpu.cores[0].numa_node == NumaNodeId{0});
+        const auto &numa_node_3 = cpu.cores[0].numa_node;
+        REQUIRE(numa_node_3.has_value());
+        if(!numa_node_3.has_value())
+        {
+            return;
+        }
+        CHECK(*numa_node_3 == NumaNodeId{0});
     }
 
     // ---- 测试 5: cpufreq 频率信息 ----
@@ -193,14 +224,28 @@ int main()
 
         std::vector<std::string> warnings;
         auto result = parse_cpu(raw, warnings);
-        CHECK(result.has_value());
+        REQUIRE(result.has_value());
+        if(!result.has_value())
+        {
+            return;
+        }
 
         const auto &cpu = *result;
-        CHECK(cpu.packages[0].base_frequency.has_value());
+        const auto &base_frequency_4 = cpu.packages[0].base_frequency;
+        REQUIRE(base_frequency_4.has_value());
+        if(!base_frequency_4.has_value())
+        {
+            return;
+        }
         // 2300000 kHz → 2300000000 Hz
-        CHECK(cpu.packages[0].base_frequency->value == 2300000ULL * 1000);
-        CHECK(cpu.packages[0].max_frequency.has_value());
-        CHECK(cpu.packages[0].max_frequency->value == 3300000ULL * 1000);
+        CHECK(base_frequency_4->value == 2300000ULL * 1000);
+        const auto &max_frequency_5 = cpu.packages[0].max_frequency;
+        REQUIRE(max_frequency_5.has_value());
+        if(!max_frequency_5.has_value())
+        {
+            return;
+        }
+        CHECK(max_frequency_5->value == 3300000ULL * 1000);
     }
 
     // ---- 测试 7: 多封装 cpufreq 频率信息（各封装独立频率） ----
@@ -239,26 +284,50 @@ int main()
 
         std::vector<std::string> warnings;
         auto result = parse_cpu(raw, warnings);
-        CHECK(result.has_value());
+        REQUIRE(result.has_value());
+        if(!result.has_value())
+        {
+            return;
+        }
 
         const auto &cpu = *result;
         CHECK(cpu.packages.size() == 2);
 
         // Package 0: 2400000 kHz → 2400000000 Hz
-        CHECK(cpu.packages[0].base_frequency.has_value());
-        CHECK(cpu.packages[0].base_frequency->value == 2400000ULL * 1000);
-        CHECK(cpu.packages[0].max_frequency.has_value());
-        CHECK(cpu.packages[0].max_frequency->value == 3500000ULL * 1000);
+        const auto &base_frequency_6 = cpu.packages[0].base_frequency;
+        REQUIRE(base_frequency_6.has_value());
+        if(!base_frequency_6.has_value())
+        {
+            return;
+        }
+        CHECK(base_frequency_6->value == 2400000ULL * 1000);
+        const auto &max_frequency_7 = cpu.packages[0].max_frequency;
+        REQUIRE(max_frequency_7.has_value());
+        if(!max_frequency_7.has_value())
+        {
+            return;
+        }
+        CHECK(max_frequency_7->value == 3500000ULL * 1000);
 
         // Package 1: 1800000 kHz → 1800000000 Hz (DIFFERENT from package 0)
-        CHECK(cpu.packages[1].base_frequency.has_value());
-        CHECK(cpu.packages[1].base_frequency->value == 1800000ULL * 1000);
-        CHECK(cpu.packages[1].max_frequency.has_value());
-        CHECK(cpu.packages[1].max_frequency->value == 2900000ULL * 1000);
+        const auto &base_frequency_8 = cpu.packages[1].base_frequency;
+        REQUIRE(base_frequency_8.has_value());
+        if(!base_frequency_8.has_value())
+        {
+            return;
+        }
+        CHECK(base_frequency_8->value == 1800000ULL * 1000);
+        const auto &max_frequency_9 = cpu.packages[1].max_frequency;
+        REQUIRE(max_frequency_9.has_value());
+        if(!max_frequency_9.has_value())
+        {
+            return;
+        }
+        CHECK(max_frequency_9->value == 2900000ULL * 1000);
 
         // Verify they are actually different
-        CHECK(cpu.packages[0].base_frequency->value != cpu.packages[1].base_frequency->value);
-        CHECK(cpu.packages[0].max_frequency->value != cpu.packages[1].max_frequency->value);
+        CHECK(base_frequency_6->value != base_frequency_8->value);
+        CHECK(max_frequency_7->value != max_frequency_9->value);
     }
 
     // ---- 测试 6: 缺少 /proc/cpuinfo 数据 ----
@@ -282,7 +351,11 @@ int main()
 
         std::vector<std::string> warnings;
         auto result = parse_cpu(raw, warnings);
-        CHECK(result.has_value());
+        REQUIRE(result.has_value());
+        if(!result.has_value())
+        {
+            return;
+        }
 
         const auto &cpu = *result;
         CHECK(cpu.isa_extensions.size() == 17);
@@ -336,7 +409,11 @@ int main()
 
         std::vector<std::string> warnings;
         auto result = parse_cpu(raw, warnings);
-        CHECK(result.has_value());
+        REQUIRE(result.has_value());
+        if(!result.has_value())
+        {
+            return;
+        }
 
         const auto &cpu = *result;
         // 缓存数量：cpu0(cpu0/cpu1)共 4 个 index；因 map 按键磁盘序，size 经 grouping
@@ -383,11 +460,13 @@ int main()
 
         std::vector<std::string> warnings;
         auto result = parse_cpu(raw, warnings);
-        CHECK(result.has_value());
+        REQUIRE(result.has_value());
+        if(!result.has_value())
+        {
+            return;
+        }
         CHECK(result->caches.empty());
         CHECK(result->governor.empty());
         CHECK(result->thermal_zones.empty());
     }
-
-    TEST_SUMMARY();
 }

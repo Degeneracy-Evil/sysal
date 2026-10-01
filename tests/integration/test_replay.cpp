@@ -1,12 +1,12 @@
 /// @file test_replay.cpp
 /// @brief Raw replay 测试
 /// @details 从 fixture 文件加载 RawStore，执行 Parser→Resolver 回放管线，
-///          验证域不变量。首次运行时自动生成 fixture。
+///          验证域不变量，不修改 fixture。
 
 #include "sysal/core/system.hpp"
 #include "sysal/test/replay.hpp"
 
-#include "test_macros.hpp"
+#include <doctest/doctest.h>
 
 #include <filesystem>
 #include <iostream>
@@ -17,38 +17,14 @@ namespace
     /// @brief fixture 文件路径
     const std::string fixture_path = "tests/fixtures/dev_machine.json";
 
-    /// @brief 生成 fixture 文件
-    /// @details 采集当前机器的原始数据并保存到 fixture 路径。
-    void generate_fixture()
-    {
-        auto sys = sysal::System::collect(sysal::full);
-        if(sys.raw.has_value())
-        {
-            sysal::test::save_raw_store(*sys.raw, fixture_path);
-            std::cout << "  Generated fixture: " << fixture_path << "\n";
-        }
-        else
-        {
-            std::cerr << "  WARNING: No raw data collected, cannot generate fixture\n";
-        }
-    }
-
 } // namespace
 
-int main()
+TEST_CASE("test_replay")
 {
     std::cout << "=== test_replay ===\n\n";
 
-    // 1. 若 fixture 不存在则生成
-    if(!std::filesystem::exists(fixture_path))
-    {
-        std::cout << "Step 1: Generating fixture...\n";
-        generate_fixture();
-    }
-    else
-    {
-        std::cout << "Step 1: Fixture already exists\n";
-    }
+    // 回放只读取已提交的 fixture，不生成或修改仓库文件。
+    CHECK(std::filesystem::exists(fixture_path));
 
     // 2. 加载 fixture
     std::cout << "\nStep 2: Loading fixture...\n";
@@ -88,6 +64,5 @@ int main()
     CHECK(!sys.meta.succeeded_collectors.empty());
     CHECK(!sys.meta.sysal_version.empty());
 
-    std::cout << "\n=== test_replay: ALL PASSED ===\n";
-    TEST_SUMMARY();
+    std::cout << "\n=== test_replay: completed ===\n";
 }

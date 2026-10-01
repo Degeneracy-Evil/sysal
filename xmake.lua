@@ -1,169 +1,146 @@
+set_project("sysal")
+on_load(function (target)
+    local version_header = io.readfile("include/sysal/version.hpp")
+    target:set("version", assert(version_header:match('VERSION_STRING%s*=%s*"([^"]+)"'), "missing sysal version"))
+end)
 set_languages("c++20")
 set_rundir(".")
+if not get_config("toolchain") then
+    set_toolchains("clang")
+end
+add_rules("mode.debug", "mode.release")
 add_rules("plugin.compile_commands.autoupdate", {outputdir = "build"})
-
-add_cxxflags("-Wall", "-Wextra", "-Werror", "-O2", {force = true})
+add_cxxflags("-Wall", "-Wextra", "-Werror", "-Wpedantic", {force = true})
 add_includedirs("include")
-add_requires("nlohmann_json")
-add_packages("nlohmann_json")
+add_requires("nlohmann_json", "doctest 2.4.12")
 
--- clang 专属选项：检测到 clang 编译器时添加 libc++/lld/compiler-rt
-local function clang_flags(target)
-    local comp = target:tool("cxx")
-    if comp and comp:find("clang", 1, true) then
-        target:add("cxxflags", "-stdlib=libc++", {force = true})
-        target:add("ldflags", "-stdlib=libc++", "-fuse-ld=lld", "-rtlib=compiler-rt",
-                   "-unwindlib=libunwind", {force = true})
+local function cpp_files()
+    local files = {}
+    for _, directory in ipairs({"include", "src", "tests", "examples"}) do
+        for _, extension in ipairs({"h", "hpp", "c", "cpp"}) do
+            for _, file in ipairs(os.files(directory .. "/**." .. extension)) do
+                table.insert(files, file)
+            end
+        end
     end
+    table.sort(files)
+    return files
 end
 
--- 源文件列表（共享给静态库和动态库）
-local SYSAL_SOURCES = {
-    "src/**.cpp"
-}
+local function translation_units()
+    local files = {}
+    for _, directory in ipairs({"src", "tests", "examples"}) do
+        for _, extension in ipairs({"c", "cpp"}) do
+            for _, file in ipairs(os.files(directory .. "/**." .. extension)) do
+                table.insert(files, file)
+            end
+        end
+    end
+    table.sort(files)
+    return files
+end
 
--- ========== 库 ==========
+local function enable_assertions(target)
+    -- mode.release adds this raw flag after undefines; keep smoke/test assertions active.
+    local flags = {}
+    for _, flag in ipairs(target:get("cxflags") or {}) do
+        if flag ~= "-DNDEBUG" then
+            table.insert(flags, flag)
+        end
+    end
+    target:set("cxflags", flags)
+end
 
 target("sysal_static")
     set_kind("static")
     set_basename("sysal")
     add_cxxflags("-fPIC", {force = true})
     set_targetdir("$(builddir)/$(plat)/$(arch)/$(mode)/static")
-    add_files(SYSAL_SOURCES)
+    add_files("src/**.cpp")
     add_includedirs("src")
-
-    on_load(function (target)
-        if os.isdir(".githooks") and (os.isdir(".git") or os.isfile(".git")) then
-            local configured = try { function() os.execv("git", {"config", "core.hooksPath"}); return true end }
-            if not configured then
-                os.runv("git", {"config", "core.hooksPath", ".githooks"})
-            end
-        end
-    end)
-    on_config(function (target)
-        clang_flags(target)
-    end)
+    add_packages("nlohmann_json")
 
 target("sysal_shared")
     set_kind("shared")
     set_basename("sysal")
-    add_files(SYSAL_SOURCES)
+    add_files("src/**.cpp")
     add_includedirs("src")
-    on_config(function (target)
-        clang_flags(target)
-    end)
+    add_packages("nlohmann_json")
 
--- ========== 测试 ==========
+target("unit_tests")
+    set_kind("binary")
+    set_default(false)
+    add_files("tests/test_main.cpp", "tests/unit/**.cpp")
+    add_deps("sysal_static")
+    add_includedirs("src", "tests")
+    add_packages("doctest")
+    add_undefines("NDEBUG")
+    on_config(enable_assertions)
 
--- 辅助函数：创建测试 binary target
--- link_shared=true 链接动态库（不暴露内部头），否则链接静态库（可访问 src/ 内部头）
-local function test_target(name, source, link_shared)
-    target(name)
-        set_kind("binary")
-        add_files(source)
-        add_deps(link_shared and "sysal_shared" or "sysal_static")
-        if not link_shared then
-            add_includedirs("src")
-        end
-        add_includedirs("tests")
-        add_cxxflags("-UNDEBUG", {force = true})
-        on_config(function (target)
-            clang_flags(target)
-        end)
-end
+target("test_replay")
+    set_kind("binary")
+    set_default(false)
+    add_files("tests/test_main.cpp", "tests/integration/test_replay.cpp")
+    add_deps("sysal_static")
+    add_packages("doctest")
+    add_undefines("NDEBUG")
+    on_config(enable_assertions)
 
--- 单元测试（链接静态库，白盒可访问内部头）
-local unit_tests = {
-    "test_types",
-    "test_model",
-    "test_parse_utils",
-    "test_raw_store_io",
-    "test_reader",
-    "test_parse_platform",
-    "test_parse_cpu",
-    "test_parse_memory",
-    "test_parse_accelerator",
-    "test_parse_storage",
-    "test_parse_pci",
-    "test_parse_network",
-    "test_parse_software",
-    "test_parse_execution",
-    "test_resolve",
-    "test_collect",
-    "test_serialization",
-    "test_replay",
-}
-
-for _, name in ipairs(unit_tests) do
-    if name == "test_replay" then
-        test_target(name, "tests/integration/" .. name .. ".cpp")
-    else
-        test_target(name, "tests/unit/" .. name .. ".cpp")
-    end
-end
-
--- sysal_info 链接动态库，仅访问公共头（demo，非测试）
 target("sysal_info")
     set_kind("binary")
     add_files("examples/sysal_info.cpp")
     add_deps("sysal_shared")
-    add_cxxflags("-UNDEBUG", {force = true})
-    on_config(function (target)
-        clang_flags(target)
-    end)
-
--- ========== task ==========
+    add_undefines("NDEBUG")
+    on_config(enable_assertions)
 
 task("test")
     set_category("plugin")
     on_run(function ()
-        local targets = {
-            "test_types", "test_model", "test_parse_utils", "test_raw_store_io",
-            "test_reader", "test_parse_platform", "test_parse_cpu", "test_parse_memory",
-            "test_parse_accelerator", "test_parse_storage", "test_parse_pci",
-            "test_parse_network", "test_parse_software", "test_parse_execution",
-            "test_resolve", "test_collect", "test_serialization", "test_replay",
-        }
-        local failed = 0
-        for _, name in ipairs(targets) do
-            if not os.execv("xmake", {"run", name}) then
-                failed = failed + 1
-            end
-        end
-        if failed > 0 then
-            raise(failed .. " test(s) failed")
-        end
+        os.execv("xmake", {"run", "unit_tests"})
+        os.execv("xmake", {"run", "test_replay"})
     end)
     set_menu {
         usage = "xmake test",
-        description = "Run all unit and integration tests",
+        description = "Run doctest unit and replay integration tests",
+        options = {}
+    }
+
+task("format")
+    set_category("plugin")
+    on_run(function ()
+        for _, file in ipairs(cpp_files()) do
+            os.execv("clang-format", {"-i", file})
+        end
+    end)
+    set_menu {
+        usage = "xmake format",
+        description = "Format project C/C++ files in place",
         options = {}
     }
 
 task("check")
     set_category("plugin")
     on_run(function ()
-        local fmt_cmd = "find include src tests -type f \\( -name '*.h' -o -name '*.hpp' -o -name '*.c' -o -name '*.cpp' \\) -print0 2>/dev/null | xargs -0 clang-format -i"
-        local tidy_cmd = "find src tests -type f \\( -name '*.c' -o -name '*.cpp' \\) -print0 2>/dev/null | xargs -0 clang-tidy -p=build"
-
-        print("[1/4] clang-format...")
-        os.execv("bash", {"-c", fmt_cmd})
-
-        print("[2/4] clang-tidy...")
+        print("[1/5] clang-format check...")
+        for _, file in ipairs(cpp_files()) do
+            os.execv("clang-format", {"--dry-run", "--Werror", file})
+        end
+        print("[2/5] compilation database...")
+        -- Include non-default test targets in the database used by clang-tidy.
         os.execv("xmake", {"project", "-k", "compile_commands", "build"})
-        os.execv("bash", {"-c", tidy_cmd})
-
-        print("[3/4] rebuild...")
+        print("[3/5] clang-tidy...")
+        for _, file in ipairs(translation_units()) do
+            os.execv("clang-tidy", {"-p=build", file})
+        end
+        print("[4/5] rebuild...")
         os.execv("xmake", {"-r"})
-
-        print("[4/4] test...")
+        print("[5/5] test...")
         os.execv("xmake", {"test"})
-
         print("\nAll checks passed.")
     end)
     set_menu {
         usage = "xmake check",
-        description = "Full quality check: format + tidy + rebuild + test",
+        description = "Validate format, tidy, rebuild, and tests without modifying tracked files",
         options = {}
     }
 
@@ -174,6 +151,6 @@ task("sysal_info")
     end)
     set_menu {
         usage = "xmake sysal_info",
-        description = "Build and run sysal_info demo with terminal output",
+        description = "Build and run sysal_info",
         options = {}
     }

@@ -4,12 +4,12 @@
 #include "sysal/test/replay.hpp"
 #include "sysal/version.hpp"
 
-#include "test_macros.hpp"
+#include <doctest/doctest.h>
 #include <string>
 
 using namespace sysal;
 
-int main()
+TEST_CASE("test_collect")
 {
     // ---- 测试 1: System::collect 基本冒烟测试 ----
     {
@@ -70,6 +70,4 @@ int main()
         }
         CHECK(threw);
     }
-
-    TEST_SUMMARY();
 }

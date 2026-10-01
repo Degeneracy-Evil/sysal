@@ -6,16 +6,20 @@
 #include "sysal/model/raw_store.hpp"
 #include "sysal/types/enums.hpp"
 
-#include "test_macros.hpp"
+#include <doctest/doctest.h>
 #include <iostream>
 
-int main()
+TEST_CASE("test_reader")
 {
     // ---- file_utils 测试 ----
 
     // read_file 成功
     auto cpuinfo = sysal::reader::read_file("/proc/cpuinfo");
-    CHECK(cpuinfo.has_value());
+    REQUIRE(cpuinfo.has_value());
+    if(!cpuinfo.has_value())
+    {
+        return;
+    }
     CHECK(!cpuinfo->empty());
 
     // read_file 失败
@@ -108,7 +112,4 @@ int main()
     auto cpuinfo_records = raw3.get_all(sysal::RawSource::ProcCpuInfo);
     CHECK(!cpuinfo_records.empty());
     CHECK(cpuinfo_records[0]->status == sysal::CollectStatus::Success);
-
-    std::cout << "test_reader: all assertions passed\n";
-    TEST_SUMMARY();
 }

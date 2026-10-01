@@ -32,6 +32,8 @@ namespace sysal
     /// @return 组合后的位掩码
     constexpr Collect operator|(Collect a, Collect b)
     {
+        // Collect 是位掩码，组合值合法但不必对应单个枚举成员。
+        // NOLINTNEXTLINE(clang-analyzer-optin.core.EnumCastOutOfRange)
         return static_cast<Collect>(static_cast<std::uint32_t>(a) | static_cast<std::uint32_t>(b));
     }
 

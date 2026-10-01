@@ -4,14 +4,14 @@
 #include "sysal/model/execution.hpp"
 #include "sysal/types/ids.hpp"
 
-#include "test_macros.hpp"
+#include <doctest/doctest.h>
 #include <string>
 #include <vector>
 
 using namespace sysal;
 using namespace sysal::detail;
 
-int main()
+TEST_CASE("test_resolve")
 {
     // ---- 测试 1: CPU 可见性计算（cpuset 约束） ----
     {
@@ -303,6 +303,4 @@ int main()
         }
         CHECK(has_phantom);
     }
-
-    TEST_SUMMARY();
 }

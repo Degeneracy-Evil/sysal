@@ -1,71 +1,52 @@
 # sysal
 
-C++ 系统信息抽象库 — 收集、归一化、暴露服务器系统信息。
+C++ 系统信息抽象库，采集、归一化并暴露服务器系统信息。
 
-## 构建
+## 环境与构建
 
-```bash
-xmake build          # 构建（静态库 + 动态库 + 全部测试）
-xmake -r             # 重新构建
-xmake sysal_info     # 编译并运行 sysal_info，终端输出
-```
-
-`compile_commands.json` 由 xmake 的 `plugin.compile_commands.autoupdate` 规则根据真实构建参数自动更新到 `build/`（供 clang-tidy / clangd 使用），无需手动生成。
-
-## 项目结构
-
-```
-include/sysal/    公共头文件
-src/              源文件
-tests/            测试样例
-docs/             文档
-docker/
-  centos7-build/  CentOS 7 兼容性构建（Dockerfile + build.sh）
-.githooks/
-  pre-commit      自动修复格式 + 尾随空白并重新暂存
-.github/
-  workflows/
-    ci.yml        CI 流水线（push/PR 触发 xmake check）
-output/           输出文件 (gitignore)
-```
-
-## 关键约定
-
-- C++20 / xmake / 自适应工具链（clang+libc++ 或 gcc+libstdc++）
-- GCC 使用系统默认标准库和链接器；Clang 使用 libc++ / lld / compiler-rt / libunwind
-- 编译选项 -Wall -Wextra -Werror，零 warning
-- clang-tidy `WarningsAsErrors: '*'`，静态分析零容忍
-- `<cctype>` 函数传参必须 `static_cast<unsigned char>()`，否则 signed char 有 UB
-- `compile_commands.json` 由 xmake 的 `plugin.compile_commands.autoupdate` 规则自动更新
-- clang-format / clang-tidy 递归检查 `include/`、`src/`、`tests/` 下的 C/C++ 文件
-- 行尾统一 LF（`.gitattributes` 控制）
-- `xmake check` 运行全量质量检查（format + tidy + rebuild + test）
-- `xmake test` 运行全部单元和集成测试
-- 版本号定义在 `include/sysal/version.hpp`（VERSION_MAJOR / VERSION_MINOR / VERSION_PATCH / VERSION_STRING）
-- pre-commit hook 自动修复格式 + 尾随空白并重新暂存，不阻塞提交；首次 `xmake build` 自动配置 `core.hooksPath`
-- 项目未配置 pre-push hook；push 后由 GitHub Actions 执行 `xmake check` 并运行 `xmake run sysal_info` 冒烟测试
-- CI 只使用 Clang，不设置编译器矩阵；xmake 使用 latest，避免在 CI 中重复单独构建
-- 命名规则参见 `docs/design/rules/strong_typing.md`
-
-## 兼容性构建
-
-预编译产物兼容 glibc 2.17+（CentOS 7 / RHEL 7 及所有主流 Linux 发行版）。
+- C++20 / xmake；默认 Clang，GCC 可显式选择。
+- 使用所选工具链的默认标准库、链接器和 runtime。
+- glibc 2.17+ 发布产物由 CentOS 7 / GCC 兼容构建提供。
+- 版本唯一来源为 `include/sysal/version.hpp`，xmake 从该文件读取版本。
 
 ```bash
-bash docker/centos7-build/build.sh   # 在 CentOS 7 容器中编译，产出 glibc 2.17 兼容的 .so/.a
+xmake f -c -y --toolchain=clang
+xmake build
+xmake run sysal_info
 ```
 
-## 开发记录规则
+普通构建包含静态库、动态库和示例；测试由 `xmake test` 构建并执行。
+`compile_commands.json` 由 xmake 自动更新到 `build/`。
 
-**每次文档或代码变动，必须在 `docs/devlog.md` 中留存痕迹。**
+## 格式与完整验证
 
-记录格式：
+```bash
+xmake format       # 显式修改格式
+xmake check        # 只验证：format check + tidy + rebuild + test
+xmake test         # doctest 单元测试与独立 replay 集成测试
 ```
-### YYYY-MM-DD 简述
 
-- **变更类型**: docs / src / fix / refactor / build / chore
-- **涉及文件**: 文件列表
-- **变更内容**: 具体做了什么
-- **原因**: 为什么做这个变更
-- **验证**: 如何验证正确性（测试命令/结果）
+- format / tidy 覆盖 `include/`、`src/`、`tests/`、`examples/` 的 C/C++ 文件。
+- 编译使用 `-Wall -Wextra -Werror -Wpedantic`；clang-tidy warnings 全部视为 error。
+- 必要的 lint 例外须局部标注并说明原因，不扩大全局禁用范围。
+- clang-format 行宽 120，缩进 4 空格；文本统一 LF。
+- `<cctype>` 函数传参须 `static_cast<unsigned char>()`。
+- 命名规则参见 `docs/design/rules/strong_typing.md`。
+- 检查不得修改 tracked 文件或 index；格式修复单独执行。
+- 开发记录写在 Git 提交中，不要求维护手工开发日志。
+
+## Git hook 与 CI
+
+```bash
+git config core.hooksPath .githooks
 ```
+
+pre-commit 只验证 staged snapshot 的空白与 C/C++ 格式，不修改工作区或 index。
+构建不自动配置 hook。CI 使用 Clang 运行 `xmake check`，断言工作区与 index 未变，
+随后运行 `xmake run sysal_info` 冒烟测试。
+
+## 修改后的验证
+
+代码或配置变更后执行 `xmake check` 和 `xmake run sysal_info`。
+工具链或构建行为变更须从 clean configuration 验证相关工具链。
+涉及兼容产物时执行 `bash docker/centos7-build/build.sh`，检查 glibc 2.17 兼容性。

@@ -57,13 +57,11 @@ namespace sysal::detail
             {
                 return {};
             }
-            auto after_block = path.substr(block_pos + 11); // "/sys/block/" 长度
-            auto slash_pos = after_block.find('/');
-            if(slash_pos == std::string_view::npos)
-            {
-                return std::string(after_block);
-            }
-            return std::string(after_block.substr(0, slash_pos));
+            const auto start = block_pos + 11; // "/sys/block/" 长度
+            // 在原始视图中查找，避免 GCC 11 对子视图长度的错误越界诊断。
+            const auto slash_pos = path.find('/', start);
+            const auto end = slash_pos == std::string_view::npos ? path.size() : slash_pos;
+            return std::string(path.substr(start, end - start));
         }
 
         /// @brief 从块设备符号链接目标中提取 PCI 地址

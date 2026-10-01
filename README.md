@@ -5,7 +5,7 @@ C++ 系统信息抽象库。采集服务器硬件与软件信息，归一化为�
 ## 快速开始
 
 ```bash
-xmake                  # 编译静态库 + 动态库
+xmake                  # 编译静态库 + 动态库 + 示例
 xmake run sysal_info   # 编译并运行演示程序，终端输出全部采集结果
 ```
 
@@ -56,12 +56,20 @@ Reader 从文件、sysfs、命令输出、系统调用采集原始数据。Parse
 ## 构建
 
 ```bash
-xmake          # 编译
+xmake f -c -y --toolchain=clang  # 默认 Clang；也可显式选择 gcc
+xmake          # 编译库与示例，使用工具链默认标准库和 runtime
 xmake -r       # 重新编译
-xmake run test_replay   # 运行 replay 测试
+xmake test     # 构建并运行 doctest 单元测试和 replay 集成测试
+xmake format   # 显式修复 include/src/tests/examples 下的格式
+xmake check    # 只验证格式、静态分析、构建与测试
 ```
 
-CI 在 push 或 PR 时自动运行 clang-format + clang-tidy + build + tests。
+项目保留 C++20；debug/release 优化由 xmake 构建模式决定。版本从 `include/sysal/version.hpp` 读取。
+
+显式启用 Git hook：`git config core.hooksPath .githooks`。hook 只检查已暂存的空白和格式，
+不会自动修复或重新暂存。`xmake check` 不修改 tracked 文件或 index。
+CI 在 push 或 PR 时运行完整检查、非修改断言及 `sysal_info` 冒烟测试。
+开发记录通过 Git 提交维护，无需手工开发日志。
 
 ### 兼容性构建（CentOS 7 / RHEL 7）
 
