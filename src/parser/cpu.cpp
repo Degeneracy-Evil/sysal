@@ -4,7 +4,10 @@
 
 #include "cpu.hpp"
 
+#include "cpu_details.hpp"
 #include "parse_utils.hpp"
+
+#include <limits>
 
 #include <algorithm>
 #include <cctype>
@@ -29,6 +32,7 @@ namespace sysal::detail
             std::string vendor_id;        ///< 厂商 ID
             std::string flags;            ///< CPU flags 字符串
             bool core_id_set{false};      ///< core_id 是否已设置
+            CpuIdentification identification;
         };
 
         /// @brief 解析 /proc/cpuinfo 内容
@@ -100,9 +104,47 @@ namespace sysal::detail
                 {
                     current.vendor_id = value;
                 }
-                else if(key == "flags")
+                else if(key == "flags" || key == "Features")
                 {
                     current.flags = value;
+                    current.identification.features = split(value, ' ');
+                    std::erase_if(current.identification.features, [](const auto &feature) { return feature.empty(); });
+                    std::ranges::sort(current.identification.features);
+                    auto duplicate = std::ranges::unique(current.identification.features);
+                    current.identification.features.erase(duplicate.begin(), duplicate.end());
+                }
+                else if(key == "microcode")
+                {
+                    current.identification.microcode = value;
+                }
+                else if(key == "CPU architecture")
+                {
+                    current.identification.architecture = value;
+                }
+                else if(key == "CPU revision")
+                {
+                    current.identification.revision = value;
+                }
+                else if(key == "cpu family" || key == "model" || key == "stepping" || key == "CPU implementer" ||
+                        key == "CPU part" || key == "CPU variant")
+                {
+                    const auto number = value.starts_with("0x") ? parse_hex(value.substr(2)) : parse_uint(value);
+                    if(number && *number <= std::numeric_limits<std::uint32_t>::max())
+                    {
+                        const auto narrowed = static_cast<std::uint32_t>(*number);
+                        if(key == "cpu family")
+                            current.identification.family = narrowed;
+                        else if(key == "model")
+                            current.identification.model = narrowed;
+                        else if(key == "stepping")
+                            current.identification.stepping = narrowed;
+                        else if(key == "CPU implementer")
+                            current.identification.implementer = narrowed;
+                        else if(key == "CPU part")
+                            current.identification.part = narrowed;
+                        else
+                            current.identification.variant = narrowed;
+                    }
                 }
             }
 
@@ -203,7 +245,7 @@ namespace sysal::detail
                      const std::unordered_set<std::uint32_t> &package_cpu_ids,
                      [[maybe_unused]] std::vector<std::string> &warnings)
         {
-            std::optional<Frequency> base_freq;
+            std::set<std::uint64_t> base_frequencies;
             std::optional<Frequency> max_freq;
 
             auto cpu_records = raw.get_all(RawSource::SysfsCpu);
@@ -224,26 +266,29 @@ namespace sysal::detail
                 }
 
                 // 查找 base_frequency: cpu/cpuN/cpufreq/base_frequency
-                if(path.find("base_frequency") != std::string::npos && !base_freq.has_value())
+                if(path.find("base_frequency") != std::string::npos)
                 {
                     auto v = parse_uint(rec->payload);
-                    if(v.has_value())
+                    if(v && *v > 0 && *v <= std::numeric_limits<std::uint64_t>::max() / 1000)
                     {
                         // sysfs 频率单位为 kHz，转换为 Hz
-                        base_freq = Frequency{*v * 1000};
+                        base_frequencies.insert(*v * 1000);
                     }
                 }
-                // 查找 scaling_max_freq: cpu/cpuN/cpufreq/scaling_max_freq
-                if(path.find("scaling_max_freq") != std::string::npos && !max_freq.has_value())
+                // 查找 cpuinfo_max_freq: cpu/cpuN/cpufreq/cpuinfo_max_freq
+                if(path.find("cpuinfo_max_freq") != std::string::npos)
                 {
                     auto v = parse_uint(rec->payload);
-                    if(v.has_value())
+                    if(v && *v > 0 && *v <= std::numeric_limits<std::uint64_t>::max() / 1000)
                     {
-                        max_freq = Frequency{*v * 1000};
+                        max_freq = Frequency{std::max(max_freq ? max_freq->value : 0, *v * 1000)};
                     }
                 }
             }
 
+            const auto base_freq = base_frequencies.size() == 1
+                                       ? std::optional<Frequency>{Frequency{*base_frequencies.begin()}}
+                                       : std::nullopt;
             return {base_freq, max_freq};
         }
 
@@ -282,6 +327,10 @@ namespace sysal::detail
             }
             auto v = parse_uint(trimmed);
             if(!v.has_value())
+            {
+                return std::nullopt;
+            }
+            if(*v > std::numeric_limits<std::uint64_t>::max() / multiplier)
             {
                 return std::nullopt;
             }
@@ -382,7 +431,23 @@ namespace sysal::detail
                 {
                     continue;
                 }
-                if(path.rfind("/level") != std::string_view::npos)
+                if(path.ends_with("/shared_cpu_list"))
+                {
+                    if(auto ids = parse_cpu_id_list(rec->payload))
+                        cache.shared_cpus = std::move(*ids);
+                }
+                else if(path.ends_with("/id") || path.ends_with("/number_of_sets"))
+                {
+                    if(auto number = parse_uint(rec->payload);
+                       number && *number <= std::numeric_limits<std::uint32_t>::max())
+                    {
+                        if(path.ends_with("/id"))
+                            cache.cache_id = static_cast<std::uint32_t>(*number);
+                        else
+                            cache.sets = static_cast<std::uint32_t>(*number);
+                    }
+                }
+                else if(path.rfind("/level") != std::string_view::npos)
                 {
                     if(auto v = parse_uint(rec->payload))
                     {
@@ -421,7 +486,17 @@ namespace sysal::detail
             for(const auto &[key, cache] : cache_map)
             {
                 (void)key;
-                caches.push_back(cache);
+                const auto duplicate = std::ranges::find_if(
+                    caches,
+                    [&cache](const auto &other)
+                    {
+                        return !cache.shared_cpus.empty() && cache.level == other.level && cache.type == other.type &&
+                               cache.shared_cpus == other.shared_cpus && cache.cache_id == other.cache_id &&
+                               cache.size == other.size && cache.ways == other.ways &&
+                               cache.line_size == other.line_size && cache.sets == other.sets;
+                    });
+                if(duplicate == caches.end())
+                    caches.push_back(cache);
             }
             return caches;
         }
@@ -431,19 +506,19 @@ namespace sysal::detail
         /// @return 调频策略字符串（如 "performance"），缺失返回空串
         std::string read_cpu_governor(const RawStore &raw)
         {
-            auto cpu_records = raw.get_all(RawSource::SysfsCpu);
-            for(const auto *rec : cpu_records)
+            std::set<std::string> governors;
+            for(const auto *rec : raw.get_all(RawSource::SysfsCpu))
             {
-                if(rec->status != CollectStatus::Success)
+                if(rec->status == CollectStatus::Success && rec->path_or_command.ends_with("/scaling_governor"))
                 {
-                    continue;
-                }
-                if(rec->path_or_command.find("scaling_governor") != std::string::npos)
-                {
-                    return trim(rec->payload);
+                    const auto value = trim(rec->payload);
+                    if(!value.empty())
+                        governors.insert(value);
                 }
             }
-            return {};
+            if(governors.empty())
+                return {};
+            return governors.size() == 1 ? *governors.begin() : "mixed";
         }
 
         /// @brief 读取温度传感器信息
@@ -592,6 +667,52 @@ namespace sysal::detail
             return cpu_to_numa;
         }
 
+        void apply_sysfs_topology(const RawStore &raw, std::vector<CpuInfoEntry> &entries)
+        {
+            struct Topology
+            {
+                std::optional<std::uint32_t> package;
+                std::optional<std::uint32_t> core;
+            };
+            std::map<std::uint32_t, Topology> topology;
+            for(const auto *record : raw.get_all(RawSource::SysfsCpu))
+            {
+                if(record->status != CollectStatus::Success)
+                    continue;
+                const auto &path = record->path_or_command;
+                if(!path.ends_with("/topology/physical_package_id") && !path.ends_with("/topology/core_id"))
+                    continue;
+                const auto number = extract_cpu_number_from_path(path);
+                const auto value = parse_uint(record->payload);
+                if(!number || !value || *value > std::numeric_limits<std::uint32_t>::max())
+                    continue;
+                auto &item = topology[*number];
+                (path.ends_with("physical_package_id") ? item.package : item.core) = static_cast<std::uint32_t>(*value);
+            }
+            for(auto &entry : entries)
+            {
+                const auto found = topology.find(entry.processor);
+                if(found == topology.end())
+                    continue;
+                if(found->second.package)
+                    entry.physical_id = *found->second.package;
+                if(found->second.core)
+                    entry.core_id = *found->second.core;
+                topology.erase(found);
+            }
+            // 离线 CPU 仅在内核明确提供封装与核归属时加入；不复制其他 CPU 的标识。
+            for(const auto &[number, item] : topology)
+            {
+                if(!item.package || !item.core)
+                    continue;
+                CpuInfoEntry entry;
+                entry.processor = number;
+                entry.physical_id = *item.package;
+                entry.core_id = *item.core;
+                entries.push_back(std::move(entry));
+            }
+        }
+
         /// @brief 从 NUMA 映射构建 NumaNode 列表
         /// @param cpu_to_numa CPU → NUMA 节点映射
         /// @return NumaNode 列表（按节点 ID 排序）
@@ -641,6 +762,7 @@ namespace sysal::detail
             return std::nullopt;
         }
 
+        apply_sysfs_topology(raw, entries);
         Cpu cpu;
 
         // 收集唯一的 package ID 和 (package_id, core_id) 对
@@ -715,6 +837,7 @@ namespace sysal::detail
             lc.core_id = core_it->second;
             lc.package_id = pkg_it->second;
             lc.visible_to_current_process = true;
+            lc.identification = e.identification;
             cpu.logical_cpus.push_back(lc);
         }
 
@@ -821,6 +944,7 @@ namespace sysal::detail
         cpu.numa_nodes = build_numa_nodes(cpu_to_numa);
 
         // 收集 CPU 缓存、调频策略与温度传感器
+        read_cpu_details(raw, cpu, warnings);
         cpu.caches = read_cpu_caches(raw);
         cpu.governor = read_cpu_governor(raw);
         cpu.thermal_zones = read_thermal_zones(raw);

@@ -37,6 +37,39 @@ namespace sysal
         std::optional<NumaNodeId> numa_node; ///< 所属 NUMA 节点（可能未知）
     };
 
+    /// @brief 系统报告的处理器标识；不同架构的编号分别保存，不推导制造规格。
+    struct CpuIdentification
+    {
+        std::optional<std::uint32_t> family{};
+        std::optional<std::uint32_t> model{};
+        std::optional<std::uint32_t> stepping{};
+        std::optional<std::uint32_t> implementer{}; ///< ARM implementer ID
+        std::optional<std::uint32_t> part{};        ///< ARM part ID
+        std::optional<std::uint32_t> variant{};     ///< ARM variant ID
+        std::string revision;
+        std::string architecture; ///< /proc/cpuinfo 的架构描述，不是微架构代号
+        std::string microcode;
+        std::vector<std::string> features; ///< 当前逻辑 CPU 的完整内核能力标识
+    };
+
+    /// @brief 一个 Linux CPUFreq policy；频率均为 Hz，成员包含在线与离线 CPU。
+    struct CpuFrequencyPolicy
+    {
+        std::uint32_t index{};
+        std::vector<LogicalCpuId> related_cpus;
+        std::vector<LogicalCpuId> affected_cpus;
+        std::optional<Frequency> base_frequency{};
+        std::optional<Frequency> hardware_min_frequency{};
+        std::optional<Frequency> hardware_max_frequency{};
+        std::optional<Frequency> scaling_min_frequency{};
+        std::optional<Frequency> scaling_max_frequency{};
+        std::optional<Frequency> scaling_current_frequency{};  ///< scaling_cur_freq 的报告值，可能是请求值
+        std::optional<Frequency> hardware_current_frequency{}; ///< cpuinfo_cur_freq 的硬件报告值
+        std::string driver;
+        std::string governor;
+        std::string energy_performance_preference;
+    };
+
     /// @brief 逻辑 CPU（硬件线程）
     struct LogicalCpu
     {
@@ -45,6 +78,8 @@ namespace sysal
         CpuPackageId package_id;             ///< 所属封装 ID（反范式化）
         std::optional<NumaNodeId> numa_node; ///< 所属 NUMA 节点（可能未知）
         bool visible_to_current_process{};   ///< 当前进程是否可见
+        CpuIdentification identification{};
+        std::optional<bool> online{}; ///< 内核明确报告的在线状态
     };
 
     /// @brief 单个 NUMA 节点
@@ -63,6 +98,9 @@ namespace sysal
         std::uint32_t ways{};       ///< 相联度
         std::uint32_t line_size{};  ///< 缓存行大小（字节）
         std::uint32_t cpu_number{}; ///< 采样来源的逻辑 CPU 编号
+        std::optional<std::uint32_t> cache_id{};
+        std::optional<std::uint32_t> sets{};
+        std::vector<LogicalCpuId> shared_cpus{}; ///< 共享此缓存的逻辑 CPU；用于实例去重
     };
 
     /// @brief 温度传感器
@@ -87,6 +125,12 @@ namespace sysal
         std::vector<CpuCache> caches;             ///< CPU 缓存实例列表（按层级/类型）
         std::string governor;                     ///< cpufreq 调频策略（如 performance）
         std::vector<ThermalZone> thermal_zones;   ///< 温度传感器列表
+        std::vector<CpuFrequencyPolicy> frequency_policies{};
+        std::optional<std::vector<LogicalCpuId>> present_cpu_ids{};
+        std::optional<std::vector<LogicalCpuId>> online_cpu_ids{};
+        std::optional<bool> smt_active{};    ///< 内核报告是否有核心正在使用 SMT
+        std::string smt_control{};           ///< on/off/forceoff/notsupported/notimplemented 等原值
+        std::optional<bool> boost_enabled{}; ///< 仅在通用 cpufreq/boost 明确提供时设置
 
         /// @brief 按封装 ID 查找封装
         /// @param id 封装 ID

@@ -509,6 +509,30 @@ int main()
     label("Logical CPUs", sys.info.cpu.logical_cpus.size());
     label("NUMA nodes", sys.info.cpu.numa_nodes.size());
 
+    if(sys.info.cpu.present_cpu_ids)
+        label("Present CPUs", sys.info.cpu.present_cpu_ids->size());
+    if(sys.info.cpu.online_cpu_ids)
+        label("Online CPUs", sys.info.cpu.online_cpu_ids->size());
+    if(sys.info.cpu.smt_active)
+        label("SMT active", *sys.info.cpu.smt_active ? "yes" : "no");
+    if(!sys.info.cpu.smt_control.empty())
+        label("SMT control", sys.info.cpu.smt_control);
+    label("Frequency policies", sys.info.cpu.frequency_policies.size());
+    if(!sys.info.cpu.logical_cpus.empty())
+    {
+        const auto &identity = sys.info.cpu.logical_cpus.front().identification;
+        label("Identification source CPU", sys.info.cpu.logical_cpus.front().id.value());
+        if(identity.family)
+            label("Family", *identity.family);
+        if(identity.model)
+            label("Model number", *identity.model);
+        if(identity.stepping)
+            label("Stepping", *identity.stepping);
+        if(!identity.microcode.empty())
+            label("Microcode", identity.microcode);
+        label("Reported capabilities", identity.features.size());
+    }
+
     for(const auto &pkg : sys.info.cpu.packages)
     {
         std::cout << "  Package " << pkg.id << ": " << pkg.model_name.value << "\n";

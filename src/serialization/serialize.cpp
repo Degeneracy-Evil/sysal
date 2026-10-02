@@ -364,6 +364,117 @@ namespace sysal
             return c;
         }
 
+        [[nodiscard]] json cpu_ids_to_json(const std::vector<LogicalCpuId> &ids)
+        {
+            json result = json::array();
+            for(auto id : ids)
+                result.push_back(id.value());
+            return result;
+        }
+
+        [[nodiscard]] std::vector<LogicalCpuId> cpu_ids_from_json(const json &j)
+        {
+            std::vector<LogicalCpuId> result;
+            for(const auto &value : j)
+                result.emplace_back(value.get<std::uint32_t>());
+            return result;
+        }
+
+        [[nodiscard]] json cpu_identification_to_json(const CpuIdentification &identity)
+        {
+            json j = json::object();
+            if(identity.family)
+                j["family"] = *identity.family;
+            if(identity.model)
+                j["model"] = *identity.model;
+            if(identity.stepping)
+                j["stepping"] = *identity.stepping;
+            if(identity.implementer)
+                j["implementer"] = *identity.implementer;
+            if(identity.part)
+                j["part"] = *identity.part;
+            if(identity.variant)
+                j["variant"] = *identity.variant;
+            j["revision"] = identity.revision;
+            j["architecture"] = identity.architecture;
+            j["microcode"] = identity.microcode;
+            j["features"] = identity.features;
+            return j;
+        }
+
+        [[nodiscard]] CpuIdentification cpu_identification_from_json(const json &j)
+        {
+            CpuIdentification identity;
+            if(j.contains("family"))
+                identity.family = j.at("family").get<std::uint32_t>();
+            if(j.contains("model"))
+                identity.model = j.at("model").get<std::uint32_t>();
+            if(j.contains("stepping"))
+                identity.stepping = j.at("stepping").get<std::uint32_t>();
+            if(j.contains("implementer"))
+                identity.implementer = j.at("implementer").get<std::uint32_t>();
+            if(j.contains("part"))
+                identity.part = j.at("part").get<std::uint32_t>();
+            if(j.contains("variant"))
+                identity.variant = j.at("variant").get<std::uint32_t>();
+            identity.revision = j.value("revision", std::string{});
+            identity.architecture = j.value("architecture", std::string{});
+            identity.microcode = j.value("microcode", std::string{});
+            identity.features = j.value("features", std::vector<std::string>{});
+            return identity;
+        }
+
+        [[nodiscard]] json cpu_policy_to_json(const CpuFrequencyPolicy &policy)
+        {
+            json j = {{"index", policy.index},
+                      {"related_cpus", cpu_ids_to_json(policy.related_cpus)},
+                      {"affected_cpus", cpu_ids_to_json(policy.affected_cpus)}};
+            if(policy.base_frequency)
+                j["base_frequency"] = policy.base_frequency->value;
+            if(policy.hardware_min_frequency)
+                j["hardware_min_frequency"] = policy.hardware_min_frequency->value;
+            if(policy.hardware_max_frequency)
+                j["hardware_max_frequency"] = policy.hardware_max_frequency->value;
+            if(policy.scaling_min_frequency)
+                j["scaling_min_frequency"] = policy.scaling_min_frequency->value;
+            if(policy.scaling_max_frequency)
+                j["scaling_max_frequency"] = policy.scaling_max_frequency->value;
+            if(policy.scaling_current_frequency)
+                j["scaling_current_frequency"] = policy.scaling_current_frequency->value;
+            if(policy.hardware_current_frequency)
+                j["hardware_current_frequency"] = policy.hardware_current_frequency->value;
+            j["driver"] = policy.driver;
+            j["governor"] = policy.governor;
+            j["energy_performance_preference"] = policy.energy_performance_preference;
+            return j;
+        }
+
+        [[nodiscard]] CpuFrequencyPolicy cpu_policy_from_json(const json &j)
+        {
+            CpuFrequencyPolicy policy;
+            policy.index = j.at("index").get<std::uint32_t>();
+            policy.related_cpus = cpu_ids_from_json(j.at("related_cpus"));
+            policy.affected_cpus = cpu_ids_from_json(j.at("affected_cpus"));
+            if(j.contains("base_frequency"))
+                policy.base_frequency = Frequency{j.at("base_frequency").get<std::uint64_t>()};
+            if(j.contains("hardware_min_frequency"))
+                policy.hardware_min_frequency = Frequency{j.at("hardware_min_frequency").get<std::uint64_t>()};
+            if(j.contains("hardware_max_frequency"))
+                policy.hardware_max_frequency = Frequency{j.at("hardware_max_frequency").get<std::uint64_t>()};
+            if(j.contains("scaling_min_frequency"))
+                policy.scaling_min_frequency = Frequency{j.at("scaling_min_frequency").get<std::uint64_t>()};
+            if(j.contains("scaling_max_frequency"))
+                policy.scaling_max_frequency = Frequency{j.at("scaling_max_frequency").get<std::uint64_t>()};
+            if(j.contains("scaling_current_frequency"))
+                policy.scaling_current_frequency = Frequency{j.at("scaling_current_frequency").get<std::uint64_t>()};
+            if(j.contains("hardware_current_frequency"))
+                policy.hardware_current_frequency = Frequency{j.at("hardware_current_frequency").get<std::uint64_t>()};
+            policy.driver = j.value("driver", std::string{});
+            policy.governor = j.value("governor", std::string{});
+            policy.energy_performance_preference = j.value("energy_performance_preference", std::string{});
+            return policy;
+        }
+
         [[nodiscard]] json logical_cpu_to_json(const LogicalCpu &lc)
         {
             json j = {
@@ -376,6 +487,9 @@ namespace sysal
             {
                 j["numa_node"] = lc.numa_node->value();
             }
+            j["identification"] = cpu_identification_to_json(lc.identification);
+            if(lc.online)
+                j["online"] = *lc.online;
             return j;
         }
 
@@ -390,6 +504,10 @@ namespace sysal
                 lc.numa_node = NumaNodeId(j.at("numa_node").get<std::uint32_t>());
             }
             lc.visible_to_current_process = j.at("visible_to_current_process").get<bool>();
+            if(j.contains("identification"))
+                lc.identification = cpu_identification_from_json(j.at("identification"));
+            if(j.contains("online"))
+                lc.online = j.at("online").get<bool>();
             return lc;
         }
 
@@ -416,11 +534,17 @@ namespace sysal
 
         [[nodiscard]] json cpu_cache_to_json(const CpuCache &c)
         {
-            return json{
+            json j{
                 {"level", c.level},         {"type", static_cast<std::uint32_t>(c.type)},
                 {"size", c.size.value},     {"ways", c.ways},
                 {"line_size", c.line_size}, {"cpu_number", c.cpu_number},
             };
+            if(c.cache_id)
+                j["cache_id"] = *c.cache_id;
+            if(c.sets)
+                j["sets"] = *c.sets;
+            j["shared_cpus"] = cpu_ids_to_json(c.shared_cpus);
+            return j;
         }
 
         [[nodiscard]] CpuCache cpu_cache_from_json(const json &j)
@@ -432,6 +556,12 @@ namespace sysal
             c.ways = j.at("ways").get<std::uint32_t>();
             c.line_size = j.at("line_size").get<std::uint32_t>();
             c.cpu_number = j.at("cpu_number").get<std::uint32_t>();
+            if(j.contains("cache_id"))
+                c.cache_id = j.at("cache_id").get<std::uint32_t>();
+            if(j.contains("sets"))
+                c.sets = j.at("sets").get<std::uint32_t>();
+            if(j.contains("shared_cpus"))
+                c.shared_cpus = cpu_ids_from_json(j.at("shared_cpus"));
             return c;
         }
 
@@ -490,7 +620,7 @@ namespace sysal
             {
                 thermal.push_back(thermal_zone_to_json(zone));
             }
-            return json{
+            json j{
                 {"arch", static_cast<std::uint32_t>(c.arch)},
                 {"packages", std::move(packages)},
                 {"cores", std::move(cores)},
@@ -501,6 +631,19 @@ namespace sysal
                 {"governor", c.governor},
                 {"thermal_zones", std::move(thermal)},
             };
+            j["frequency_policies"] = json::array();
+            for(const auto &policy : c.frequency_policies)
+                j["frequency_policies"].push_back(cpu_policy_to_json(policy));
+            if(c.present_cpu_ids)
+                j["present_cpu_ids"] = cpu_ids_to_json(*c.present_cpu_ids);
+            if(c.online_cpu_ids)
+                j["online_cpu_ids"] = cpu_ids_to_json(*c.online_cpu_ids);
+            if(c.smt_active)
+                j["smt_active"] = *c.smt_active;
+            if(c.boost_enabled)
+                j["boost_enabled"] = *c.boost_enabled;
+            j["smt_control"] = c.smt_control;
+            return j;
         }
 
         [[nodiscard]] Cpu cpu_from_json(const json &j)
@@ -546,6 +689,20 @@ namespace sysal
                     c.thermal_zones.push_back(thermal_zone_from_json(elem));
                 }
             }
+            if(j.contains("frequency_policies"))
+            {
+                for(const auto &policy : j.at("frequency_policies"))
+                    c.frequency_policies.push_back(cpu_policy_from_json(policy));
+            }
+            if(j.contains("present_cpu_ids"))
+                c.present_cpu_ids = cpu_ids_from_json(j.at("present_cpu_ids"));
+            if(j.contains("online_cpu_ids"))
+                c.online_cpu_ids = cpu_ids_from_json(j.at("online_cpu_ids"));
+            if(j.contains("smt_active"))
+                c.smt_active = j.at("smt_active").get<bool>();
+            if(j.contains("boost_enabled"))
+                c.boost_enabled = j.at("boost_enabled").get<bool>();
+            c.smt_control = j.value("smt_control", std::string{});
             return c;
         }
 

@@ -1,159 +1,72 @@
-# Cpu
+# CPU
 
-CPU 子系统描述处理器的拓扑与基本属性。sysal 通过父 ID 字段表达
-`package → core → 逻辑 CPU` 的三层层次关系，避免使用嵌套结构，使各层
-可以独立遍历与查询。
+公共定义见 `include/sysal/model/cpu.hpp`。拓扑由 `CpuPackage → CpuCore → LogicalCpu`
+的强类型 ID 关联，不假定每个插槽、核心或线程具有相同能力。
 
-## 强类型标识符
+## 拓扑与在线状态
 
-CPU 拓扑中三类对象各自拥有独立的强类型 ID，防止相互误用。
+- `CpuPackage`：厂商、型号、已描述的核心/线程数、基础频率和硬件最高频率。
+- `CpuCore`：所属封装、已描述的线程数、NUMA 归属。
+- `LogicalCpu`：核心/封装/NUMA 归属、进程可见性、可选在线状态和处理器标识。
+- `Cpu.present_cpu_ids` / `online_cpu_ids` 保存内核明确报告的集合；缺失为未知，
+  与成功读取的空集合不同。
+- sysfs 有效拓扑编号优先于 `/proc/cpuinfo`。离线线程仅在内核明确提供封装和核心
+  编号时加入完整拓扑，其身份不从其他线程复制；present 集合可能更完整。
+  不把拓扑列表长度解释成芯片的理论线程上限。
+- `smt_active` 是内核报告的活动状态；`smt_control` 是控制状态原值，
+  `on` 不代表此刻有核心正在使用 SMT。离线线程不作为进程可见资源。
 
-```cpp
-// CPU 物理封装（socket）ID
-using CpuPackageId = StrongId<std::uint32_t, CpuPackageIdTag>;
-// CPU 物理核 ID
-using CpuCoreId = StrongId<std::uint32_t, CpuCoreIdTag>;
-// 逻辑 CPU（硬件线程）ID
-using LogicalCpuId = StrongId<std::uint32_t, LogicalCpuIdTag>;
-```
+## 处理器标识
 
-## 数据结构
+每个逻辑 CPU 的 `identification` 独立保存 `CpuIdentification`：
 
-### CpuPackage
+| 字段 | 含义 |
+| --- | --- |
+| family / model / stepping | x86 家族、型号编号、步进 |
+| implementer / part / variant | ARM 的原始对应编号，保持与 x86 的语义区别 |
+| revision / architecture | ARM 修订和 `/proc/cpuinfo` 的架构描述 |
+| microcode | 系统报告的微码版本原值 |
+| features | 当前线程完整内核能力标识，排序、去重 |
 
-CPU 物理封装（socket）。
+缺失编号保持未知。`isa_extensions` 保留既有枚举接口，完整能力查询使用线程的
+`features`；能力标识还包含其他 CPU/内核能力，不等于芯片全部物理能力。
+不从型号字符串推导制程、微架构代号、IPC 或内存控制器理论规格。
 
-```cpp
-struct CpuPackage
-{
-    CpuPackageId id;                         // 封装 ID
-    Vendor vendor;                           // 厂商
-    DeviceName model_name;                   // 型号名称
-    std::uint32_t physical_cores{};          // 物理核数
-    std::uint32_t logical_threads{};         // 逻辑线程数
-    std::optional<Frequency> base_frequency; // 基础频率（可能未知）
-    std::optional<Frequency> max_frequency;  // 最大频率（可能未知）
-};
-```
+## 频率策略
 
-### CpuCore
+`frequency_policies` 保存每个 `CpuFrequencyPolicy`。频率使用强类型 `Frequency`，
+单位 Hz；解析 sysfs kHz 时检查数值和乘法溢出。
 
-CPU 物理核。通过 `package_id` 指向所属封装。
+| 字段 | sysfs 来源 |
+| --- | --- |
+| related_cpus / affected_cpus | 同名文件：前者含所属在线与离线线程，后者是当前受影响线程 |
+| base_frequency | base_frequency |
+| hardware_min_frequency / hardware_max_frequency | cpuinfo_min_freq / cpuinfo_max_freq |
+| scaling_min_frequency / scaling_max_frequency | scaling_min_freq / scaling_max_freq |
+| scaling_current_frequency | scaling_cur_freq：可能是请求值或驱动报告值 |
+| hardware_current_frequency | cpuinfo_cur_freq：仅在后端提供时设置 |
+| driver / governor / energy_performance_preference | scaling_driver / scaling_governor / energy_performance_preference |
 
-```cpp
-struct CpuCore
-{
-    CpuCoreId id;                        // 物理核 ID
-    CpuPackageId package_id;             // 所属封装 ID
-    std::uint32_t logical_threads{};     // 该核上的逻辑线程数
-    std::optional<NumaNodeId> numa_node; // 所属 NUMA 节点（可能未知）
-};
-```
+`index` 对应 `policyN` 的 N；旧内核只提供 `cpuN/cpufreq` 时使用采样 CPU 编号，
+按明确的 related CPU 集合合并重复条目。RawStore 保留实际路径。
+两种目录均不存在时不创建虚构策略。
 
-### LogicalCpu
+封装的 `base_frequency` 仅在已取得的值一致时设置，`max_frequency` 为已取得的
+硬件最高频率最大值，策略上限不替代硬件最高频率。
+整机 `governor` 在已报告值一致时返回该值，不同值返回 `mixed`。
+`boost_enabled` 仅在通用 `cpufreq/boost` 明确提供 0/1 时设置。
 
-逻辑 CPU（硬件线程）。通过 `core_id` 指向所属物理核，并通过
-`package_id` 反范式化指向所属封装。
+## 缓存
 
-```cpp
-struct LogicalCpu
-{
-    LogicalCpuId id;                     // 逻辑 CPU ID
-    CpuCoreId core_id;                   // 所属物理核 ID
-    CpuPackageId package_id;             // 所属封装 ID（反范式化）
-    std::optional<NumaNodeId> numa_node; // 所属 NUMA 节点（可能未知）
-    bool visible_to_current_process{};   // 当前进程是否可见
-};
-```
+`CpuCache` 保存层级、类型、单实例容量、相联度、缓存行大小与采样 CPU。
+`cache_id`、`sets`、`shared_cpus` 对应缓存 ID、组数和共享线程集合。
+共享集合、层级、类型、ID 和已取得属性相同的记录合并为一个实例。
+没有共享集合时保留采样记录，不按相同容量猜测共享关系。
+SystemCard 提供实例统计，在 CPU 详情展示每个缓存的共享集合。
 
-### NumaNode
+## 采集与兼容
 
-单个 NUMA 节点的基本信息。
-
-```cpp
-struct NumaNode
-{
-    NumaNodeId id;                  // NUMA 节点 ID
-    std::vector<LogicalCpuId> cpus; // 该节点包含的逻辑 CPU 列表
-};
-```
-
-`NumaNode` 仅描述 CPU 侧的 NUMA 归属关系。各 NUMA 节点的内存信息见
-`memory.md` 中的 `NumaMemory`。
-
-### Cpu
-
-CPU 子系统聚合，持有封装、物理核、逻辑 CPU、NUMA 节点与 ISA 扩展
-列表，并提供层级关系查询与可见性筛选接口。
-
-```cpp
-struct Cpu
-{
-    Arch arch{};                               // CPU 架构
-    std::vector<CpuPackage> packages;         // 物理封装列表
-    std::vector<CpuCore> cores;               // 物理核列表
-    std::vector<LogicalCpu> logical_cpus;     // 逻辑 CPU 列表
-    std::vector<NumaNode> numa_nodes;         // NUMA 节点列表
-    std::vector<IsaExtension> isa_extensions; // 支持的 ISA 扩展列表
-    std::vector<CpuCache> caches;             // CPU 缓存实例列表（按层级/类型）
-    std::string governor;                     // cpufreq 调频策略（如 performance）
-    std::vector<ThermalZone> thermal_zones;   // 温度传感器列表
-
-    // 按封装 ID 查找封装
-    const CpuPackage* find_package(CpuPackageId id) const;
-    // 按物理核 ID 查找物理核
-    const CpuCore* find_core(CpuCoreId id) const;
-    // 按逻辑 CPU ID 查找逻辑 CPU
-    const LogicalCpu* find_logical_cpu(LogicalCpuId id) const;
-    // 获取指定封装下的全部逻辑 CPU
-    std::vector<const LogicalCpu*> logical_cpus_of_package(CpuPackageId id) const;
-    // 获取指定物理核上的全部逻辑 CPU
-    std::vector<const LogicalCpu*> logical_cpus_of_core(CpuCoreId id) const;
-    // 获取指定封装下的全部物理核
-    std::vector<const CpuCore*> cores_of_package(CpuPackageId id) const;
-    // 获取当前进程可见的全部逻辑 CPU
-    std::vector<const LogicalCpu*> visible_logical_cpus() const;
-};
-```
-
-### CpuCache
-
-单个缓存实例，按层级（L1/L2/L3）与类型（Data/Instruction/Unified）区分。
-
-```cpp
-struct CpuCache
-{
-    std::uint32_t level;     // 缓存层级（1 = L1, 2 = L2, ...）
-    CacheType type;          // 缓存类型
-    MemorySize size;         // 缓存大小（字节）
-    std::uint32_t ways;      // 相联度
-    std::uint32_t line_size; // 缓存行大小（字节）
-    std::uint32_t cpu_number; // 采样来源的逻辑 CPU 编号
-};
-```
-
-### ThermalZone
-
-单个温度传感器。
-
-```cpp
-struct ThermalZone
-{
-    std::string name; // 传感器名称（如 thermal_zone0）
-    std::string type; // 类型（如 x86_pkg_temp）
-    Temperature temp; // 当前温度（毫摄氏度）
-};
-```
-
-## 设计说明
-
-- **`LogicalCpu::package_id` 反范式化**：逻辑 CPU 已持有 `core_id`，理论上
-  可以通过 `core_id → CpuCore::package_id` 两步查找得到封装。但在高频访问
-  场景下两步查找既不便于使用也增加出错面，因此在 `LogicalCpu` 上冗余存储
-  `package_id`，使单条记录即可定位所属封装。
-- **`numa_node` 直接从 sysfs 读取**：`CpuCore::numa_node` 与
-  `LogicalCpu::numa_node` 直接来自 `/sys/devices/system/node` 下的映射
-  （如 `cpulist`），不经过额外的拓扑解析层。
-- **缓存与热区按采样 CPU 记录**：`CpuCache` 带 `cpu_number` 标注来源逻辑 CPU，
-  `ThermalZone` 逐一列出全部热区。两者均来自 sysfs，读取不到时静默为空，
-  不产生 warning。
+Reader 读取 `/proc/cpuinfo`、sysfs 的 topology、online、cache、CPUFreq、SMT 信息。
+Parser / Resolver 只消费 RawStore，不读取当前机器。
+可选字段缺失不导致整个 CPU 采集失败；旧 JSON 中缺少新增字段时保持未知或空列表。
+温度和 NUMA 归属继续使用既有接口。

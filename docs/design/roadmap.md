@@ -7,6 +7,7 @@ Sysal 版本唯一来源为 `include/sysal/version.hpp`，当前能力以代码�
 
 - Linux Reader → RawStore → Parser → Resolver；公共 `System::collect(Collect)` 与 `refresh()`。
 - CPU、NUMA、内存/DIMM、PCI、网络/IP、存储/挂载、平台、软件栈、执行上下文。
+- CPU 逐线程标识/完整能力、在线集合和 SMT 状态；独立频率策略；缓存组数及共享实例去重。
 - CPU affinity/cpuset；cgroup v1/v2 层级 CPU 时间配额、内存上限与当前用量。
 - NVIDIA：动态 NVML 设备与 MIG 采集；nvidia-smi 降级与补充。
 - AMD / Intel：DRM/sysfs 设备清单；AMD 可选 VRAM / unique_id，设备级 PCI 与 NUMA。

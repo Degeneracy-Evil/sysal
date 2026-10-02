@@ -220,7 +220,7 @@ TEST_CASE("test_parse_cpu")
                                           "core id\t\t: 0\n"
                                           "flags\t\t: sse4_2\n"));
         raw.records.push_back(make_record(RawSource::SysfsCpu, "cpu/cpu0/cpufreq/base_frequency", "2300000\n"));
-        raw.records.push_back(make_record(RawSource::SysfsCpu, "cpu/cpu0/cpufreq/scaling_max_freq", "3300000\n"));
+        raw.records.push_back(make_record(RawSource::SysfsCpu, "cpu/cpu0/cpufreq/cpuinfo_max_freq", "3300000\n"));
 
         std::vector<std::string> warnings;
         auto result = parse_cpu(raw, warnings);
@@ -273,14 +273,14 @@ TEST_CASE("test_parse_cpu")
                                           "flags\t\t: sse4_2\n"));
         // Package 0: CPU 0 and 1
         raw.records.push_back(make_record(RawSource::SysfsCpu, "cpu/cpu0/cpufreq/base_frequency", "2400000\n"));
-        raw.records.push_back(make_record(RawSource::SysfsCpu, "cpu/cpu0/cpufreq/scaling_max_freq", "3500000\n"));
+        raw.records.push_back(make_record(RawSource::SysfsCpu, "cpu/cpu0/cpufreq/cpuinfo_max_freq", "3500000\n"));
         raw.records.push_back(make_record(RawSource::SysfsCpu, "cpu/cpu1/cpufreq/base_frequency", "2400000\n"));
-        raw.records.push_back(make_record(RawSource::SysfsCpu, "cpu/cpu1/cpufreq/scaling_max_freq", "3500000\n"));
+        raw.records.push_back(make_record(RawSource::SysfsCpu, "cpu/cpu1/cpufreq/cpuinfo_max_freq", "3500000\n"));
         // Package 1: CPU 2 and 3 — different frequencies
         raw.records.push_back(make_record(RawSource::SysfsCpu, "cpu/cpu2/cpufreq/base_frequency", "1800000\n"));
-        raw.records.push_back(make_record(RawSource::SysfsCpu, "cpu/cpu2/cpufreq/scaling_max_freq", "2900000\n"));
+        raw.records.push_back(make_record(RawSource::SysfsCpu, "cpu/cpu2/cpufreq/cpuinfo_max_freq", "2900000\n"));
         raw.records.push_back(make_record(RawSource::SysfsCpu, "cpu/cpu3/cpufreq/base_frequency", "1800000\n"));
-        raw.records.push_back(make_record(RawSource::SysfsCpu, "cpu/cpu3/cpufreq/scaling_max_freq", "2900000\n"));
+        raw.records.push_back(make_record(RawSource::SysfsCpu, "cpu/cpu3/cpufreq/cpuinfo_max_freq", "2900000\n"));
 
         std::vector<std::string> warnings;
         auto result = parse_cpu(raw, warnings);

@@ -34,6 +34,17 @@ namespace sysal::reader
             }
         }
 
+        void read_frequency_files(RawStore &raw, const fs::path &directory)
+        {
+            for(const auto *field :
+                {"related_cpus", "affected_cpus", "base_frequency", "cpuinfo_min_freq", "cpuinfo_max_freq",
+                 "scaling_min_freq", "scaling_max_freq", "scaling_cur_freq", "cpuinfo_cur_freq", "scaling_driver",
+                 "scaling_governor", "energy_performance_preference"})
+            {
+                read_sysfs_file(raw, RawSource::SysfsCpu, (directory / field).string());
+            }
+        }
+
         /// @brief 采集 CPU 拓扑信息
         /// @param raw 原始证据存储
         /// @details 遍历 /sys/devices/system/cpu/cpuN，读取 topology、online、cpufreq 文件
@@ -44,6 +55,28 @@ namespace sysal::reader
             {
                 add_record(raw, RawSource::SysfsCpu, cpu_base.string(), "", CollectStatus::Failed);
                 return;
+            }
+
+            for(const auto *field : {"present", "online", "smt/active", "smt/control", "cpufreq/boost"})
+            {
+                read_sysfs_file(raw, RawSource::SysfsCpu, (cpu_base / field).string());
+            }
+            const auto policy_base = cpu_base / "cpufreq";
+            bool policies_collected = false;
+            std::error_code policy_ec;
+            if(fs::is_directory(policy_base, policy_ec))
+            {
+                for(const auto &policy : fs::directory_iterator(policy_base, policy_ec))
+                {
+                    const auto name = policy.path().filename().string();
+                    if(name.size() <= 6 || !name.starts_with("policy") ||
+                       name.find_first_not_of("0123456789", 6) != std::string::npos)
+                    {
+                        continue;
+                    }
+                    policies_collected = true;
+                    read_frequency_files(raw, policy.path());
+                }
             }
 
             bool found_any = false;
@@ -72,10 +105,18 @@ namespace sysal::reader
                 // online 状态
                 read_sysfs_file(raw, RawSource::SysfsCpu, (dir / "online").string());
 
-                // cpufreq 文件
-                read_sysfs_file(raw, RawSource::SysfsCpu, (dir / "cpufreq" / "base_frequency").string());
-                read_sysfs_file(raw, RawSource::SysfsCpu, (dir / "cpufreq" / "scaling_max_freq").string());
-                read_sysfs_file(raw, RawSource::SysfsCpu, (dir / "cpufreq" / "scaling_governor").string());
+                // 旧内核可能仅提供每个 CPU 的 cpufreq 目录。
+                if(!policies_collected)
+                {
+                    std::error_code frequency_ec;
+                    if(fs::is_directory(dir / "cpufreq", frequency_ec))
+                        read_frequency_files(raw, dir / "cpufreq");
+                }
+                else
+                {
+                    read_sysfs_file(raw, RawSource::SysfsCpu, (dir / "cpufreq" / "base_frequency").string());
+                    read_sysfs_file(raw, RawSource::SysfsCpu, (dir / "cpufreq" / "cpuinfo_max_freq").string());
+                }
 
                 // 缓存目录：cpuN/cache/indexM/{level,type,size,ways_of_associativity,line_size}
                 std::error_code cache_ec;
@@ -88,6 +129,10 @@ namespace sysal::reader
                         if(cache_name.size() < 6 || cache_name.substr(0, 5) != "index")
                         {
                             continue;
+                        }
+                        for(const auto *field : {"id", "number_of_sets", "shared_cpu_list"})
+                        {
+                            read_sysfs_file(raw, RawSource::SysfsCpu, (cache_entry.path() / field).string());
                         }
                         read_sysfs_file(raw, RawSource::SysfsCpu, (cache_entry.path() / "level").string());
                         read_sysfs_file(raw, RawSource::SysfsCpu, (cache_entry.path() / "type").string());

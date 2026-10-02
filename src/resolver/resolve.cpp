@@ -26,7 +26,7 @@ namespace sysal::detail
             {
                 for(auto &lc : cpu.logical_cpus)
                 {
-                    lc.visible_to_current_process = true;
+                    lc.visible_to_current_process = lc.online != false;
                 }
                 return;
             }
@@ -40,7 +40,7 @@ namespace sysal::detail
 
             for(auto &lc : cpu.logical_cpus)
             {
-                lc.visible_to_current_process = visible_set.count(lc.id.value()) != 0;
+                lc.visible_to_current_process = lc.online != false && visible_set.count(lc.id.value()) != 0;
             }
         }
 
