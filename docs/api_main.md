@@ -18,7 +18,7 @@ const auto& gpus = sys.info.accelerators;
 
 ```cpp
 sysal::System partial = sysal::System::collect(
-    sysal::Collect::Cpu | sysal::Collect::Accelerator
+    sysal::Collect::Cpu | sysal::Collect::Accelerator | sysal::Collect::Execution
 );
 ```
 
@@ -56,3 +56,11 @@ sysal::System partial = sysal::System::collect(
 
 - [GitHub](https://github.com/Degeneracy-Evil/sysal)
 - License: Apache 2.0
+
+## 0.0.9 新增字段
+
+AcceleratorDevice 支持 uuid / parent_uuid 与 MIG 实例 ID；Cgroup 支持微秒单位的
+CPU quota/period、字节单位的 memory_limit/current，以及独立的 *_limit_known 状态。
+详细语义参见 [执行上下文](design/data_model/execution.md) 和
+[加速器模型](design/data_model/accelerator.md)。新增字段以可选值表达未知，旧 JSON 缺少
+这些字段仍可反序列化。

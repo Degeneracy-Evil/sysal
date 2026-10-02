@@ -1,52 +1,23 @@
-# 冲突解决策略
+# 归并与可见性策略
 
-## 当前实现（v0.0.3）
+## 当前实现（0.0.9）
 
-v0.0.3 的 Resolver 职责有限：将 `ParseResult` 中的字段移动到 `SystemInfo`，
-计算可见性，交叉校验便利索引。当前版本是**单来源**的——每个字段只来自一个
-Parser，不存在多来源冲突。
+Parser 将 GPU 库存按来源顺序归并：NVML → nvidia-smi / MIG 列表 →
+runtime 可见设备 → DRM。已取得的 UUID、显存和 NUMA 信息保留，后续来源补缺。
+物理设备通过 UUID / PCI / 同厂商物理索引关联；MIG 实例优先 UUID，不能仅按 PCI 合并。
+尚未实现通用的逐字段冲突报告框架；原始证据可用于审查差异。
 
-### Resolver 管线
+Resolver 移动各子域到 SystemInfo，并计算资源可见性：
 
-```
-ParseResult → resolve() → SystemInfo
-```
+| 资源 | 依据 |
+| --- | --- |
+| CPU | 当前进程 CPU affinity / cpuset 的便利索引；旧快照空索引使用既有默认 |
+| GPU | 完整的 runtime 进程枚举优先；缺失时用各厂商环境变量；无显式限制默认可见 |
+| Network | 当前网络命名空间中采集到的接口 |
 
-`resolve()` 函数（`src/resolver/resolve.cpp`）做三件事：
+GPU 变量未设置与显式空值不同，空值不能按“全部可见”处理。
+MIG 存在时物理父设备不重复计入可见计算设备。Resolve 后重新生成 GPU 可见 ID 索引。
+索引引用了不存在的资源时记录 warning；CPU affinity 与 CPU quota 不合并为一个数字。
 
-1. **移动字段**：将 `ParseResult` 中各子域（platform、cpu、memory 等）的
-   `std::optional` 值移动到 `SystemInfo` 对应成员。若某子域为 `nullopt`，
-   保留默认构造值。
-2. **计算可见性**：以 `ExecutionContext` 中的便利索引
-   （`visible_logical_cpu_ids`、`visible_accelerator_ids`）为依据，
-   设置各资源子域的 `visible_to_current_process` 字段。
-3. **交叉校验**：检测便利索引中的幻影 ID（引用了模型中不存在的资源），
-   记录警告。同时记录约束提示（如 cpuset 限制了可见 CPU 数量）。
-
-### 可见性计算
-
-| 子域 | 依据 | 说明 |
-|------|------|------|
-| CPU | `visible_logical_cpu_ids` | cpuset 约束，空列表=全部可见 |
-| Accelerator | `visible_accelerator_ids` | CUDA_VISIBLE_DEVICES 等约束 |
-| Network | 全部可见 | v0.0.3 中网络命名空间检测推迟 |
-
-### 交叉校验
-
-Resolver 检测两类问题并写入 `warnings`：
-
-- **幻影 ID**：便利索引引用了模型中不存在的资源 ID
-- **约束提示**：可见资源数量少于模型中的总量（信息性）
-
-## 未来方向
-
-当 NVML、ibverbs 等后端加入后，同一字段可能来自多个来源
-（如 GPU 显存：NVML 报告 96GB，sysfs 报告 98GB），届时需要多来源冲突解决。
-
-计划中的冲突解决框架：
-
-- **来源信任优先级**：专用后端（NVML、ibverbs）> sysfs > procfs > 命令输出 > 推断值
-- **冲突类别**：数量冲突、可见性冲突、标识冲突、状态冲突、归属冲突
-- **记录格式**：`[conflict] <字段名>: <高优先级来源>=<值>, <低优先级来源>=<值>, adopted=<采用的来源>`
-
-当前版本不实现此框架。当多来源场景出现时，再按需引入。
+后端缺失、枚举不完整或关联失败时保持降级信息，不利用部分 runtime 列表排除其他设备。
+复杂 SYCL 选择器、驱动不同版本的 MIG 枚举规则见 docs/issues.md。

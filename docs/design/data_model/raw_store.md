@@ -29,7 +29,7 @@ enum class RawSource
     Lsblk,
     // 环境变量
     Environment,
-    // 外部库后端（未来支持）
+    // 外部库后端（NVML 已支持；其他来源按实际后端演进）
     Nvml,
     Ibverbs,
     HwinfoOutput,
@@ -51,6 +51,13 @@ enum class RawSource
     NvccPath,        ///< nvcc 可执行文件路径
     CudaHome,        ///< CUDA_HOME 环境变量
     SysfsThermal,    ///< /sys/class/thermal 温度传感器
+    CgroupMountInfo, ///< cgroup 挂载点与层级根
+    CgroupFile,      ///< cgroup v1/v2 配额文件
+    SysfsDrm,       ///< GPU sysfs 库存
+    NvidiaMigList,  ///< nvidia-smi -L
+    RocmVersion,    ///< ROCm 版本 / HIP 路径命令与文件
+    PackageLibrary, ///< pkg-config 版本 / libdir
+    AcceleratorRuntime, ///< CUDA Driver / HIP / Level Zero 枚举
 };
 
 enum class CollectStatus

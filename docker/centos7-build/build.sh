@@ -11,20 +11,30 @@ IMAGE_NAME="sysal-centos7-build"
 command -v docker >/dev/null 2>&1 || { echo "ERROR: docker not found. Install Docker first."; exit 1; }
 docker info >/dev/null 2>&1 || { echo "ERROR: Docker daemon not running."; exit 1; }
 
-echo "=== Building Docker image ==="
-docker build \
-    --build-arg HTTP_PROXY="${http_proxy:-}" \
-    --build-arg HTTPS_PROXY="${https_proxy:-}" \
-    -t "$IMAGE_NAME" \
-    "$SCRIPT_DIR"
+DOCKER_NET_ARGS=()
+if [ "${CI:-}" != "true" ]; then
+    DOCKER_NET_ARGS=(--network host)
+fi
+if [ "${SYSAL_SKIP_IMAGE_BUILD:-0}" != "1" ]; then
+    echo "=== Building Docker image ==="
+    docker build "${DOCKER_NET_ARGS[@]}" \
+        --build-arg HTTP_PROXY="${http_proxy:-}" \
+        --build-arg HTTPS_PROXY="${https_proxy:-}" \
+        -t "$IMAGE_NAME" \
+        "$SCRIPT_DIR"
+else
+    docker image inspect "$IMAGE_NAME" >/dev/null
+fi
 
 echo "=== Running build in container ==="
-DOCKER_NET="--network host"
-if [ "${CI:-}" = "true" ]; then
-    DOCKER_NET=""   # GitHub Actions 禁用 host 网络；容器直接走 bridge（默认）公网
+XMAKE_CACHE_ARGS=()
+if [ -n "${SYSAL_XMAKE_CACHE:-}" ]; then
+    mkdir -p "$SYSAL_XMAKE_CACHE"
+    XMAKE_CACHE_ARGS=(-v "$SYSAL_XMAKE_CACHE:/root/.xmake")
 fi
 docker run --rm \
-    $DOCKER_NET \
+    "${XMAKE_CACHE_ARGS[@]}" \
+    "${DOCKER_NET_ARGS[@]}" \
     -e http_proxy="${http_proxy:-}" \
     -e https_proxy="${https_proxy:-}" \
     -v "$PROJECT_ROOT:/workspace" \

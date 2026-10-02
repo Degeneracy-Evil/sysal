@@ -8,6 +8,7 @@
 
 #include "sysal/types/enums.hpp"
 #include "sysal/types/ids.hpp"
+#include "sysal/types/units.hpp"
 #include "sysal/types/value_types.hpp"
 
 #include <optional>
@@ -38,9 +39,15 @@ namespace sysal
     /// @brief cgroup 约束
     struct Cgroup
     {
-        CgroupVersion version{};              ///< cgroup 版本
-        std::string path;                     ///< cgroup 路径
-        std::vector<std::string> controllers; ///< cgroup 控制器列表
+        CgroupVersion version{};                     ///< cgroup 版本
+        std::string path;                            ///< cgroup 路径
+        std::vector<std::string> controllers;        ///< cgroup 控制器列表
+        std::optional<Microseconds> cpu_quota_us{};  ///< 最严格祖先的 CPU 时间配额
+        std::optional<Microseconds> cpu_period_us{}; ///< 对应 CPU 调度周期
+        std::optional<MemorySize> memory_limit{};    ///< 层级有效内存上限（字节）
+        std::optional<MemorySize> memory_current{};  ///< 当前 cgroup 内存使用量（字节）
+        bool cpu_limit_known{};                      ///< 已读到有效 CPU 限制；quota 缺失表示无限制
+        bool memory_limit_known{};                   ///< 已读到有效内存限制；limit 缺失表示无限制
     };
 
     /// @brief cpuset 约束
@@ -83,6 +90,7 @@ namespace sysal
         std::vector<LogicalCpuId> visible_logical_cpu_ids;          ///< 可见逻辑 CPU ID
         std::vector<AcceleratorId> visible_accelerator_ids;         ///< 可见加速器 ID
         std::vector<InterfaceName> visible_network_interface_names; ///< 可见网络接口名
+        bool accelerator_visibility_restricted{}; ///< 有显式加速器选择约束，空索引表示全部隐藏
     };
 
 } // namespace sysal

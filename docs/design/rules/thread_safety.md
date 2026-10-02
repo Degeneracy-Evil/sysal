@@ -26,5 +26,5 @@ const auto& cpu = sys.info.cpu;
 
 1. **无全局可变状态**：无全局变量，无静态局部缓存，无全局 `init()`。
 2. **Reader 句柄不跨调用复用**：每次 `collect()` / `refresh()` 创建新的文件句柄和后端句柄。
-3. **后端初始化生命周期**：NVML 等后端的初始化（如 `nvmlInit`）和清理（如 `nvmlShutdown`）在 `collect()` / `refresh()` 内部配对完成，不跨调用保持。对调用方完全透明。
+3. **后端初始化生命周期**：NVML 等后端的初始化（如 `nvmlInit`）和清理（如 `nvmlShutdown`）在 `collect()` / `refresh()` 内部配对完成，不跨调用保持。CUDA/HIP/Level Zero 可能保留厂商库内部的进程级初始化状态，因此应在首次采集前设置设备选择环境变量；运行中修改环境后调用 refresh 不保证 runtime 重新选择设备。
 4. **`System` 构造后只读**：成员为公开 const 访问，不提供非 const 方法（`refresh()` 除外）。

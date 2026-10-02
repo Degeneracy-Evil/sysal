@@ -4,6 +4,7 @@
 ///          交叉校验便利索引与资源级 visible_to_current_process 的一致性。
 
 #include "resolver/resolve.hpp"
+#include "resolver/accelerator_visibility.hpp"
 
 #include <algorithm>
 #include <cstdint>
@@ -40,34 +41,6 @@ namespace sysal::detail
             for(auto &lc : cpu.logical_cpus)
             {
                 lc.visible_to_current_process = visible_set.count(lc.id.value()) != 0;
-            }
-        }
-
-        /// @brief 计算加速器可见性
-        /// @details 根据 ExecutionContext.visible_accelerator_ids 设置每个
-        ///          AcceleratorDevice 的 visible_to_current_process。
-        ///          若列表为空（无 CUDA_VISIBLE_DEVICES 等约束），所有加速器均可见。
-        void compute_accelerator_visibility(Accelerators &acc, const ExecutionContext &exec)
-        {
-            if(exec.visible_accelerator_ids.empty())
-            {
-                for(auto &dev : acc.devices)
-                {
-                    dev.visible_to_current_process = true;
-                }
-                return;
-            }
-
-            std::unordered_set<std::uint32_t> visible_set;
-            visible_set.reserve(exec.visible_accelerator_ids.size());
-            for(const auto &id : exec.visible_accelerator_ids)
-            {
-                visible_set.insert(id.value());
-            }
-
-            for(auto &dev : acc.devices)
-            {
-                dev.visible_to_current_process = visible_set.count(dev.id.value()) != 0;
             }
         }
 
@@ -187,7 +160,8 @@ namespace sysal::detail
         // 计算可见性：以 ExecutionContext 中的便利索引为依据，
         // 设置各资源子域的 visible_to_current_process 字段。
         compute_cpu_visibility(info.cpu, info.execution);
-        compute_accelerator_visibility(info.accelerators, info.execution);
+        resolve_accelerator_visibility(info.accelerators, info.execution, warnings,
+                                       result.accelerator_runtime_visibility);
         compute_network_visibility(info.network);
 
         // 交叉校验：检测幻影 ID 和约束提示

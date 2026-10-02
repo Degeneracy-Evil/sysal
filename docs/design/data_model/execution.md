@@ -17,6 +17,7 @@ struct ExecutionContext
     Cgroup      cgroup;      // cgroup 约束
     Cpuset      cpuset;      // cpuset 约束
     Permission  permission;  // 权限
+    bool accelerator_visibility_restricted{}; // 有显式 GPU 限制环境配置
     std::optional<Container> container;  // 容器（若在容器内）
 
     // 可见性便利索引：当前进程实际能看到的资源 ID
@@ -79,3 +80,18 @@ struct ExecutionContext
 * `container` 为 `std::optional`：不在容器内时为 `std::nullopt`。
 * 可见性索引是便利字段，事实来源在各资源子域的 `visible_to_current_process`。
 * 字段命名遵循 `snake_case`，类型名遵循 `PascalCase`。
+
+## cgroup 配额（0.0.9）
+
+| 字段 | 单位 / 语义 |
+| --- | --- |
+| cpu_quota_us / cpu_period_us | 可选微秒；quota / period 是 CPU 时间配额折合核数，不是可见逻辑 CPU 数 |
+| memory_limit | 可选字节；取可访问层级中最严格的内存上限 |
+| memory_current | 可选字节；当前进程所在叶 cgroup 的用量，可能包含多个进程 |
+| cpu_limit_known / memory_limit_known | 成功读取限制状态；false 为未知，true 且对应上限为空为无限制 |
+
+cgroup v2 的 max、v1 的 CPU -1 和内存无限制哨兵均转换为已知无限制。
+配额从叶节点到挂载根取最严格值；被命名空间隐藏的祖先无法推断。
+整机内存、进程 CPU affinity 和 cgroup 配额独立保留，SystemCard 分别展示。
+`accelerator_visibility_restricted` 区分显式空可见集和没有环境配置；实际可见集合
+仍由设备的 visible_to_current_process 与便利索引表达。

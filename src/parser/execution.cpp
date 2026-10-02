@@ -5,6 +5,7 @@
 #include "execution.hpp"
 
 #include "parse_utils.hpp"
+#include "parser/cgroup.hpp"
 
 #include <cstdint>
 #include <string_view>
@@ -420,6 +421,9 @@ namespace sysal::detail
                 break;
             }
         }
+
+        parse_cgroup_limits(raw, ctx, warnings);
+        has_data = has_data || !raw.get_all(RawSource::CgroupFile).empty();
 
         // 容器检测
         ctx.container = detect_container(raw, ctx);

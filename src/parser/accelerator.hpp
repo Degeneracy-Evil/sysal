@@ -14,6 +14,8 @@
 
 namespace sysal::detail
 {
+    std::vector<std::pair<AcceleratorId, bool>> parse_accelerator_runtime_visibility(const RawStore &raw,
+                                                                                     const Accelerators &devices);
 
     /// @brief 解析加速器信息
     /// @param raw 原始证据存储（只读）

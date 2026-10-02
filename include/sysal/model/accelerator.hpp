@@ -20,15 +20,19 @@ namespace sysal
     /// @brief 单个加速器设备
     struct AcceleratorDevice
     {
-        AcceleratorId id;                            ///< 加速器 ID
-        AcceleratorKind kind{};                      ///< 加速器类型
-        Vendor vendor;                               ///< 厂商
-        DeviceName name;                             ///< 设备名称
-        std::optional<PciAddress> pci_address;       ///< PCI 地址（可能无）
-        std::optional<NumaNodeId> nearest_numa_node; ///< 最近 NUMA 节点（可能未知）
-        std::optional<MemorySize> memory_size;       ///< 设备显存/内存（可能未知）
-        std::optional<DriverId> driver;              ///< 关联驱动 ID（可能无）
-        bool visible_to_current_process{};           ///< 当前进程是否可见
+        AcceleratorId id;                                   ///< 加速器 ID
+        AcceleratorKind kind{};                             ///< 加速器类型
+        Vendor vendor;                                      ///< 厂商
+        DeviceName name;                                    ///< 设备名称
+        std::optional<PciAddress> pci_address;              ///< PCI 地址（可能无）
+        std::optional<NumaNodeId> nearest_numa_node;        ///< 最近 NUMA 节点（可能未知）
+        std::optional<MemorySize> memory_size;              ///< 设备显存/内存（可能未知）
+        std::optional<DriverId> driver;                     ///< 关联驱动 ID（可能无）
+        bool visible_to_current_process{};                  ///< 当前进程是否可见
+        std::optional<std::string> uuid{};                  ///< 后端设备 UUID（可按唯一前缀选择）
+        std::optional<std::string> parent_uuid{};           ///< MIG 实例所属的物理 GPU UUID
+        std::optional<std::uint32_t> gpu_instance_id{};     ///< MIG GPU instance ID（若后端提供）
+        std::optional<std::uint32_t> compute_instance_id{}; ///< MIG compute instance ID（若后端提供）
     };
 
     /// @brief 加速器子系统聚合

@@ -36,22 +36,6 @@ namespace sysal::detail
     namespace
     {
 
-        /// @brief 后端初始化占位
-        /// @details v0.0.1 无外部后端（NVML 等），此函数为空。
-        ///          未来在此处调用 nvmlInit 等后端初始化。
-        void init_backend()
-        {
-            // v0.0.1: 无外部后端需要初始化
-        }
-
-        /// @brief 后端清理占位
-        /// @details v0.0.1 无外部后端，此函数为空。
-        ///          未来在此处调用 nvmlShutdown 等后端清理。
-        void shutdown_backend()
-        {
-            // v0.0.1: 无外部后端需要清理
-        }
-
         /// @brief 记录成功/失败的采集器
         /// @details 根据 ParseResult 各域是否为 nullopt 判断成功与否。
         ///          仅检查 flags 中实际请求的域，未请求的域不计入成功或失败。
@@ -126,8 +110,13 @@ namespace sysal::detail
              +[](ParseResult &r, const RawStore &raw, std::vector<std::string> &w) { r.pci = parse_pci(raw, w); }},
             {Collect::Network, +[](ParseResult &r, const RawStore &raw, std::vector<std::string> &w)
                                { r.network = parse_network(raw, w); }},
-            {Collect::Accelerator, +[](ParseResult &r, const RawStore &raw, std::vector<std::string> &w)
-                                   { r.accelerators = parse_accelerator(raw, w); }},
+            {Collect::Accelerator,
+             +[](ParseResult &r, const RawStore &raw, std::vector<std::string> &w)
+             {
+                 r.accelerators = parse_accelerator(raw, w);
+                 if(r.accelerators.has_value())
+                     r.accelerator_runtime_visibility = parse_accelerator_runtime_visibility(raw, *r.accelerators);
+             }},
             {Collect::Storage, +[](ParseResult &r, const RawStore &raw, std::vector<std::string> &w)
                                { r.storage = parse_storage(raw, w); }},
             {Collect::Software, +[](ParseResult &r, const RawStore &raw, std::vector<std::string> &w)
@@ -141,16 +130,6 @@ namespace sysal::detail
     System run_replay(const RawStore &raw, Collect flags, std::vector<std::string> &warnings)
     {
         const auto start = std::chrono::system_clock::now();
-
-        // 后端初始化生命周期：init/shutdown 在 collect 内部配对完成
-        init_backend();
-        struct BackendGuard
-        {
-            ~BackendGuard()
-            {
-                shutdown_backend();
-            }
-        } guard;
 
         ParseResult result;
 

@@ -46,11 +46,15 @@ namespace sysal
     struct TemperatureTag
     {
     };
+    struct MicrosecondsTag
+    {
+    };
 
     using MemorySize = ScalarUnit<MemorySizeTag>;     ///< 内存大小（字节）
     using Frequency = ScalarUnit<FrequencyTag>;       ///< 频率（赫兹）
     using Bandwidth = ScalarUnit<BandwidthTag>;       ///< 带宽（比特每秒）
     using TransferRate = ScalarUnit<TransferRateTag>; ///< 传输速率（MT/s）
     using Temperature = ScalarUnit<TemperatureTag>;   ///< 温度（摄氏度的毫摄氏度）
+    using Microseconds = ScalarUnit<MicrosecondsTag>; ///< 时长（微秒）
 
 } // namespace sysal

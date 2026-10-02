@@ -114,7 +114,7 @@ namespace sysal
         [[nodiscard]] RawRecord raw_record_from_json(const json &j)
         {
             RawRecord rec;
-            rec.source = validate_enum(j.at("source").get<std::uint32_t>(), RawSource::SysfsThermal, "source");
+            rec.source = validate_enum(j.at("source").get<std::uint32_t>(), RawSource::AcceleratorRuntime, "source");
             j.at("path_or_command").get_to(rec.path_or_command);
             j.at("payload").get_to(rec.payload);
             rec.status = validate_enum(j.at("status").get<std::uint32_t>(), CollectStatus::NotCollected, "status");
@@ -759,6 +759,14 @@ namespace sysal
             {
                 j["driver"] = d.driver->value();
             }
+            if(d.uuid)
+                j["uuid"] = *d.uuid;
+            if(d.parent_uuid)
+                j["parent_uuid"] = *d.parent_uuid;
+            if(d.gpu_instance_id)
+                j["gpu_instance_id"] = *d.gpu_instance_id;
+            if(d.compute_instance_id)
+                j["compute_instance_id"] = *d.compute_instance_id;
             return j;
         }
 
@@ -786,6 +794,14 @@ namespace sysal
                 d.driver = DriverId(j.at("driver").get<std::uint32_t>());
             }
             d.visible_to_current_process = j.at("visible_to_current_process").get<bool>();
+            if(j.contains("uuid"))
+                d.uuid = j.at("uuid").get<std::string>();
+            if(j.contains("parent_uuid"))
+                d.parent_uuid = j.at("parent_uuid").get<std::string>();
+            if(j.contains("gpu_instance_id"))
+                d.gpu_instance_id = j.at("gpu_instance_id").get<std::uint32_t>();
+            if(j.contains("compute_instance_id"))
+                d.compute_instance_id = j.at("compute_instance_id").get<std::uint32_t>();
             return d;
         }
 
@@ -1333,6 +1349,16 @@ namespace sysal
                 arr.push_back(ctrl);
             }
             j["controllers"] = std::move(arr);
+            j["cpu_limit_known"] = c.cpu_limit_known;
+            j["memory_limit_known"] = c.memory_limit_known;
+            if(c.cpu_quota_us)
+                j["cpu_quota_us"] = c.cpu_quota_us->value;
+            if(c.cpu_period_us)
+                j["cpu_period_us"] = c.cpu_period_us->value;
+            if(c.memory_limit)
+                j["memory_limit"] = c.memory_limit->value;
+            if(c.memory_current)
+                j["memory_current"] = c.memory_current->value;
             return j;
         }
 
@@ -1345,6 +1371,16 @@ namespace sysal
             {
                 c.controllers = str_array_from_json(j.at("controllers"));
             }
+            c.cpu_limit_known = j.value("cpu_limit_known", false);
+            c.memory_limit_known = j.value("memory_limit_known", false);
+            if(j.contains("cpu_quota_us"))
+                c.cpu_quota_us = Microseconds{j.at("cpu_quota_us").get<std::uint64_t>()};
+            if(j.contains("cpu_period_us"))
+                c.cpu_period_us = Microseconds{j.at("cpu_period_us").get<std::uint64_t>()};
+            if(j.contains("memory_limit"))
+                c.memory_limit = MemorySize{j.at("memory_limit").get<std::uint64_t>()};
+            if(j.contains("memory_current"))
+                c.memory_current = MemorySize{j.at("memory_current").get<std::uint64_t>()};
             return c;
         }
 
@@ -1442,6 +1478,7 @@ namespace sysal
                 vacc.push_back(id.value());
             }
             j["visible_accelerator_ids"] = std::move(vacc);
+            j["accelerator_visibility_restricted"] = e.accelerator_visibility_restricted;
 
             json vnet = json::array();
             for(const auto &name : e.visible_network_interface_names)
@@ -1458,6 +1495,7 @@ namespace sysal
             ExecutionContext e;
             e.process = process_from_json(j.at("process"));
             e.environment = environment_from_json(j.at("environment"));
+            e.accelerator_visibility_restricted = j.value("accelerator_visibility_restricted", false);
             e.cgroup = cgroup_from_json(j.at("cgroup"));
             e.cpuset = cpuset_from_json(j.at("cpuset"));
             e.permission = permission_from_json(j.at("permission"));

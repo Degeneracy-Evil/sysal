@@ -360,6 +360,20 @@ namespace
             return "CudaHome";
         case sysal::RawSource::SysfsThermal:
             return "SysfsThermal";
+        case sysal::RawSource::CgroupMountInfo:
+            return "CgroupMountInfo";
+        case sysal::RawSource::CgroupFile:
+            return "CgroupFile";
+        case sysal::RawSource::SysfsDrm:
+            return "SysfsDrm";
+        case sysal::RawSource::NvidiaMigList:
+            return "NvidiaMigList";
+        case sysal::RawSource::RocmVersion:
+            return "RocmVersion";
+        case sysal::RawSource::PackageLibrary:
+            return "PackageLibrary";
+        case sysal::RawSource::AcceleratorRuntime:
+            return "AcceleratorRuntime";
         }
         return "?";
     }

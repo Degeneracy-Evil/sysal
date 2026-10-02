@@ -4,6 +4,8 @@
 ///          使用 has(flags, Collect::Xxx) 决定是否采集各域。
 
 #include "reader/linux/procfs.hpp"
+#include "reader/linux/accelerator.hpp"
+#include "reader/linux/cgroup.hpp"
 #include "reader/linux/file_utils.hpp"
 
 #include <arpa/inet.h>
@@ -222,10 +224,11 @@ namespace sysal::reader
         // ---- Accelerator 域 ----
         if(has(flags, Collect::Accelerator))
         {
+            read_accelerator_backends(raw);
+            read_cmd(raw, RawSource::NvidiaMigList, "nvidia-smi -L");
             read_cmd(raw, RawSource::NvidiaSmi,
                      "nvidia-smi --query-gpu=index,name,memory.total,"
-                     "pci.bus_id,driver_version --format=csv,noheader");
-            read_cmd(raw, RawSource::Nvcc, "nvcc --version");
+                     "pci.bus_id,driver_version,uuid --format=csv,noheader");
         }
 
         // ---- Network 域 ----
@@ -254,13 +257,14 @@ namespace sysal::reader
         // ---- Software 域 ----
         if(has(flags, Collect::Software))
         {
+            read_cmd(raw, RawSource::Nvcc, "nvcc --version");
             // NvidiaSmi / Nvcc 已在 Accelerator 域采集，此处仅当 Accelerator 未采集时补充
             if(!has(flags, Collect::Accelerator))
             {
+                read_accelerator_backends(raw);
                 read_cmd(raw, RawSource::NvidiaSmi,
                          "nvidia-smi --query-gpu=index,name,memory.total,"
-                         "pci.bus_id,driver_version --format=csv,noheader");
-                read_cmd(raw, RawSource::Nvcc, "nvcc --version");
+                         "pci.bus_id,driver_version,uuid --format=csv,noheader");
             }
 
             // CUDA 路径探测：缺失时 read_cmd 静默记 Failed，不产生 warning
@@ -286,11 +290,22 @@ namespace sysal::reader
             read_cmd(raw, RawSource::IbverbsVersion, "pkg-config --modversion libibverbs");
             read_cmd(raw, RawSource::IbverbsLibdir, "pkg-config --variable=libdir libibverbs");
             read_cmd(raw, RawSource::UcxVersion, "pkg-config --modversion ucx");
+            read_cmd(raw, RawSource::RocmVersion, "hipconfig --version");
+            read_cmd(raw, RawSource::RocmVersion, "command -v hipconfig");
+            for(const auto *path : {"/opt/rocm/.info/version", "/opt/rocm/.info/version-dev"})
+                read_proc_file(raw, RawSource::RocmVersion, path);
+            for(const auto *library :
+                {"level-zero", "ze_loader", "OpenCL", "openblas", "blas", "lapack", "fftw3", "libfabric", "hwloc"})
+            {
+                read_cmd(raw, RawSource::PackageLibrary, std::string("pkg-config --modversion ") + library);
+                read_cmd(raw, RawSource::PackageLibrary, std::string("pkg-config --variable=libdir ") + library);
+            }
         }
 
         // ---- Execution 域 ----
         if(has(flags, Collect::Execution))
         {
+            read_cgroup_limits(raw);
             read_proc_file(raw, RawSource::ProcSelfCgroup, "/proc/self/cgroup");
             read_proc_file(raw, RawSource::ProcSelfStatus, "/proc/self/status");
             read_proc_file(raw, RawSource::ProcOneCgroup, "/proc/1/cgroup");
@@ -298,7 +313,8 @@ namespace sysal::reader
             // 采集关键环境变量
             static const char *const env_names[] = {
                 "CUDA_VISIBLE_DEVICES", "HIP_VISIBLE_DEVICES", "ONEAPI_DEVICE_SELECTOR",  "OMP_NUM_THREADS",
-                "MLU_VISIBLE_DEVICES",  "container",           "KUBERNETES_SERVICE_HOST",
+                "MLU_VISIBLE_DEVICES",  "container",           "KUBERNETES_SERVICE_HOST", "ROCR_VISIBLE_DEVICES",
+                "CUDA_DEVICE_ORDER",    "ZE_AFFINITY_MASK",
             };
             read_env_vars(raw, env_names, sizeof(env_names) / sizeof(env_names[0]));
         }

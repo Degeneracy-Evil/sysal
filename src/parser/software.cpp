@@ -5,7 +5,9 @@
 #include "software.hpp"
 
 #include "parse_utils.hpp"
+#include <nlohmann/json.hpp>
 
+#include <algorithm>
 #include <cctype>
 #include <optional>
 #include <string>
@@ -135,6 +137,23 @@ namespace sysal::detail
             return std::nullopt;
         }
 
+        std::optional<std::string> runtime_version(std::string_view value)
+        {
+            for(std::size_t start = 0; start < value.size(); ++start)
+            {
+                if(!std::isdigit(static_cast<unsigned char>(value[start])))
+                    continue;
+                auto end = start;
+                while(end < value.size() && (std::isdigit(static_cast<unsigned char>(value[end])) || value[end] == '.'))
+                    ++end;
+                auto version = std::string(value.substr(start, end - start));
+                if(version.find('.') != std::string::npos && !version.ends_with('.'))
+                    return version;
+                start = end;
+            }
+            return std::nullopt;
+        }
+
         /// @brief 从 MPI --version 首行提取实现名与版本
         /// @param payload mpirun --version 命令输出
         /// @return (实现名, 版本) 二元组；若无法提取返回 nullopt
@@ -257,6 +276,19 @@ namespace sysal::detail
             }
         }
 
+        if(!driver_version)
+        {
+            for(const auto *record : raw.get_all(RawSource::Nvml))
+            {
+                if(record->status != CollectStatus::Success)
+                    continue;
+                const auto evidence = nlohmann::json::parse(record->payload, nullptr, false);
+                if(evidence.is_object() && evidence.contains("driver_version") &&
+                   evidence["driver_version"].is_string())
+                    driver_version = evidence["driver_version"].get<std::string>();
+            }
+        }
+
         // 提取 CUDA 版本
         std::optional<std::string> cuda_version;
         auto nvcc_records = raw.get_all(RawSource::Nvcc);
@@ -279,6 +311,92 @@ namespace sysal::detail
         }
 
         SoftwareStack stack;
+
+        for(const auto *record : raw.get_all(RawSource::RocmVersion))
+        {
+            if(record->status != CollectStatus::Success || record->path_or_command.starts_with("command -v"))
+                continue;
+            if(!record->path_or_command.starts_with("/"))
+                continue;
+            auto version = runtime_version(record->payload);
+            if(!version)
+                continue;
+            Rocm rocm;
+            rocm.version = *version;
+            if(const auto *path = first_success_cmd(raw, RawSource::RocmVersion, "command -v hipconfig"))
+                rocm.hip_path = trim(path->payload);
+            if(record->path_or_command.starts_with("/opt/rocm/"))
+                rocm.rocm_path = "/opt/rocm";
+            stack.rocm = std::move(rocm);
+            break;
+        }
+        for(const auto &[name, kind] : {std::pair{"level-zero", "GPU"},
+                                        {"ze_loader", "GPU"},
+                                        {"OpenCL", "GPU"},
+                                        {"openblas", "BLAS"},
+                                        {"blas", "BLAS"},
+                                        {"lapack", "LAPACK"},
+                                        {"fftw3", "FFT"},
+                                        {"libfabric", "Network"},
+                                        {"hwloc", "Topology"}})
+        {
+            const auto *version =
+                first_success_cmd(raw, RawSource::PackageLibrary, std::string("pkg-config --modversion ") + name);
+            if(version == nullptr)
+                continue;
+            Library library;
+            library.name = name;
+            library.kind = kind;
+            library.version = trim(version->payload);
+            if(const auto *path = first_success_cmd(raw, RawSource::PackageLibrary,
+                                                    std::string("pkg-config --variable=libdir ") + name))
+                library.path = trim(path->payload);
+            if(library.name == "level-zero" || library.name == "ze_loader")
+                stack.level_zero =
+                    LevelZero{library.version, library.path.empty() ? "" : library.path + "/libze_loader.so.1"};
+            stack.libraries.push_back(std::move(library));
+        }
+        if(stack.level_zero)
+            stack.runtimes.push_back(
+                Runtime{"level-zero", stack.level_zero->version, stack.level_zero->loader_path, "ZE_AFFINITY_MASK"});
+
+        if(const auto *hip = first_success_cmd(raw, RawSource::RocmVersion, "hipconfig --version"))
+        {
+            if(const auto version = runtime_version(hip->payload))
+            {
+                if(!stack.rocm)
+                    stack.rocm = Rocm{};
+                if(const auto *path = first_success_cmd(raw, RawSource::RocmVersion, "command -v hipconfig"))
+                    stack.rocm->hip_path = trim(path->payload);
+                stack.runtimes.push_back(Runtime{"hip", *version, stack.rocm->hip_path, "HIP_PATH"});
+            }
+        }
+        for(const auto *record : raw.get_all(RawSource::AcceleratorRuntime))
+        {
+            if(record->status != CollectStatus::Success)
+                continue;
+            const auto entry = nlohmann::json::parse(record->payload, nullptr, false);
+            if(!entry.is_object())
+                continue;
+            if(record->path_or_command == "HIP" && entry.contains("runtime_version") &&
+               entry["runtime_version"].is_string())
+            {
+                if(!stack.rocm)
+                    stack.rocm = Rocm{};
+                if(std::none_of(stack.runtimes.begin(), stack.runtimes.end(),
+                                [](const auto &runtime) { return runtime.name == "hip"; }))
+                    stack.runtimes.push_back(
+                        Runtime{"hip", entry["runtime_version"].get<std::string>(), "libamdhip64.so", "HIP_PATH"});
+            }
+            if(record->path_or_command == "Level Zero" && entry.contains("api_version") &&
+               entry["api_version"].is_string())
+            {
+                if(!stack.level_zero)
+                    stack.level_zero = LevelZero{"", "libze_loader.so.1"};
+                stack.runtimes.push_back(Runtime{"level-zero API", entry["api_version"].get<std::string>(),
+                                                 "libze_loader.so.1", "ZE_AFFINITY_MASK"});
+            }
+        }
 
         // 编译器：逐个探测 gcc/g++/clang/clang++/gfortran
         // 缺失的命令在 reader 层静默记 Failed，此处仅收集 Success 记录，不产生 warning
@@ -394,8 +512,8 @@ namespace sysal::detail
         }
 
         // 无任何可解析的软件（无 nvidia-smi、无 nvcc、无编译器、无 MPI、无 RDMA）
-        if(stack.drivers.empty() && stack.runtimes.empty() && stack.compilers.empty() && !stack.mpi.has_value() &&
-           !stack.rdma.has_value())
+        if(stack.drivers.empty() && stack.runtimes.empty() && stack.compilers.empty() && stack.libraries.empty() &&
+           !stack.mpi.has_value() && !stack.rdma.has_value())
         {
             // 仅当完全不采集到任何软件数据时才告警；数据存在但解析失败属静默场景不告警
             if(nvidia_records.empty() && nvcc_records.empty() && !has_compiler_data && !has_mpi_data && !has_rdma_data)
@@ -406,9 +524,6 @@ namespace sysal::detail
         }
 
         // v0.0.1：库、ROCm、Level Zero 均不实现
-        // stack.libraries 保持空
-        // stack.rocm 保持 nullopt
-        // stack.level_zero 保持 nullopt
 
         return stack;
     }

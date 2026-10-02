@@ -33,6 +33,7 @@ namespace sysal::detail
         std::optional<Storage> storage;
         std::optional<SoftwareStack> software;
         std::optional<ExecutionContext> execution;
+        std::vector<std::pair<AcceleratorId, bool>> accelerator_runtime_visibility;
     };
 
 } // namespace sysal::detail
