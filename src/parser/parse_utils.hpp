@@ -21,6 +21,9 @@ namespace sysal::detail
     /// @brief 去除首尾空白
     std::string trim(std::string_view s);
 
+    /// @brief 清理固件/设备标识；常见占位字符串返回空串
+    std::string hardware_text(std::string_view s);
+
     /// @brief 按分隔符拆分
     std::vector<std::string> split(std::string_view s, char delimiter);
 

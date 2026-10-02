@@ -253,7 +253,7 @@ namespace sysal::reader
         }
 
         // ---- Pci 域 ----
-        if(has(flags, Collect::Pci))
+        if(has(flags, Collect::Pci | Collect::Storage))
         {
             // Lspci 已在 Network 域采集，此处仅当 Network 未采集时补充
             if(!has(flags, Collect::Network))

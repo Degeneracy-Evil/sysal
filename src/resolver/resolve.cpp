@@ -157,6 +157,37 @@ namespace sysal::detail
         info.software = std::move(result.software).value_or(SoftwareStack{});
         info.execution = std::move(result.execution).value_or(ExecutionContext{});
 
+        // 通过明确的 PCI 地址关联硬件身份；不按接口名或型号猜测设备。
+        for(auto &iface : info.network.interfaces)
+        {
+            if(iface.pci_address)
+            {
+                if(const auto *device = info.pci.find(*iface.pci_address))
+                {
+                    iface.vendor = device->vendor;
+                    iface.device_name = device->device_name;
+                    if(!iface.numa_node)
+                    {
+                        iface.numa_node = device->numa_node;
+                    }
+                }
+            }
+        }
+        for(auto &storage : info.storage.devices)
+        {
+            if(storage.pci_address)
+            {
+                if(const auto *device = info.pci.find(*storage.pci_address))
+                {
+                    storage.controller_name = device->device_name.value;
+                    if(!storage.numa_node)
+                    {
+                        storage.numa_node = device->numa_node;
+                    }
+                }
+            }
+        }
+
         // 计算可见性：以 ExecutionContext 中的便利索引为依据，
         // 设置各资源子域的 visible_to_current_process 字段。
         compute_cpu_visibility(info.cpu, info.execution);

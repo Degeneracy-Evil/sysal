@@ -41,3 +41,12 @@ struct Pci
 - **`numa_node` 直接从 sysfs 读取**：来自
   `/sys/bus/pci/devices/<addr>/numa_node`，不经过额外的拓扑解析层。
   在不支持 NUMA 的系统或该字段缺失时为 `std::nullopt`。
+
+## 插槽、固件标签与链路
+
+PciDevice 可保留 physical_slot、firmware_label（sysfs label），以及 current/max_link_speed、current/max_link_width。
+速率保持内核自带单位的字符串，位宽为可选 lane 数；缺失不以零代替。
+当前协商链路与设备报告的最大链路分别保留，不能视为整条上游路径的可用吞吐量。
+没有插槽号或固件标签时保持缺失，不按总线号或设备名猜测插槽位置。
+
+来源：[Linux PCI sysfs ABI](https://github.com/torvalds/linux/blob/master/Documentation/ABI/testing/sysfs-bus-pci)。

@@ -22,6 +22,12 @@ namespace sysal
         DeviceName device_name;              ///< 设备名称
         PciClass device_class;               ///< 设备类别
         std::optional<NumaNodeId> numa_node; ///< 所属 NUMA 节点（可能未知）
+        std::string physical_slot{};
+        std::string firmware_label{};
+        std::string current_link_speed{}; ///< 内核报告字符串，包含 GT/s 等单位
+        std::string max_link_speed{};
+        std::optional<std::uint32_t> current_link_width{};
+        std::optional<std::uint32_t> max_link_width{};
     };
 
     /// @brief PCI 子系统聚合

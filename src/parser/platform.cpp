@@ -125,57 +125,84 @@ namespace sysal::detail
             }
 
             Firmware firmware;
+            Baseboard board;
+            Chassis chassis;
             bool has_firmware = false;
-
+            bool has_board = false;
+            bool has_chassis = false;
+            const std::pair<std::string_view, std::string *> fields[] = {
+                {"bios_vendor", &firmware.bios_vendor.value},
+                {"bios_version", &firmware.bios_version},
+                {"bios_date", &firmware.bios_date},
+                {"bios_release", &firmware.bios_release},
+                {"ec_firmware_release", &firmware.ec_firmware_release},
+                {"sys_vendor", &platform.host.vendor.value},
+                {"product_name", &platform.host.product_name},
+                {"product_serial", &platform.host.serial},
+                {"product_family", &platform.host.product_family},
+                {"product_version", &platform.host.product_version},
+                {"product_sku", &platform.host.product_sku},
+                {"product_uuid", &platform.host.product_uuid},
+                {"board_vendor", &board.vendor.value},
+                {"board_name", &board.name},
+                {"board_version", &board.version},
+                {"board_serial", &board.serial},
+                {"board_asset_tag", &board.asset_tag},
+                {"chassis_vendor", &chassis.vendor.value},
+                {"chassis_version", &chassis.version},
+                {"chassis_serial", &chassis.serial},
+                {"chassis_asset_tag", &chassis.asset_tag},
+            };
             for(const auto *rec : dmi_records)
             {
                 if(rec->status != CollectStatus::Success)
                 {
                     continue;
                 }
-
-                const auto &path = rec->path_or_command;
-                const auto &payload = rec->payload;
-
-                // BIOS 信息
-                if(path.find("bios_vendor") != std::string::npos)
-                {
-                    firmware.bios_vendor = Vendor{trim(payload)};
-                    has_firmware = true;
-                }
-                else if(path.find("bios_version") != std::string::npos)
-                {
-                    firmware.bios_version = trim(payload);
-                    has_firmware = true;
-                }
-                else if(path.find("bios_date") != std::string::npos)
-                {
-                    firmware.bios_date = trim(payload);
-                    has_firmware = true;
-                }
-                // 主机信息
-                else if(path.find("product_name") != std::string::npos)
-                {
-                    platform.host.product_name = trim(payload);
-                }
-                else if(path.find("sys_vendor") != std::string::npos)
-                {
-                    platform.host.vendor = Vendor{trim(payload)};
-                }
-                else if(path.find("product_serial") != std::string::npos)
-                {
-                    platform.host.serial = trim(payload);
-                }
-                else if(path.find("/sys/firmware/efi") != std::string::npos)
+                if(rec->path_or_command == "/sys/firmware/efi")
                 {
                     firmware.uefi = true;
                     has_firmware = true;
+                    continue;
+                }
+                const auto name = extract_filename(rec->path_or_command);
+                const auto value = hardware_text(rec->payload);
+                if(value.empty())
+                {
+                    continue;
+                }
+                if(name == "chassis_type")
+                {
+                    if(auto number = parse_uint(value); number && *number <= 255)
+                    {
+                        chassis.type = static_cast<std::uint32_t>(*number);
+                        has_chassis = true;
+                    }
+                    continue;
+                }
+                for(const auto &[field, destination] : fields)
+                {
+                    if(name == field)
+                    {
+                        *destination = value;
+                        has_firmware |= name.starts_with("bios_") || name == "ec_firmware_release";
+                        has_board |= name.starts_with("board_");
+                        has_chassis |= name.starts_with("chassis_");
+                        break;
+                    }
                 }
             }
-
             if(has_firmware)
             {
-                platform.firmware = firmware;
+                platform.firmware = std::move(firmware);
+            }
+            if(has_board)
+            {
+                platform.baseboard = std::move(board);
+            }
+            if(has_chassis)
+            {
+                platform.chassis = std::move(chassis);
             }
         }
 

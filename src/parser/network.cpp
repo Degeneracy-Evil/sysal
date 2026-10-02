@@ -6,6 +6,7 @@
 
 #include "parse_utils.hpp"
 
+#include <limits>
 #include <map>
 #include <string_view>
 #include <vector>
@@ -141,7 +142,7 @@ namespace sysal::detail
                 {
                     auto trimmed = trim(payload);
                     auto val = parse_uint(trimmed);
-                    if(val.has_value() && *val > 0)
+                    if(val.has_value() && *val > 0 && *val <= std::numeric_limits<std::uint64_t>::max() / 1'000'000)
                     {
                         // speed 文件单位为 Mbps，转换为 bps
                         iface.speed = Bandwidth{*val * 1'000'000};
@@ -149,6 +150,52 @@ namespace sysal::detail
                     else
                     {
                         // speed 不可用（如回环接口），保持 nullopt
+                    }
+                }
+                else if(filename == "mtu")
+                {
+                    if(auto number = parse_uint(trim(payload)); number && *number > 0)
+                    {
+                        iface.mtu = MemorySize{*number};
+                    }
+                }
+                else if(filename == "carrier")
+                {
+                    const auto value = trim(payload);
+                    if(value == "0" || value == "1")
+                    {
+                        iface.carrier = value == "1";
+                    }
+                }
+                else if(filename == "duplex")
+                {
+                    const auto value = trim(payload);
+                    if(value == "full" || value == "half")
+                    {
+                        iface.duplex = value;
+                    }
+                }
+                else if(filename == "driver")
+                {
+                    iface.driver = hardware_text(payload);
+                }
+                else if(filename == "phys_port_name")
+                {
+                    iface.physical_port_name = hardware_text(payload);
+                }
+                else if(filename == "numa_node" || filename == "ifindex")
+                {
+                    if(auto number = parse_uint(trim(payload));
+                       number && *number <= std::numeric_limits<std::uint32_t>::max())
+                    {
+                        if(filename == "numa_node")
+                        {
+                            iface.numa_node = NumaNodeId{static_cast<std::uint32_t>(*number)};
+                        }
+                        else
+                        {
+                            iface.interface_index = static_cast<std::uint32_t>(*number);
+                        }
                     }
                 }
                 else if(filename == "device")

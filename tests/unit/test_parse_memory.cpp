@@ -55,11 +55,11 @@ TEST_CASE("test_parse_memory")
                                           "MemTotal:       395617072 kB\n"
                                           "MemAvailable:   360924620 kB\n"));
         raw.records.push_back(make_record(RawSource::SysfsNuma, "node/node0/meminfo",
-                                          "Node 0 Total:      197808536 kB\n"
-                                          "Node 0 Free:       180462310 kB\n"));
+                                          "Node 0 MemTotal:      197808536 kB\n"
+                                          "Node 0 MemFree:       180462310 kB\n"));
         raw.records.push_back(make_record(RawSource::SysfsNuma, "node/node1/meminfo",
-                                          "Node 1 Total:      197808536 kB\n"
-                                          "Node 1 Free:       180462310 kB\n"));
+                                          "Node 1 MemTotal:      197808536 kB\n"
+                                          "Node 1 MemFree:       180462310 kB\n"));
 
         std::vector<std::string> warnings;
         auto result = parse_memory(raw, warnings);
@@ -73,13 +73,13 @@ TEST_CASE("test_parse_memory")
         CHECK(mem.numa_memory.size() == 2);
         CHECK(mem.numa_memory[0].node == NumaNodeId{0});
         CHECK(mem.numa_memory[0].total.value == 197808536ULL * 1024);
-        const auto &available_1 = mem.numa_memory[0].available;
-        REQUIRE(available_1.has_value());
-        if(!available_1.has_value())
+        const auto &free_1 = mem.numa_memory[0].free;
+        REQUIRE(free_1.has_value());
+        if(!free_1.has_value())
         {
             return;
         }
-        CHECK(available_1->value == 180462310ULL * 1024);
+        CHECK(free_1->value == 180462310ULL * 1024);
         CHECK(mem.numa_memory[1].node == NumaNodeId{1});
     }
 

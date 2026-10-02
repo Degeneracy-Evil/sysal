@@ -1,45 +1,34 @@
 # Platform
 
-描述系统的基本标识：运行在什么主机上、什么操作系统、什么内核、什么架构，
-以及固件和虚拟化情况。`Platform` 是 `SystemInfo` 的第一层，回答
-"这是一台什么样的机器"。
+平台信息回答“这是一台什么机器”：主机、操作系统、内核、架构、整机、主板、机箱、固件和虚拟化。
+所有固件身份均来自 Linux 导出的 `/sys/class/dmi/id` 文本，不根据型号查询或推断。
 
-## Platform 结构体
+## 数据结构
 
-```cpp
-namespace sysal
-{
+| 结构体 | 字段 |
+| --- | --- |
+| `Host` | hostname、machine_id、vendor、product_name、serial、product_family、product_version、product_sku、product_uuid |
+| `Baseboard` | vendor、name、version、serial、asset_tag |
+| `Chassis` | vendor、可选 SMBIOS type 编号、version、serial、asset_tag |
+| `Firmware` | bios_vendor、bios_version、bios_date、bios_release、ec_firmware_release、uefi |
+| `Os` | name、version、distribution、distribution_version、codename |
+| `Kernel` | release、version、compiled_at、architecture |
+| `Architecture` | name、bits、byte_order |
+| `Virtualization` | kind、hypervisor |
 
-struct Platform
-{
-    Host                   host;            // 主机标识
-    Os                     os;              // 操作系统
-    Kernel                 kernel;          // 内核
-    Architecture           architecture;    // 硬件架构
-    std::optional<Firmware>       firmware;        // 固件（可能采集不到）
-    std::optional<Virtualization> virtualization;  // 虚拟化（可能采集不到）
-};
+`Platform.baseboard`、`chassis`、`firmware`、`virtualization` 均为可选值。
+只有读到有效字段才创建主板、机箱和固件对象。新字段缺失时，旧 JSON 仍可载入。
+空字符串表示未获取有效标识；数值和状态字段使用 optional 区分未知与零/false。
 
-}  // namespace sysal
-```
+## 语义与边界
 
-`firmware` 与 `virtualization` 为 `std::optional`：在容器或某些环境下
-可能无法获取，缺失时不影响其余字段。
+- `product_uuid` 是固件产品 UUID，`machine_id` 是操作系统安装标识，两者不能替代。
+- `bios_version` 是厂商版本字符串；`bios_release` 是 SMBIOS BIOS revision，两者分别保留。
+- `chassis.type` 保留系统提供的 SMBIOS 编号，不从机器型号推断机箱规格。
+- `uefi=true` 表示观察到了 EFI sysfs；false 也可能是容器遮蔽，不证明 Legacy 启动。
+- 常见占位字符串（如 Not Specified、Default String、NO DIMM）不作为有效身份；有效型号、版本及大小写保持原样。
+- 内核通常限制普通用户读取整机 UUID 和整机/主板/机箱序列号；保持缺失，不自动提权。
+- DMI 不存在的架构或容器仍可获取 OS、内核和主机名，其他硬件身份允许缺失。
+- 虚拟化检测保留现有 sysfs、DMI 和 CPU 标志路径；容器属于 ExecutionContext。
 
-## 子结构体
-
-| 结构体 | 说明 | 示例字段 |
-|---|---|---|
-| `Host` | 主机标识 | `hostname`、`machine_id`、`product_name`、`vendor`、`serial` |
-| `Os` | 操作系统 | `name`、`version`、`distribution`、`distribution_version`、`codename` |
-| `Kernel` | 内核 | `release`、`version`、`compiled_at`、`architecture` |
-| `Architecture` | 硬件架构 | `name`（如 `x86_64`/`aarch64`）、`bits`（64/32）、`byte_order` |
-| `Firmware` | 固件 | `bios_vendor`（Vendor）、`bios_version`、`bios_date`、`uefi`（bool） |
-| `Virtualization` | 虚拟化 | `kind`（None/KVM/Xen/VMware/QEMU/Hyper-V/VirtualBox/Parallels/Other）、`hypervisor` |
-
-## 设计说明
-
-* `Platform` 只描述"机器本身"，不涉及 CPU 核数、内存大小等资源数量——
-  那些属于 `Cpu` / `Memory` 等资源子域。
-* `Virtualization::kind` 为枚举，`None` 表示物理机。检测优先级：`/sys/hypervisor/type`（Xen）→ DMI sys_vendor/product_name 关键词匹配 → `/proc/cpuinfo` flags 含 `hypervisor` 标志。容器检测独立于硬件虚拟化，由 `ExecutionContext.container` 承载。
-* 字段命名遵循 `snake_case`，类型名遵循 `PascalCase`。
+字段来源参见 [Linux DMI sysfs 实现](https://github.com/torvalds/linux/blob/master/drivers/firmware/dmi-id.c)。

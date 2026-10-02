@@ -7,6 +7,7 @@
 #include "parse_utils.hpp"
 
 #include <cctype>
+#include <limits>
 #include <map>
 #include <string_view>
 
@@ -207,7 +208,7 @@ namespace sysal::detail
             if(size_it != attrs.end())
             {
                 auto sectors = parse_uint(trim(size_it->second));
-                if(sectors.has_value())
+                if(sectors.has_value() && *sectors <= std::numeric_limits<std::uint64_t>::max() / 512)
                 {
                     dev.capacity = MemorySize{*sectors * 512};
                 }
@@ -225,6 +226,74 @@ namespace sysal::detail
                 if(auto pci = extract_pci_address_from_block(dev_pci_it->second))
                 {
                     dev.pci_address = pci;
+                }
+            }
+
+            const std::pair<std::string_view, std::string *> text_fields[] = {{"model", &dev.model},
+                                                                              {"vendor", &dev.vendor.value},
+                                                                              {"serial", &dev.serial},
+                                                                              {"rev", &dev.firmware_revision},
+                                                                              {"firmware_rev", &dev.firmware_revision},
+                                                                              {"wwid", &dev.wwid},
+                                                                              {"transport", &dev.transport}};
+            for(const auto &[field, destination] : text_fields)
+            {
+                if(auto it = attrs.find(std::string(field)); it != attrs.end())
+                {
+                    auto value = hardware_text(it->second);
+                    if(!value.empty())
+                    {
+                        *destination = std::move(value);
+                    }
+                }
+            }
+            const std::pair<std::string_view, std::optional<MemorySize> *> sizes[] = {
+                {"logical_block_size", &dev.logical_block_size},
+                {"physical_block_size", &dev.physical_block_size},
+                {"minimum_io_size", &dev.minimum_io_size},
+                {"optimal_io_size", &dev.optimal_io_size}};
+            for(const auto &[field, destination] : sizes)
+            {
+                if(auto it = attrs.find(std::string(field)); it != attrs.end())
+                {
+                    if(auto number = parse_uint(trim(it->second)))
+                    {
+                        *destination = MemorySize{*number};
+                    }
+                }
+            }
+            const std::pair<std::string_view, std::optional<bool> *> states[] = {
+                {"rotational", &dev.rotational}, {"ro", &dev.read_only}, {"removable", &dev.removable}};
+            for(const auto &[field, destination] : states)
+            {
+                if(auto it = attrs.find(std::string(field)); it != attrs.end())
+                {
+                    auto value = trim(it->second);
+                    if(value == "0" || value == "1")
+                    {
+                        *destination = value == "1";
+                    }
+                }
+            }
+            if(auto it = attrs.find("numa_node"); it != attrs.end())
+            {
+                if(auto number = parse_uint(trim(it->second));
+                   number && *number <= std::numeric_limits<std::uint32_t>::max())
+                {
+                    dev.numa_node = NumaNodeId{static_cast<std::uint32_t>(*number)};
+                }
+            }
+            if(auto it = attrs.find("scheduler"); it != attrs.end())
+            {
+                const auto start = it->second.find('[');
+                const auto end = it->second.find(']', start);
+                if(start != std::string::npos && end != std::string::npos)
+                {
+                    dev.scheduler = it->second.substr(start + 1, end - start - 1);
+                }
+                else if(trim(it->second) == "none")
+                {
+                    dev.scheduler = "none";
                 }
             }
 

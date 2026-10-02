@@ -6,6 +6,7 @@
 
 #include "parse_utils.hpp"
 
+#include <limits>
 #include <map>
 #include <optional>
 #include <string_view>
@@ -22,31 +23,14 @@ namespace sysal::detail
         /// @return PCI 地址字符串（路径最后一段），如 "0000:41:00.0"
         std::string extract_pci_address_from_path(std::string_view path)
         {
-            // 路径格式: /sys/bus/pci/devices/DDDDD:BB:DD.F/<file>
-            // 或 /sys/bus/pci/devices/DDDDD:BB:DD.F (目录本身)
-            // 需要提取 DDDDD:BB:DD.F 部分
-            auto last_slash = path.rfind('/');
-            if(last_slash == std::string_view::npos)
+            constexpr std::string_view prefix = "/sys/bus/pci/devices/";
+            if(!path.starts_with(prefix))
             {
-                return std::string(path);
+                return {};
             }
-            auto after_slash = path.substr(last_slash + 1);
-
-            // 如果 after_slash 是文件名（vendor, device, class, numa_node），
-            // 则需要再往前取一段
-            if(after_slash == "vendor" || after_slash == "device" || after_slash == "class" ||
-               after_slash == "numa_node")
-            {
-                auto rest = path.substr(0, last_slash);
-                auto prev_slash = rest.rfind('/');
-                if(prev_slash == std::string_view::npos)
-                {
-                    return std::string(rest);
-                }
-                return std::string(rest.substr(prev_slash + 1));
-            }
-
-            return std::string(after_slash);
+            const auto start = prefix.size();
+            const auto end = path.find('/', start);
+            return std::string(path.substr(start, end == std::string_view::npos ? path.size() - start : end - start));
         }
 
         /// @brief 归一化 lspci 地址为 DDDD:BB:DD.F 格式
@@ -190,6 +174,41 @@ namespace sysal::detail
                 {
                     auto trimmed = trim(payload);
                     dev.device_class = PciClass{trimmed};
+                }
+                else if(filename == "physical_slot")
+                {
+                    dev.physical_slot = hardware_text(payload);
+                }
+                else if(filename == "label")
+                {
+                    dev.firmware_label = hardware_text(payload);
+                }
+                else if(filename == "current_link_speed" || filename == "max_link_speed")
+                {
+                    const auto value = hardware_text(payload);
+                    if(filename == "current_link_speed")
+                    {
+                        dev.current_link_speed = value;
+                    }
+                    else
+                    {
+                        dev.max_link_speed = value;
+                    }
+                }
+                else if(filename == "current_link_width" || filename == "max_link_width")
+                {
+                    if(auto number = parse_uint(trim(payload));
+                       number && *number > 0 && *number <= std::numeric_limits<std::uint32_t>::max())
+                    {
+                        if(filename == "current_link_width")
+                        {
+                            dev.current_link_width = static_cast<std::uint32_t>(*number);
+                        }
+                        else
+                        {
+                            dev.max_link_width = static_cast<std::uint32_t>(*number);
+                        }
+                    }
                 }
                 else if(filename == "numa_node")
                 {

@@ -484,12 +484,23 @@ int main()
     label("Architecture", sys.info.platform.architecture.name);
     label("Bits", std::to_string(sys.info.platform.architecture.bits));
     label("Byte order", sys.info.platform.architecture.byte_order);
+    label("Product", sys.info.platform.host.vendor.value + " " + sys.info.platform.host.product_name);
+    if(sys.info.platform.baseboard)
+    {
+        const auto &board = *sys.info.platform.baseboard;
+        label("Motherboard", board.vendor.value + " " + board.name + " " + board.version);
+    }
+    if(sys.info.platform.chassis && sys.info.platform.chassis->type)
+    {
+        label("Chassis type", std::to_string(*sys.info.platform.chassis->type));
+    }
     if(sys.info.platform.firmware.has_value())
     {
         label("BIOS vendor", sys.info.platform.firmware->bios_vendor.value);
         label("BIOS version", sys.info.platform.firmware->bios_version);
         label("BIOS date", sys.info.platform.firmware->bios_date);
-        label("UEFI", sys.info.platform.firmware->uefi ? "yes" : "no");
+        label("UEFI observed", sys.info.platform.firmware->uefi ? "yes" : "unknown");
+        label("BIOS revision", sys.info.platform.firmware->bios_release);
     }
     if(sys.info.platform.virtualization.has_value())
     {
@@ -603,9 +614,9 @@ int main()
     for(const auto &nm : sys.info.memory.numa_memory)
     {
         label("NUMA " + std::to_string(nm.node.value()) + " total", format_memory(nm.total.value));
-        if(nm.available.has_value())
+        if(nm.free.has_value())
         {
-            label("NUMA " + std::to_string(nm.node.value()) + " available", format_memory(nm.available->value));
+            label("NUMA " + std::to_string(nm.node.value()) + " free", format_memory(nm.free->value));
         }
     }
     if(sys.info.memory.dimm_count.has_value())

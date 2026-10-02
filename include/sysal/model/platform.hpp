@@ -1,7 +1,7 @@
 /// @file platform.hpp
 /// @brief 平台信息数据模型
 /// @details 定义 Platform 及其子结构体（Host、Os、Kernel、Architecture、
-///          Firmware、Virtualization），描述系统的基本标识。
+///          Baseboard、Chassis、Firmware、Virtualization），描述系统的基本标识。
 
 #pragma once
 
@@ -17,11 +17,35 @@ namespace sysal
     /// @brief 主机标识
     struct Host
     {
-        std::string hostname;     ///< 主机名
-        std::string machine_id;   ///< machine-id
-        std::string product_name; ///< 产品名称
-        Vendor vendor;            ///< 厂商
-        std::string serial;       ///< 序列号
+        std::string hostname;          ///< 主机名
+        std::string machine_id;        ///< machine-id
+        std::string product_name;      ///< 产品名称
+        Vendor vendor;                 ///< 厂商
+        std::string serial;            ///< 序列号
+        std::string product_family{};  ///< 产品系列
+        std::string product_version{}; ///< 产品版本
+        std::string product_sku{};     ///< 产品 SKU
+        std::string product_uuid{};    ///< 固件产品 UUID，不是 machine-id
+    };
+
+    /// @brief 主板标识，由固件提供
+    struct Baseboard
+    {
+        Vendor vendor;
+        std::string name;
+        std::string version;
+        std::string serial;
+        std::string asset_tag;
+    };
+
+    /// @brief 机箱标识，由固件提供
+    struct Chassis
+    {
+        Vendor vendor;
+        std::optional<std::uint32_t> type; ///< SMBIOS 类型编号，保留未知的未来编号
+        std::string version;
+        std::string serial;
+        std::string asset_tag;
     };
 
     /// @brief 操作系统
@@ -54,10 +78,12 @@ namespace sysal
     /// @brief 固件
     struct Firmware
     {
-        Vendor bios_vendor;       ///< BIOS 厂商
-        std::string bios_version; ///< BIOS 版本
-        std::string bios_date;    ///< BIOS 日期
-        bool uefi{};              ///< 是否为 UEFI
+        Vendor bios_vendor;                ///< BIOS 厂商
+        std::string bios_version;          ///< BIOS 版本
+        std::string bios_date;             ///< BIOS 日期
+        bool uefi{};                       ///< 是否观察到 EFI sysfs；false 不证明 Legacy 启动
+        std::string bios_release{};        ///< SMBIOS BIOS revision，与厂商版本字符串区分
+        std::string ec_firmware_release{}; ///< 嵌入式控制器固件 revision
     };
 
     /// @brief 虚拟化
@@ -77,6 +103,8 @@ namespace sysal
         Architecture architecture;                    ///< 硬件架构
         std::optional<Firmware> firmware;             ///< 固件（可能采集不到）
         std::optional<Virtualization> virtualization; ///< 虚拟化（可能采集不到）
+        std::optional<Baseboard> baseboard{};         ///< 主板（可能采集不到）
+        std::optional<Chassis> chassis{};             ///< 机箱（可能采集不到）
     };
 
 } // namespace sysal

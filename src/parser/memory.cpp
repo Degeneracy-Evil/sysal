@@ -6,6 +6,8 @@
 
 #include "parse_utils.hpp"
 
+#include <algorithm>
+#include <limits>
 #include <map>
 #include <set>
 #include <string_view>
@@ -88,7 +90,7 @@ namespace sysal::detail
                 auto trimmed_key = trim(key);
 
                 // 检查是否为 "Node N Total" 格式
-                if(trimmed_key.find("Total") != std::string::npos)
+                if(trimmed_key == "Node " + std::to_string(node_id) + " MemTotal")
                 {
                     auto parts = split(value, ' ');
                     if(!parts.empty())
@@ -105,7 +107,7 @@ namespace sysal::detail
                         }
                     }
                 }
-                else if(trimmed_key.find("Free") != std::string::npos)
+                else if(trimmed_key == "Node " + std::to_string(node_id) + " MemFree")
                 {
                     auto parts = split(value, ' ');
                     if(!parts.empty())
@@ -113,7 +115,7 @@ namespace sysal::detail
                         auto kb = parse_kb_to_bytes(trim(parts[0]));
                         if(kb.has_value())
                         {
-                            nm.available = *kb;
+                            nm.free = *kb;
                         }
                         else
                         {
@@ -165,7 +167,11 @@ namespace sysal::detail
                     continue;
                 }
                 auto key = trim(rest.substr(0, eq_pos));
-                auto value = trim(rest.substr(eq_pos + 1));
+                auto value = hardware_text(rest.substr(eq_pos + 1));
+                if(value.empty())
+                {
+                    continue;
+                }
 
                 if(key.size() <= prefix.size() || key.substr(0, prefix.size()) != prefix)
                 {
@@ -197,15 +203,20 @@ namespace sysal::detail
 
                 if(field == "TYPE")
                 {
+                    dimm.memory_type = value;
                     if(out_memory_type.empty())
                     {
                         out_memory_type = value;
+                    }
+                    else if(out_memory_type != value)
+                    {
+                        out_memory_type = "mixed";
                     }
                 }
                 else if(field == "SPEED_MTS")
                 {
                     auto v = parse_uint(value);
-                    if(v.has_value())
+                    if(v.has_value() && *v > 0)
                     {
                         dimm.speed_mts = TransferRate{*v};
                     }
@@ -213,9 +224,9 @@ namespace sysal::detail
                 else if(field == "CONFIGURED_SPEED_MTS")
                 {
                     auto v = parse_uint(value);
-                    if(v.has_value() && !out_configured_speed.has_value())
+                    if(v.has_value() && *v > 0)
                     {
-                        out_configured_speed = TransferRate{*v};
+                        dimm.configured_speed_mts = TransferRate{*v};
                     }
                 }
                 else if(field == "SIZE")
@@ -245,7 +256,7 @@ namespace sysal::detail
                 else if(field == "RANK")
                 {
                     auto v = parse_uint(value);
-                    if(v.has_value())
+                    if(v.has_value() && *v > 0 && *v <= std::numeric_limits<std::uint32_t>::max())
                     {
                         dimm.rank = static_cast<std::uint32_t>(*v);
                     }
@@ -253,7 +264,7 @@ namespace sysal::detail
                 else if(field == "TOTAL_WIDTH")
                 {
                     auto v = parse_uint(value);
-                    if(v.has_value())
+                    if(v.has_value() && *v > 0 && *v <= std::numeric_limits<std::uint32_t>::max())
                     {
                         dimm.total_width = static_cast<std::uint32_t>(*v);
                     }
@@ -261,7 +272,7 @@ namespace sysal::detail
                 else if(field == "DATA_WIDTH")
                 {
                     auto v = parse_uint(value);
-                    if(v.has_value())
+                    if(v.has_value() && *v > 0 && *v <= std::numeric_limits<std::uint32_t>::max())
                     {
                         dimm.data_width = static_cast<std::uint32_t>(*v);
                     }
@@ -269,6 +280,36 @@ namespace sysal::detail
                 else if(field == "FORM_FACTOR")
                 {
                     dimm.form_factor = value;
+                }
+                else if(field == "SERIAL_NUMBER")
+                {
+                    dimm.serial = value;
+                }
+                else if(field == "ASSET_TAG")
+                {
+                    dimm.asset_tag = value;
+                }
+                else if(field == "TYPE_DETAIL")
+                {
+                    dimm.type_detail = value;
+                }
+                else if(field == "CONFIGURED_VOLTAGE")
+                {
+                    auto parts = split(value, '.');
+                    if(parts.size() <= 2)
+                    {
+                        auto whole = parse_uint(parts.front());
+                        auto fraction = parts.size() == 2 ? parts[1] : std::string{};
+                        if(fraction.size() <= 3)
+                        {
+                            fraction.append(3 - fraction.size(), '0');
+                            auto decimal = parse_uint(fraction);
+                            if(whole && *whole <= 100 && decimal && *decimal < 1000)
+                            {
+                                dimm.configured_voltage_mv = Millivolts{*whole * 1000 + *decimal};
+                            }
+                        }
+                    }
                 }
                 else if(field == "PRESENT")
                 {
@@ -286,6 +327,30 @@ namespace sysal::detail
                     dimm.present = (dimm.size.value > 0);
                 }
                 result.push_back(std::move(dimm));
+            }
+            bool complete_speed = true;
+            for(const auto &dimm : result)
+            {
+                if(!dimm.present)
+                {
+                    continue;
+                }
+                if(!dimm.configured_speed_mts)
+                {
+                    complete_speed = false;
+                }
+                else if(!out_configured_speed)
+                {
+                    out_configured_speed = dimm.configured_speed_mts;
+                }
+                else
+                {
+                    complete_speed &= out_configured_speed->value == dimm.configured_speed_mts->value;
+                }
+            }
+            if(!complete_speed)
+            {
+                out_configured_speed.reset();
             }
             return result;
         }
@@ -311,29 +376,43 @@ namespace sysal::detail
                 }
                 auto dir = path.substr(0, slash);
                 auto fname = path.substr(slash + 1);
-                auto value = trim(rec->payload);
+                auto value = hardware_text(rec->payload);
 
                 auto &dimm = grouped[dir];
-                dimm.present = true;
+                // Presence follows size, not the existence of an EDAC slot directory.
 
                 if(fname == "dimm_mem_type")
                 {
+                    dimm.memory_type = value;
                     if(out_memory_type.empty())
                     {
                         out_memory_type = value;
+                    }
+                    else if(out_memory_type != value)
+                    {
+                        out_memory_type = "mixed";
                     }
                 }
                 else if(fname == "size")
                 {
                     auto mb = parse_uint(value);
-                    if(mb.has_value())
+                    if(mb.has_value() && *mb <= std::numeric_limits<std::uint64_t>::max() / (1024ULL * 1024))
                     {
                         dimm.size = MemorySize{*mb * 1024 * 1024};
+                        dimm.present = *mb > 0;
                     }
                 }
                 else if(fname == "dimm_label")
                 {
                     dimm.locator = value;
+                }
+                else if(fname == "dimm_edac_mode")
+                {
+                    dimm.edac_mode = value;
+                }
+                else if(fname == "dimm_dev_type")
+                {
+                    dimm.device_width = value;
                 }
                 else if(fname == "dimm_location")
                 {
@@ -443,10 +522,32 @@ namespace sysal::detail
             }
         }
 
+        auto edac_records = raw.get_all(RawSource::SysfsEdac);
+        std::string edac_type;
+        auto edac_dimms = parse_edac_dimms(edac_records, edac_type);
         if(memory.dimms.empty())
         {
-            auto edac_records = raw.get_all(RawSource::SysfsEdac);
-            memory.dimms = parse_edac_dimms(edac_records, memory_type);
+            memory.dimms = std::move(edac_dimms);
+            memory_type = std::move(edac_type);
+        }
+        else
+        {
+            // 只合并唯一且明确相同的插槽标签，不按数组顺序猜测 SMBIOS/EDAC 对应关系。
+            for(const auto &edac : edac_dimms)
+            {
+                if(edac.locator.empty())
+                {
+                    continue;
+                }
+                const auto matches = [&](const DimmInfo &dimm)
+                { return dimm.locator == edac.locator && dimm.size == edac.size; };
+                if(std::count_if(memory.dimms.begin(), memory.dimms.end(), matches) == 1)
+                {
+                    auto dimm = std::find_if(memory.dimms.begin(), memory.dimms.end(), matches);
+                    dimm->edac_mode = edac.edac_mode;
+                    dimm->device_width = edac.device_width;
+                }
+            }
         }
 
         memory.memory_type = std::move(memory_type);

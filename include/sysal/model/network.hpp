@@ -26,6 +26,15 @@ namespace sysal
         std::vector<IpAddress> addresses;      ///< 绑定的 IP 地址列表
         std::optional<PciAddress> pci_address; ///< PCI 地址（可能无）
         bool visible_to_current_process{};     ///< 当前进程是否可见
+        std::optional<MemorySize> mtu{};       ///< 当前 MTU（字节）
+        std::optional<bool> carrier{};         ///< 内核报告的链路 carrier
+        std::string duplex{};
+        std::string driver{};
+        std::string physical_port_name{};
+        std::optional<NumaNodeId> numa_node{};
+        std::optional<std::uint32_t> interface_index{};
+        Vendor vendor{};          ///< PCI 厂商标识（通常为数值 ID）
+        DeviceName device_name{}; ///< 系统 PCI 数据库提供的名称
     };
 
     /// @brief 网络子系统聚合

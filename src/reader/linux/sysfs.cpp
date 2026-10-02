@@ -224,6 +224,20 @@ namespace sysal::reader
                 read_sysfs_file(raw, RawSource::SysfsNet, (dir / "operstate").string());
                 read_sysfs_file(raw, RawSource::SysfsNet, (dir / "speed").string());
 
+                static constexpr std::string_view fields[] = {"mtu",     "carrier",        "duplex",
+                                                              "ifindex", "phys_port_name", "device/numa_node"};
+                for(auto field : fields)
+                {
+                    read_sysfs_file(raw, RawSource::SysfsNet, (dir / field).string());
+                }
+                std::error_code driver_ec;
+                auto driver = fs::read_symlink(dir / "device" / "driver", driver_ec);
+                if(!driver_ec)
+                {
+                    add_record(raw, RawSource::SysfsNet, (dir / "driver").string(), driver.filename().string(),
+                               CollectStatus::Success);
+                }
+
                 // device 符号链接 → PCI 地址（虚拟接口如 lo 无此链接，静默跳过）
                 std::error_code link_ec;
                 auto device_target = fs::read_symlink(dir / "device", link_ec);
@@ -273,6 +287,13 @@ namespace sysal::reader
                 read_sysfs_file(raw, RawSource::SysfsPci, (dir / "device").string());
                 read_sysfs_file(raw, RawSource::SysfsPci, (dir / "class").string());
                 read_sysfs_file(raw, RawSource::SysfsPci, (dir / "numa_node").string());
+                static constexpr std::string_view fields[] = {"physical_slot",      "label",
+                                                              "current_link_speed", "max_link_speed",
+                                                              "current_link_width", "max_link_width"};
+                for(auto field : fields)
+                {
+                    read_sysfs_file(raw, RawSource::SysfsPci, (dir / field).string());
+                }
             }
 
             if(!found_any)
@@ -315,10 +336,25 @@ namespace sysal::reader
                 // queue/rotational: "0"=SSD, "1"=HDD
                 read_sysfs_file(raw, RawSource::SysfsBlock, (dir / "queue" / "rotational").string());
 
-                // device/ 子目录下的型号设备
-                if(fs::exists(dir / "device"))
+                static constexpr std::string_view fields[] = {"ro",
+                                                              "removable",
+                                                              "wwid",
+                                                              "device/model",
+                                                              "device/vendor",
+                                                              "device/serial",
+                                                              "device/rev",
+                                                              "device/firmware_rev",
+                                                              "device/numa_node",
+                                                              "device/wwid",
+                                                              "device/transport",
+                                                              "queue/logical_block_size",
+                                                              "queue/physical_block_size",
+                                                              "queue/minimum_io_size",
+                                                              "queue/optimal_io_size",
+                                                              "queue/scheduler"};
+                for(auto field : fields)
                 {
-                    read_sysfs_file(raw, RawSource::SysfsBlock, (dir / "device" / "model").string());
+                    read_sysfs_file(raw, RawSource::SysfsBlock, (dir / field).string());
                 }
 
                 // 块设备入口本身是符号链接，目标指向 PCI 设备树，如
@@ -353,12 +389,17 @@ namespace sysal::reader
                 return;
             }
 
-            read_sysfs_file(raw, RawSource::SysfsDmi, (dmi_base / "bios_vendor").string());
-            read_sysfs_file(raw, RawSource::SysfsDmi, (dmi_base / "bios_version").string());
-            read_sysfs_file(raw, RawSource::SysfsDmi, (dmi_base / "bios_date").string());
-            read_sysfs_file(raw, RawSource::SysfsDmi, (dmi_base / "product_name").string());
-            read_sysfs_file(raw, RawSource::SysfsDmi, (dmi_base / "product_serial").string());
-            read_sysfs_file(raw, RawSource::SysfsDmi, (dmi_base / "sys_vendor").string());
+            static constexpr std::string_view fields[] = {
+                "bios_vendor",    "bios_version",      "bios_date",      "bios_release",   "ec_firmware_release",
+                "sys_vendor",     "product_name",      "product_serial", "product_family", "product_version",
+                "product_sku",    "product_uuid",      "board_vendor",   "board_name",     "board_version",
+                "board_serial",   "board_asset_tag",   "chassis_vendor", "chassis_type",   "chassis_version",
+                "chassis_serial", "chassis_asset_tag",
+            };
+            for(auto field : fields)
+            {
+                read_sysfs_file(raw, RawSource::SysfsDmi, (dmi_base / field).string());
+            }
 
             // UEFI 检测：/sys/firmware/efi 在 UEFI 系统上存在
             if(fs::exists("/sys/firmware/efi"))
@@ -470,7 +511,7 @@ namespace sysal::reader
             {Collect::Cpu, read_cpu_sysfs},
             {Collect::Cpu | Collect::Memory, read_numa_sysfs},
             {Collect::Network, read_net_sysfs},
-            {Collect::Pci, read_pci_sysfs},
+            {Collect::Pci | Collect::Network | Collect::Storage, read_pci_sysfs},
             {Collect::Storage, read_block_sysfs},
             {Collect::Platform, read_dmi_sysfs},
             {Collect::Platform, read_hypervisor_type},

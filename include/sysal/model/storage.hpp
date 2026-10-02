@@ -27,6 +27,22 @@ namespace sysal
         StorageKind kind{};                    ///< 存储类型
         std::optional<MountPoint> mount_point; ///< 挂载点
         std::optional<FilesystemType> fs_type; ///< 文件系统类型
+        std::string model{};
+        Vendor vendor{};
+        std::string serial{};
+        std::string firmware_revision{};
+        std::string wwid{};
+        std::optional<MemorySize> logical_block_size{};
+        std::optional<MemorySize> physical_block_size{};
+        std::optional<MemorySize> minimum_io_size{};
+        std::optional<MemorySize> optimal_io_size{};
+        std::optional<bool> rotational{};
+        std::optional<bool> read_only{};
+        std::optional<bool> removable{};
+        std::optional<NumaNodeId> numa_node{};
+        std::string transport{};       ///< 仅保留驱动明确报告的 transport
+        std::string controller_name{}; ///< 关联 PCI 控制器名称
+        std::string scheduler{};       ///< 当前内核 I/O scheduler
     };
 
     /// @brief 存储子系统聚合

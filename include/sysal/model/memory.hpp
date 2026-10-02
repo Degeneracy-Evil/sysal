@@ -20,7 +20,8 @@ namespace sysal
     {
         NumaNodeId node;                     ///< NUMA 节点 ID
         MemorySize total;                    ///< 节点内存总量
-        std::optional<MemorySize> available; ///< 可用内存（可能未知）
+        std::optional<MemorySize> available; ///< 可用内存（可能未知，不以 MemFree 替代）
+        std::optional<MemorySize> free{};    ///< MemFree，区别于 MemAvailable
     };
 
     /// @brief 单条 DIMM 内存条信息
@@ -37,6 +38,14 @@ namespace sysal
         std::optional<std::uint32_t> data_width;  ///< 数据位宽
         std::optional<std::string> form_factor;   ///< 外形规格（如 DIMM）
         bool present{};                           ///< 插槽是否已安装内存条
+        std::string memory_type{};
+        std::optional<TransferRate> configured_speed_mts{};
+        std::string serial{};
+        std::string asset_tag{};
+        std::string type_detail{};
+        std::optional<Millivolts> configured_voltage_mv{};
+        std::string edac_mode{};    ///< EDAC 报告的纠错模式
+        std::string device_width{}; ///< EDAC 报告的 DRAM device type，如 x8
     };
 
     /// @brief 内存子系统聚合

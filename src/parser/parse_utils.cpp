@@ -27,6 +27,36 @@ namespace sysal::detail
         return std::string(begin, end);
     }
 
+    std::string hardware_text(std::string_view s)
+    {
+        auto value = trim(s);
+        auto lower = value;
+        std::transform(lower.begin(), lower.end(), lower.begin(),
+                       [](unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
+        static constexpr std::string_view placeholders[] = {"no dimm",
+                                                            "unspecified",
+                                                            "not provided",
+                                                            "unknown",
+                                                            "not specified",
+                                                            "not applicable",
+                                                            "none",
+                                                            "n/a",
+                                                            "default string",
+                                                            "to be filled by o.e.m.",
+                                                            "to be filled by oem",
+                                                            "system serial number",
+                                                            "00000000-0000-0000-0000-000000000000",
+                                                            "ffffffff-ffff-ffff-ffff-ffffffffffff"};
+        for(auto placeholder : placeholders)
+        {
+            if(lower == placeholder)
+            {
+                return {};
+            }
+        }
+        return value;
+    }
+
     std::vector<std::string> split(std::string_view s, char delimiter)
     {
         std::vector<std::string> result;

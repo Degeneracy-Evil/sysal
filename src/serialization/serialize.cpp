@@ -146,10 +146,27 @@ namespace sysal
 
         [[nodiscard]] json host_to_json(const Host &h)
         {
-            return json{
+            json j{
                 {"hostname", h.hostname},   {"machine_id", h.machine_id}, {"product_name", h.product_name},
                 {"vendor", h.vendor.value}, {"serial", h.serial},
             };
+            if(!h.product_family.empty())
+            {
+                j["product_family"] = h.product_family;
+            }
+            if(!h.product_version.empty())
+            {
+                j["product_version"] = h.product_version;
+            }
+            if(!h.product_sku.empty())
+            {
+                j["product_sku"] = h.product_sku;
+            }
+            if(!h.product_uuid.empty())
+            {
+                j["product_uuid"] = h.product_uuid;
+            }
+            return j;
         }
 
         [[nodiscard]] Host host_from_json(const json &j)
@@ -160,6 +177,10 @@ namespace sysal
             j.at("product_name").get_to(h.product_name);
             j.at("vendor").get_to(h.vendor.value);
             j.at("serial").get_to(h.serial);
+            h.product_family = j.value("product_family", std::string{});
+            h.product_version = j.value("product_version", std::string{});
+            h.product_sku = j.value("product_sku", std::string{});
+            h.product_uuid = j.value("product_uuid", std::string{});
             return h;
         }
 
@@ -225,12 +246,21 @@ namespace sysal
 
         [[nodiscard]] json firmware_to_json(const Firmware &f)
         {
-            return json{
+            json j{
                 {"bios_vendor", f.bios_vendor.value},
                 {"bios_version", f.bios_version},
                 {"bios_date", f.bios_date},
                 {"uefi", f.uefi},
             };
+            if(!f.bios_release.empty())
+            {
+                j["bios_release"] = f.bios_release;
+            }
+            if(!f.ec_firmware_release.empty())
+            {
+                j["ec_firmware_release"] = f.ec_firmware_release;
+            }
+            return j;
         }
 
         [[nodiscard]] Firmware firmware_from_json(const json &j)
@@ -240,6 +270,8 @@ namespace sysal
             j.at("bios_version").get_to(f.bios_version);
             j.at("bios_date").get_to(f.bios_date);
             f.uefi = j.at("uefi").get<bool>();
+            f.bios_release = j.value("bios_release", std::string{});
+            f.ec_firmware_release = j.value("ec_firmware_release", std::string{});
             return f;
         }
 
@@ -259,6 +291,51 @@ namespace sysal
             return v;
         }
 
+        [[nodiscard]] json baseboard_to_json(const Baseboard &b)
+        {
+            return json{{"vendor", b.vendor.value},
+                        {"name", b.name},
+                        {"version", b.version},
+                        {"serial", b.serial},
+                        {"asset_tag", b.asset_tag}};
+        }
+
+        [[nodiscard]] Baseboard baseboard_from_json(const json &j)
+        {
+            Baseboard b;
+            b.vendor = Vendor{j.value("vendor", std::string{})};
+            b.name = j.value("name", std::string{});
+            b.version = j.value("version", std::string{});
+            b.serial = j.value("serial", std::string{});
+            b.asset_tag = j.value("asset_tag", std::string{});
+            return b;
+        }
+
+        [[nodiscard]] json chassis_to_json(const Chassis &c)
+        {
+            json j{
+                {"vendor", c.vendor.value}, {"version", c.version}, {"serial", c.serial}, {"asset_tag", c.asset_tag}};
+            if(c.type)
+            {
+                j["type"] = *c.type;
+            }
+            return j;
+        }
+
+        [[nodiscard]] Chassis chassis_from_json(const json &j)
+        {
+            Chassis c;
+            c.vendor = Vendor{j.value("vendor", std::string{})};
+            c.version = j.value("version", std::string{});
+            c.serial = j.value("serial", std::string{});
+            c.asset_tag = j.value("asset_tag", std::string{});
+            if(j.contains("type"))
+            {
+                c.type = j.at("type").get<std::uint32_t>();
+            }
+            return c;
+        }
+
         [[nodiscard]] json platform_to_json(const Platform &p)
         {
             json j = {
@@ -274,6 +351,14 @@ namespace sysal
             if(p.virtualization)
             {
                 j["virtualization"] = virt_to_json(*p.virtualization);
+            }
+            if(p.baseboard)
+            {
+                j["baseboard"] = baseboard_to_json(*p.baseboard);
+            }
+            if(p.chassis)
+            {
+                j["chassis"] = chassis_to_json(*p.chassis);
             }
             return j;
         }
@@ -292,6 +377,14 @@ namespace sysal
             if(j.contains("virtualization"))
             {
                 p.virtualization = virt_from_json(j.at("virtualization"));
+            }
+            if(j.contains("baseboard"))
+            {
+                p.baseboard = baseboard_from_json(j.at("baseboard"));
+            }
+            if(j.contains("chassis"))
+            {
+                p.chassis = chassis_from_json(j.at("chassis"));
             }
             return p;
         }
@@ -718,6 +811,10 @@ namespace sysal
             {
                 j["available"] = nm.available->value;
             }
+            if(nm.free)
+            {
+                j["free"] = nm.free->value;
+            }
             return j;
         }
 
@@ -729,6 +826,10 @@ namespace sysal
             if(j.contains("available"))
             {
                 nm.available = MemorySize{j.at("available").get<std::uint64_t>()};
+            }
+            if(j.contains("free"))
+            {
+                nm.free = MemorySize{j.at("free").get<std::uint64_t>()};
             }
             return nm;
         }
@@ -769,6 +870,38 @@ namespace sysal
             {
                 j["form_factor"] = *d.form_factor;
             }
+            if(!d.memory_type.empty())
+            {
+                j["memory_type"] = d.memory_type;
+            }
+            if(!d.serial.empty())
+            {
+                j["serial"] = d.serial;
+            }
+            if(!d.asset_tag.empty())
+            {
+                j["asset_tag"] = d.asset_tag;
+            }
+            if(!d.type_detail.empty())
+            {
+                j["type_detail"] = d.type_detail;
+            }
+            if(!d.edac_mode.empty())
+            {
+                j["edac_mode"] = d.edac_mode;
+            }
+            if(!d.device_width.empty())
+            {
+                j["device_width"] = d.device_width;
+            }
+            if(d.configured_speed_mts)
+            {
+                j["configured_speed_mts"] = d.configured_speed_mts->value;
+            }
+            if(d.configured_voltage_mv)
+            {
+                j["configured_voltage_mv"] = d.configured_voltage_mv->value;
+            }
             return j;
         }
 
@@ -806,6 +939,20 @@ namespace sysal
             if(j.contains("form_factor"))
             {
                 d.form_factor = j.at("form_factor").get<std::string>();
+            }
+            d.memory_type = j.value("memory_type", std::string{});
+            d.serial = j.value("serial", std::string{});
+            d.asset_tag = j.value("asset_tag", std::string{});
+            d.type_detail = j.value("type_detail", std::string{});
+            d.edac_mode = j.value("edac_mode", std::string{});
+            d.device_width = j.value("device_width", std::string{});
+            if(j.contains("configured_speed_mts"))
+            {
+                d.configured_speed_mts = TransferRate{j.at("configured_speed_mts").get<std::uint64_t>()};
+            }
+            if(j.contains("configured_voltage_mv"))
+            {
+                d.configured_voltage_mv = Millivolts{j.at("configured_voltage_mv").get<std::uint64_t>()};
             }
             return d;
         }
@@ -1006,6 +1153,42 @@ namespace sysal
             {
                 j["pci_address"] = pci_address_to_json(*ni.pci_address);
             }
+            if(!ni.duplex.empty())
+            {
+                j["duplex"] = ni.duplex;
+            }
+            if(!ni.driver.empty())
+            {
+                j["driver"] = ni.driver;
+            }
+            if(!ni.physical_port_name.empty())
+            {
+                j["physical_port_name"] = ni.physical_port_name;
+            }
+            if(ni.mtu)
+            {
+                j["mtu"] = ni.mtu->value;
+            }
+            if(ni.carrier)
+            {
+                j["carrier"] = *ni.carrier;
+            }
+            if(ni.numa_node)
+            {
+                j["numa_node"] = ni.numa_node->value();
+            }
+            if(ni.interface_index)
+            {
+                j["interface_index"] = *ni.interface_index;
+            }
+            if(!ni.vendor.value.empty())
+            {
+                j["vendor"] = ni.vendor.value;
+            }
+            if(!ni.device_name.value.empty())
+            {
+                j["device_name"] = ni.device_name.value;
+            }
             return j;
         }
 
@@ -1033,6 +1216,27 @@ namespace sysal
                 ni.pci_address = pci_address_from_json(j.at("pci_address"));
             }
             ni.visible_to_current_process = j.at("visible_to_current_process").get<bool>();
+            ni.duplex = j.value("duplex", std::string{});
+            ni.driver = j.value("driver", std::string{});
+            ni.physical_port_name = j.value("physical_port_name", std::string{});
+            if(j.contains("mtu"))
+            {
+                ni.mtu = MemorySize{j.at("mtu").get<std::uint64_t>()};
+            }
+            if(j.contains("carrier"))
+            {
+                ni.carrier = j.at("carrier").get<bool>();
+            }
+            if(j.contains("numa_node"))
+            {
+                ni.numa_node = NumaNodeId{j.at("numa_node").get<std::uint32_t>()};
+            }
+            if(j.contains("interface_index"))
+            {
+                ni.interface_index = j.at("interface_index").get<std::uint32_t>();
+            }
+            ni.vendor = Vendor{j.value("vendor", std::string{})};
+            ni.device_name = DeviceName{j.value("device_name", std::string{})};
             return ni;
         }
 
@@ -1081,6 +1285,70 @@ namespace sysal
             {
                 j["fs_type"] = sd.fs_type->value;
             }
+            if(!sd.model.empty())
+            {
+                j["model"] = sd.model;
+            }
+            if(!sd.vendor.value.empty())
+            {
+                j["vendor"] = sd.vendor.value;
+            }
+            if(!sd.serial.empty())
+            {
+                j["serial"] = sd.serial;
+            }
+            if(!sd.firmware_revision.empty())
+            {
+                j["firmware_revision"] = sd.firmware_revision;
+            }
+            if(!sd.wwid.empty())
+            {
+                j["wwid"] = sd.wwid;
+            }
+            if(!sd.scheduler.empty())
+            {
+                j["scheduler"] = sd.scheduler;
+            }
+            if(sd.logical_block_size)
+            {
+                j["logical_block_size"] = sd.logical_block_size->value;
+            }
+            if(sd.physical_block_size)
+            {
+                j["physical_block_size"] = sd.physical_block_size->value;
+            }
+            if(sd.minimum_io_size)
+            {
+                j["minimum_io_size"] = sd.minimum_io_size->value;
+            }
+            if(sd.optimal_io_size)
+            {
+                j["optimal_io_size"] = sd.optimal_io_size->value;
+            }
+            if(sd.rotational)
+            {
+                j["rotational"] = *sd.rotational;
+            }
+            if(sd.read_only)
+            {
+                j["read_only"] = *sd.read_only;
+            }
+            if(sd.removable)
+            {
+                j["removable"] = *sd.removable;
+            }
+            if(sd.numa_node)
+            {
+                j["numa_node"] = sd.numa_node->value();
+            }
+            if(!sd.transport.empty())
+            {
+                j["transport"] = sd.transport;
+            }
+            if(!sd.controller_name.empty())
+            {
+                j["controller_name"] = sd.controller_name;
+            }
             return j;
         }
 
@@ -1106,6 +1374,46 @@ namespace sysal
                 sd.fs_type = FilesystemType{j.at("fs_type").get<std::string>()};
             }
             sd.kind = validate_enum(j.at("kind").get<std::uint32_t>(), StorageKind::Other, "kind");
+            sd.model = j.value("model", std::string{});
+            sd.vendor = Vendor{j.value("vendor", std::string{})};
+            sd.serial = j.value("serial", std::string{});
+            sd.firmware_revision = j.value("firmware_revision", std::string{});
+            sd.wwid = j.value("wwid", std::string{});
+            sd.scheduler = j.value("scheduler", std::string{});
+            if(j.contains("logical_block_size"))
+            {
+                sd.logical_block_size = MemorySize{j.at("logical_block_size").get<std::uint64_t>()};
+            }
+            if(j.contains("physical_block_size"))
+            {
+                sd.physical_block_size = MemorySize{j.at("physical_block_size").get<std::uint64_t>()};
+            }
+            if(j.contains("minimum_io_size"))
+            {
+                sd.minimum_io_size = MemorySize{j.at("minimum_io_size").get<std::uint64_t>()};
+            }
+            if(j.contains("optimal_io_size"))
+            {
+                sd.optimal_io_size = MemorySize{j.at("optimal_io_size").get<std::uint64_t>()};
+            }
+            if(j.contains("rotational"))
+            {
+                sd.rotational = j.at("rotational").get<bool>();
+            }
+            if(j.contains("read_only"))
+            {
+                sd.read_only = j.at("read_only").get<bool>();
+            }
+            if(j.contains("removable"))
+            {
+                sd.removable = j.at("removable").get<bool>();
+            }
+            if(j.contains("numa_node"))
+            {
+                sd.numa_node = NumaNodeId{j.at("numa_node").get<std::uint32_t>()};
+            }
+            sd.transport = j.value("transport", std::string{});
+            sd.controller_name = j.value("controller_name", std::string{});
             return sd;
         }
 
@@ -1143,6 +1451,30 @@ namespace sysal
             {
                 j["numa_node"] = pd.numa_node->value();
             }
+            if(!pd.physical_slot.empty())
+            {
+                j["physical_slot"] = pd.physical_slot;
+            }
+            if(!pd.firmware_label.empty())
+            {
+                j["firmware_label"] = pd.firmware_label;
+            }
+            if(!pd.current_link_speed.empty())
+            {
+                j["current_link_speed"] = pd.current_link_speed;
+            }
+            if(!pd.max_link_speed.empty())
+            {
+                j["max_link_speed"] = pd.max_link_speed;
+            }
+            if(pd.current_link_width)
+            {
+                j["current_link_width"] = *pd.current_link_width;
+            }
+            if(pd.max_link_width)
+            {
+                j["max_link_width"] = *pd.max_link_width;
+            }
             return j;
         }
 
@@ -1156,6 +1488,18 @@ namespace sysal
             if(j.contains("numa_node"))
             {
                 pd.numa_node = NumaNodeId(j.at("numa_node").get<std::uint32_t>());
+            }
+            pd.physical_slot = j.value("physical_slot", std::string{});
+            pd.firmware_label = j.value("firmware_label", std::string{});
+            pd.current_link_speed = j.value("current_link_speed", std::string{});
+            pd.max_link_speed = j.value("max_link_speed", std::string{});
+            if(j.contains("current_link_width"))
+            {
+                pd.current_link_width = j.at("current_link_width").get<std::uint32_t>();
+            }
+            if(j.contains("max_link_width"))
+            {
+                pd.max_link_width = j.at("max_link_width").get<std::uint32_t>();
             }
             return pd;
         }
