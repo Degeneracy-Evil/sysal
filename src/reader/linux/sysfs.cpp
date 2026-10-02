@@ -468,7 +468,7 @@ namespace sysal::reader
 
         static const ReaderDispatch reader_dispatch[] = {
             {Collect::Cpu, read_cpu_sysfs},
-            {Collect::Memory, read_numa_sysfs},
+            {Collect::Cpu | Collect::Memory, read_numa_sysfs},
             {Collect::Network, read_net_sysfs},
             {Collect::Pci, read_pci_sysfs},
             {Collect::Storage, read_block_sysfs},

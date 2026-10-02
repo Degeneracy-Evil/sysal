@@ -67,6 +67,7 @@ SystemCard 提供实例统计，在 CPU 详情展示每个缓存的共享集合�
 ## 采集与兼容
 
 Reader 读取 `/proc/cpuinfo`、sysfs 的 topology、online、cache、CPUFreq、SMT 信息。
+仅采集 CPU 时也读取共享的 NUMA 节点证据，避免按栏目采集丢失节点归属。
 Parser / Resolver 只消费 RawStore，不读取当前机器。
 可选字段缺失不导致整个 CPU 采集失败；旧 JSON 中缺少新增字段时保持未知或空列表。
 温度和 NUMA 归属继续使用既有接口。
