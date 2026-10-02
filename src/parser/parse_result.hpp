@@ -5,6 +5,8 @@
 
 #pragma once
 
+#include "parser/accelerator_evidence.hpp"
+
 #include "sysal/model/accelerator.hpp"
 #include "sysal/model/cpu.hpp"
 #include "sysal/model/execution.hpp"
@@ -33,7 +35,7 @@ namespace sysal::detail
         std::optional<Storage> storage;
         std::optional<SoftwareStack> software;
         std::optional<ExecutionContext> execution;
-        std::vector<std::pair<AcceleratorId, bool>> accelerator_runtime_visibility;
+        std::vector<RuntimeVisibility> accelerator_runtime_visibility;
     };
 
 } // namespace sysal::detail

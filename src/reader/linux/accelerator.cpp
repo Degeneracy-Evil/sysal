@@ -1,12 +1,11 @@
 #include "reader/linux/accelerator.hpp"
 #include "reader/linux/accelerator_runtime.hpp"
 #include "reader/linux/file_utils.hpp"
+#include "reader/linux/shared_library.hpp"
 
 #include <nlohmann/json.hpp>
 
 #include <array>
-#include <bit>
-#include <dlfcn.h>
 #include <filesystem>
 #include <string>
 
@@ -28,21 +27,51 @@ namespace sysal::reader
             unsigned long long total{}, free{}, used{};
         };
 
+        struct NvmlFunctions
+        {
+            using StringQuery = int (*)(Device, char *, unsigned);
+            explicit NvmlFunctions(const SharedLibrary &library)
+                : init(library.symbol<int (*)()>("nvmlInit_v2")), shutdown(library.symbol<int (*)()>("nvmlShutdown")),
+                  count(library.symbol<int (*)(unsigned *)>("nvmlDeviceGetCount_v2")),
+                  handle(library.symbol<int (*)(unsigned, Device *)>("nvmlDeviceGetHandleByIndex_v2")),
+                  name(library.symbol<StringQuery>("nvmlDeviceGetName")),
+                  uuid(library.symbol<StringQuery>("nvmlDeviceGetUUID")),
+                  pci(library.symbol<int (*)(Device, PciInfo *)>("nvmlDeviceGetPciInfo_v3")),
+                  memory(library.symbol<int (*)(Device, MemoryInfo *)>("nvmlDeviceGetMemoryInfo")),
+                  mig_count(library.symbol<int (*)(Device, unsigned *)>("nvmlDeviceGetMaxMigDeviceCount")),
+                  mig_handle(
+                      library.symbol<int (*)(Device, unsigned, Device *)>("nvmlDeviceGetMigDeviceHandleByIndex")),
+                  gpu_instance(library.symbol<int (*)(Device, unsigned *)>("nvmlDeviceGetGpuInstanceId")),
+                  compute_instance(library.symbol<int (*)(Device, unsigned *)>("nvmlDeviceGetComputeInstanceId")),
+                  driver(library.symbol<int (*)(char *, unsigned)>("nvmlSystemGetDriverVersion"))
+            {
+            }
+            int (*init)();
+            int (*shutdown)();
+            int (*count)(unsigned *);
+            int (*handle)(unsigned, Device *);
+            StringQuery name, uuid;
+            int (*pci)(Device, PciInfo *);
+            int (*memory)(Device, MemoryInfo *);
+            int (*mig_count)(Device, unsigned *);
+            int (*mig_handle)(Device, unsigned, Device *);
+            int (*gpu_instance)(Device, unsigned *);
+            int (*compute_instance)(Device, unsigned *);
+            int (*driver)(char *, unsigned);
+        };
+
         class Nvml
         {
         public:
-            Nvml() : library_(dlopen("libnvidia-ml.so.1", RTLD_LOCAL | RTLD_LAZY))
+            Nvml()
+                : functions_(library_),
+                  initialized_(functions_.init != nullptr && functions_.shutdown != nullptr && functions_.init() == 0)
             {
-                const auto init = symbol<int (*)()>("nvmlInit_v2");
-                shutdown_ = symbol<int (*)()>("nvmlShutdown");
-                initialized_ = init != nullptr && shutdown_ != nullptr && init() == 0;
             }
             ~Nvml()
             {
                 if(initialized_)
-                    shutdown_();
-                if(library_ != nullptr)
-                    dlclose(library_);
+                    functions_.shutdown();
             }
             Nvml(const Nvml &) = delete;
             Nvml &operator=(const Nvml &) = delete;
@@ -52,79 +81,71 @@ namespace sysal::reader
             {
                 return initialized_;
             }
-            template <typename Function> Function symbol(const char *name) const
+            const NvmlFunctions &functions() const
             {
-                return library_ == nullptr ? nullptr : std::bit_cast<Function>(dlsym(library_, name));
+                return functions_;
             }
 
         private:
-            void *library_{};
-            int (*shutdown_)(){};
+            SharedLibrary library_{"libnvidia-ml.so.1"};
+            NvmlFunctions functions_;
             bool initialized_{};
         };
 
-        nlohmann::json nvml_device(const Nvml &api, Device handle, unsigned index)
+        nlohmann::json nvml_device(const NvmlFunctions &api, Device handle, unsigned index)
         {
             nlohmann::json record{{"index", index}};
-            using StringQuery = int (*)(Device, char *, unsigned);
-            for(const auto &[symbol, key] : std::array<std::pair<const char *, const char *>, 2>{
-                    {{"nvmlDeviceGetName", "name"}, {"nvmlDeviceGetUUID", "uuid"}}})
+            for(const auto &[query, key] : std::array<std::pair<NvmlFunctions::StringQuery, const char *>, 2>{
+                    {{api.name, "name"}, {api.uuid, "uuid"}}})
             {
                 std::array<char, 256> buffer{};
-                const auto query = api.symbol<StringQuery>(symbol);
                 if(query != nullptr && query(handle, buffer.data(), buffer.size()) == 0)
                     record[key] = buffer.data();
             }
             PciInfo pci;
-            const auto pci_query = api.symbol<int (*)(Device, PciInfo *)>("nvmlDeviceGetPciInfo_v3");
-            if(pci_query != nullptr && pci_query(handle, &pci) == 0)
+            if(api.pci != nullptr && api.pci(handle, &pci) == 0)
                 record["pci_bus_id"] = pci.bus_id.data();
             MemoryInfo memory;
-            const auto memory_query = api.symbol<int (*)(Device, MemoryInfo *)>("nvmlDeviceGetMemoryInfo");
-            if(memory_query != nullptr && memory_query(handle, &memory) == 0)
+            if(api.memory != nullptr && api.memory(handle, &memory) == 0)
                 record["memory_total"] = memory.total;
             return record;
         }
 
         void read_nvml(RawStore &raw)
         {
-            const Nvml api;
-            if(!api.available())
+            const Nvml session;
+            if(!session.available())
                 return;
-            const auto count_query = api.symbol<int (*)(unsigned *)>("nvmlDeviceGetCount_v2");
-            const auto handle_query = api.symbol<int (*)(unsigned, Device *)>("nvmlDeviceGetHandleByIndex_v2");
+            const auto &api = session.functions();
             unsigned count{};
-            if(count_query == nullptr || handle_query == nullptr || count_query(&count) != 0 || count > 65536)
+            if(api.count == nullptr || api.handle == nullptr || api.count(&count) != 0 || count > 65536)
                 return;
             auto evidence = nlohmann::json{{"devices", nlohmann::json::array()}};
             for(unsigned index = 0; index < count; ++index)
             {
                 Device handle{};
-                if(handle_query(index, &handle) != 0)
+                if(api.handle(index, &handle) != 0)
                     continue;
                 auto device = nvml_device(api, handle, index);
                 evidence["devices"].push_back(device);
-                const auto mig_count = api.symbol<int (*)(Device, unsigned *)>("nvmlDeviceGetMaxMigDeviceCount");
-                const auto mig_handle =
-                    api.symbol<int (*)(Device, unsigned, Device *)>("nvmlDeviceGetMigDeviceHandleByIndex");
+                if(!device.contains("uuid"))
+                    continue; // A MIG instance without a stable parent must not become a physical device.
                 unsigned instances{};
-                if(mig_count == nullptr || mig_handle == nullptr || mig_count(handle, &instances) != 0 ||
+                if(api.mig_count == nullptr || api.mig_handle == nullptr || api.mig_count(handle, &instances) != 0 ||
                    instances > 1024)
                     continue;
                 for(unsigned instance = 0; instance < instances; ++instance)
                 {
                     Device child{};
-                    if(mig_handle(handle, instance, &child) != 0)
+                    if(api.mig_handle(handle, instance, &child) != 0)
                         continue;
                     auto entry = nvml_device(api, child, index);
                     if(device.contains("uuid"))
                         entry["parent_uuid"] = device["uuid"];
                     entry["mig_index"] = instance;
-                    for(const auto &[symbol, key] : std::array<std::pair<const char *, const char *>, 2>{
-                            {{"nvmlDeviceGetGpuInstanceId", "gpu_instance_id"},
-                             {"nvmlDeviceGetComputeInstanceId", "compute_instance_id"}}})
+                    for(const auto &[query, key] : std::array<std::pair<int (*)(Device, unsigned *), const char *>, 2>{
+                            {{api.gpu_instance, "gpu_instance_id"}, {api.compute_instance, "compute_instance_id"}}})
                     {
-                        const auto query = api.symbol<int (*)(Device, unsigned *)>(symbol);
                         unsigned id{};
                         if(query != nullptr && query(child, &id) == 0)
                             entry[key] = id;
@@ -133,8 +154,7 @@ namespace sysal::reader
                 }
             }
             std::array<char, 128> version{};
-            const auto driver_query = api.symbol<int (*)(char *, unsigned)>("nvmlSystemGetDriverVersion");
-            if(driver_query != nullptr && driver_query(version.data(), version.size()) == 0)
+            if(api.driver != nullptr && api.driver(version.data(), version.size()) == 0)
                 evidence["driver_version"] = version.data();
             add_record(raw, RawSource::Nvml, "libnvidia-ml.so.1", evidence.dump(), CollectStatus::Success);
         }

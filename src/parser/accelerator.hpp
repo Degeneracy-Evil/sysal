@@ -5,6 +5,8 @@
 
 #pragma once
 
+#include "parser/accelerator_evidence.hpp"
+
 #include "sysal/model/accelerator.hpp"
 #include "sysal/model/raw_store.hpp"
 
@@ -14,8 +16,8 @@
 
 namespace sysal::detail
 {
-    std::vector<std::pair<AcceleratorId, bool>> parse_accelerator_runtime_visibility(const RawStore &raw,
-                                                                                     const Accelerators &devices);
+    std::vector<RuntimeVisibility> parse_accelerator_runtime_visibility(const RawStore &raw,
+                                                                        const Accelerators &devices);
 
     /// @brief 解析加速器信息
     /// @param raw 原始证据存储（只读）

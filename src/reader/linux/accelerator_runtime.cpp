@@ -1,51 +1,26 @@
 #include "reader/linux/accelerator_runtime.hpp"
 #include "reader/linux/file_utils.hpp"
+#include "reader/linux/shared_library.hpp"
 
 #include <nlohmann/json.hpp>
 
 #include <array>
-#include <bit>
 #include <cstdint>
 #include <cstdio>
-#include <dlfcn.h>
 #include <vector>
 
 namespace sysal::reader
 {
     namespace
     {
-        class Library
-        {
-        public:
-            explicit Library(const char *name) : handle_(dlopen(name, RTLD_LOCAL | RTLD_LAZY)) {}
-            ~Library()
-            {
-                if(handle_ != nullptr)
-                    dlclose(handle_);
-            }
-            Library(const Library &) = delete;
-            Library &operator=(const Library &) = delete;
-            Library(Library &&) = delete;
-            Library &operator=(Library &&) = delete;
-            [[nodiscard]] bool available() const
-            {
-                return handle_ != nullptr;
-            }
-            template <typename Function> Function symbol(const char *name) const
-            {
-                return handle_ == nullptr ? nullptr : std::bit_cast<Function>(dlsym(handle_, name));
-            }
-
-        private:
-            void *handle_{};
-        };
-
-        void read_hip(RawStore &raw, const Library &library)
+        void read_hip(RawStore &raw, const SharedLibrary &library)
         {
             const auto count_query = library.symbol<int (*)(int *)>("hipGetDeviceCount");
             const auto pci_query = library.symbol<int (*)(char *, int, int)>("hipDeviceGetPCIBusId");
             if(count_query == nullptr || pci_query == nullptr)
                 return;
+            const auto name_query = library.symbol<int (*)(char *, int, int)>("hipDeviceGetName");
+            const auto memory_query = library.symbol<int (*)(std::size_t *, int)>("hipDeviceTotalMem");
             int count{};
             const int status = count_query(&count);
             if((status != 0 && status != 100) || count < 0 || count > 65536)
@@ -60,11 +35,9 @@ namespace sysal::reader
                     return; // Partial enumeration cannot establish exclusions.
                 auto device = nlohmann::json{{"pci_bus_id", pci.data()}, {"index", index}};
                 std::array<char, 256> name{};
-                const auto name_query = library.symbol<int (*)(char *, int, int)>("hipDeviceGetName");
                 if(name_query != nullptr && name_query(name.data(), name.size(), index) == 0)
                     device["name"] = name.data();
                 std::size_t memory{};
-                const auto memory_query = library.symbol<int (*)(std::size_t *, int)>("hipDeviceTotalMem");
                 if(memory_query != nullptr && memory_query(&memory, index) == 0)
                     device["memory_total"] = memory;
                 evidence["devices"].push_back(std::move(device));
@@ -80,7 +53,7 @@ namespace sysal::reader
 
         void read_cuda(RawStore &raw)
         {
-            const Library library("libcuda.so.1");
+            const SharedLibrary library("libcuda.so.1");
             const auto init = library.symbol<int (*)(unsigned)>("cuInit");
             const auto count_query = library.symbol<int (*)(int *)>("cuDeviceGetCount");
             const auto device_query = library.symbol<int (*)(int *, int)>("cuDeviceGet");
@@ -91,6 +64,8 @@ namespace sysal::reader
             if(init == nullptr || count_query == nullptr || device_query == nullptr || pci_query == nullptr ||
                uuid_query == nullptr)
                 return;
+            const auto name_query = library.symbol<int (*)(char *, int, int)>("cuDeviceGetName");
+            const auto memory_query = library.symbol<int (*)(std::size_t *, int)>("cuDeviceTotalMem_v2");
             const int status = init(0);
             int count{};
             if((status != 0 && status != 100) || (status == 0 && count_query(&count) != 0) || count < 0 ||
@@ -115,11 +90,9 @@ namespace sysal::reader
                 }
                 auto entry = nlohmann::json{{"pci_bus_id", pci.data()}, {"uuid_hex", hex}};
                 std::array<char, 256> name{};
-                const auto name_query = library.symbol<int (*)(char *, int, int)>("cuDeviceGetName");
                 if(name_query != nullptr && name_query(name.data(), name.size(), device) == 0)
                     entry["name"] = name.data();
                 std::size_t memory{};
-                const auto memory_query = library.symbol<int (*)(std::size_t *, int)>("cuDeviceTotalMem_v2");
                 if(memory_query != nullptr && memory_query(&memory, device) == 0)
                     entry["memory_total"] = memory;
                 evidence["devices"].push_back(std::move(entry));
@@ -141,7 +114,7 @@ namespace sysal::reader
 
         void read_level_zero(RawStore &raw)
         {
-            const Library library("libze_loader.so.1");
+            const SharedLibrary library("libze_loader.so.1");
             const auto init = library.symbol<int (*)(std::uint32_t)>("zeInit");
             const auto drivers_query = library.symbol<int (*)(std::uint32_t *, ZeDriver **)>("zeDriverGet");
             const auto devices_query = library.symbol<int (*)(ZeDriver *, std::uint32_t *, ZeDevice **)>("zeDeviceGet");
@@ -149,6 +122,7 @@ namespace sysal::reader
             if(init == nullptr || drivers_query == nullptr || devices_query == nullptr || pci_query == nullptr ||
                init(1) != 0)
                 return;
+            const auto version_query = library.symbol<int (*)(ZeDriver *, std::uint32_t *)>("zeDriverGetApiVersion");
             std::uint32_t count{};
             if(drivers_query(&count, nullptr) != 0 || count > 1024)
                 return;
@@ -181,8 +155,6 @@ namespace sysal::reader
                     evidence["devices"].push_back(nlohmann::json{{"pci_bus_id", address}});
                 }
                 std::uint32_t version{};
-                const auto version_query =
-                    library.symbol<int (*)(ZeDriver *, std::uint32_t *)>("zeDriverGetApiVersion");
                 if(version_query != nullptr && version_query(driver, &version) == 0)
                     evidence["api_version"] = std::to_string(version >> 16) + "." + std::to_string(version & 0xffff);
             }
@@ -195,7 +167,7 @@ namespace sysal::reader
         read_cuda(raw);
         for(const auto *name : {"libamdhip64.so", "libamdhip64.so.7", "libamdhip64.so.6", "libamdhip64.so.5"})
         {
-            const Library library(name);
+            const SharedLibrary library(name);
             if(!library.available())
                 continue;
             read_hip(raw, library);

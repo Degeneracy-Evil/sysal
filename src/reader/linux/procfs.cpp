@@ -8,6 +8,8 @@
 #include "reader/linux/cgroup.hpp"
 #include "reader/linux/file_utils.hpp"
 
+#include <nlohmann/json.hpp>
+
 #include <arpa/inet.h>
 #include <cstdlib>
 #include <ifaddrs.h>
@@ -46,15 +48,21 @@ namespace sysal::reader
         /// @param cmd 命令字符串
         void read_cmd(RawStore &raw, RawSource source, const std::string &cmd)
         {
-            auto output = read_command(cmd);
-            if(output)
+            const auto result = execute_command(cmd);
+            const auto status = result.successful() ? CollectStatus::Success : CollectStatus::Failed;
+            auto payload = result.output;
+            if(!result.successful())
             {
-                add_record(raw, source, cmd, *output, CollectStatus::Success);
+                auto failure = nlohmann::json{{"command_status", static_cast<unsigned>(result.status)},
+                                              {"stdout", result.output},
+                                              {"stderr", result.error}};
+                if(result.exit_code)
+                    failure["exit_code"] = *result.exit_code;
+                if(result.signal)
+                    failure["signal"] = *result.signal;
+                payload = failure.dump();
             }
-            else
-            {
-                add_record(raw, source, cmd, "", CollectStatus::Failed);
-            }
+            add_record(raw, source, cmd, payload, status);
         }
 
         /// @brief 通过 uname() 系统调用采集架构与内核信息

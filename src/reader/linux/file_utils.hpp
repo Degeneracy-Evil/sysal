@@ -5,10 +5,10 @@
 
 #pragma once
 
+#include "reader/linux/command.hpp"
 #include "sysal/model/raw_store.hpp"
 
 #include <chrono>
-#include <cstdio>
 #include <filesystem>
 #include <fstream>
 #include <optional>
@@ -42,31 +42,10 @@ namespace sysal::reader
     /// @return 命令标准输出；失败返回 nullopt
     inline std::optional<std::string> read_command(const std::string &cmd)
     {
-        // 重定向 stderr 到 /dev/null，避免命令不存在时错误信息泄漏到终端
-        std::string full_cmd = cmd + " 2>/dev/null";
-        // NOLINTNEXTLINE(cert-env33-c) — 采集层需要执行外部命令
-        auto *pipe = popen(full_cmd.c_str(), "r");
-        if(!pipe)
-        {
+        auto result = execute_command(cmd);
+        if(!result.successful() || result.output.empty())
             return std::nullopt;
-        }
-        std::ostringstream oss;
-        char buffer[256];
-        while(auto *ptr = std::fgets(buffer, sizeof(buffer), pipe))
-        {
-            oss << ptr;
-        }
-        auto status = pclose(pipe);
-        if(status == -1)
-        {
-            return std::nullopt;
-        }
-        auto output = oss.str();
-        if(output.empty())
-        {
-            return std::nullopt;
-        }
-        return output;
+        return std::move(result.output);
     }
 
     /// @brief 检查文件是否存在

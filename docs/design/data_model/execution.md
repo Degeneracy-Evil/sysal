@@ -88,10 +88,15 @@ struct ExecutionContext
 | cpu_quota_us / cpu_period_us | 可选微秒；quota / period 是 CPU 时间配额折合核数，不是可见逻辑 CPU 数 |
 | memory_limit | 可选字节；取可访问层级中最严格的内存上限 |
 | memory_current | 可选字节；当前进程所在叶 cgroup 的用量，可能包含多个进程 |
-| cpu_limit_known / memory_limit_known | 成功读取限制状态；false 为未知，true 且对应上限为空为无限制 |
+| cpu_limit_known / memory_limit_known | 可读层级状态完整；true 且上限为空为无限制；false 且有上限为读取不完整时的已知上界 |
 
 cgroup v2 的 max、v1 的 CPU -1 和内存无限制哨兵均转换为已知无限制。
 配额从叶节点到挂载根取最严格值；被命名空间隐藏的祖先无法推断。
 整机内存、进程 CPU affinity 和 cgroup 配额独立保留，SystemCard 分别展示。
 `accelerator_visibility_restricted` 区分显式空可见集和没有环境配置；实际可见集合
 仍由设备的 visible_to_current_process 与便利索引表达。
+
+0.0.10 在内部区分 Unknown / Unlimited / Finite / Incomplete。叶节点或祖先读取失败时，
+保留可读限额作为上界，将 *_limit_known 设为 false，并附带 warning。
+SystemCard 显示 `≤ 数值 (partial)`，不会把读取不完整解释成无限制。
+v2 层级根本来不存在的配额文件不计为读取失败。

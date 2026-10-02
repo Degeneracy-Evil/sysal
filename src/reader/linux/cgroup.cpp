@@ -52,8 +52,15 @@ namespace sysal::reader
                         continue;
                     const auto path = (leaf / name).string();
                     const auto payload = read_file(path);
-                    add_record(raw, RawSource::CgroupFile, path, payload.value_or(""),
-                               payload ? CollectStatus::Success : CollectStatus::Failed);
+                    auto status = payload ? CollectStatus::Success : CollectStatus::Failed;
+                    // The v2 hierarchy root has no quota files; their absence is not an I/O failure.
+                    if(!payload && !current && leaf == mount)
+                    {
+                        std::error_code error;
+                        if(!std::filesystem::exists(path, error) && !error)
+                            status = CollectStatus::NotCollected;
+                    }
+                    add_record(raw, RawSource::CgroupFile, path, payload.value_or(""), status);
                 }
                 if(leaf == mount)
                     break;

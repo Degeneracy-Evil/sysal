@@ -46,8 +46,8 @@ namespace sysal
         std::optional<Microseconds> cpu_period_us{}; ///< 对应 CPU 调度周期
         std::optional<MemorySize> memory_limit{};    ///< 层级有效内存上限（字节）
         std::optional<MemorySize> memory_current{};  ///< 当前 cgroup 内存使用量（字节）
-        bool cpu_limit_known{};                      ///< 已读到有效 CPU 限制；quota 缺失表示无限制
-        bool memory_limit_known{};                   ///< 已读到有效内存限制；limit 缺失表示无限制
+        bool cpu_limit_known{};                      ///< 可读层级 CPU 限制完整；quota 缺失表示无限制
+        bool memory_limit_known{};                   ///< 可读层级内存限制完整；limit 缺失表示无限制
     };
 
     /// @brief cpuset 约束
