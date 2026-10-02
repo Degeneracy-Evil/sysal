@@ -4,3 +4,6 @@ output/
 .clangd/
 compile_commands.json
 .xrepo/
+
+# Project temporary files
+/tmp/

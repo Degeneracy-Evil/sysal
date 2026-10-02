@@ -50,3 +50,8 @@ pre-commit 只验证 staged snapshot 的空白与 C/C++ 格式，不修改工作
 代码或配置变更后执行 `xmake check` 和 `xmake run sysal_info`。
 工具链或构建行为变更须从 clean configuration 验证相关工具链。
 涉及兼容产物时执行 `bash docker/centos7-build/build.sh`，检查 glibc 2.17 兼容性。
+
+## 临时文件
+
+开发过程中主动生成的临时构建、日志、采集样本和预览统一放在本项目的 `tmp/` 下，
+不写入系统 `/tmp`。`tmp/` 不提交到 Git；工具支持指定临时目录时使用项目 `tmp/`。
