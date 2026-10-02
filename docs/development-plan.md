@@ -34,7 +34,7 @@ PyPI 正式发布等待账号配置，不属于本轮七项开发的发布动作
 - SystemCard 实际栏目采集：system 的位掩码为1，memory 为261，accelerators 为329。
 - 固定展示数据涵盖容器 CPU/内存限制和 MIG；四份终端快照可直接审阅。
 - 启动脚本实际验证：uvx 使用 Python 3.12 wheel；临时 venv 使用 CentOS 7 的 Python 3.6.8 wheel，展示真实的1.5 CPU / 512 MiB 配额。
-- Sysal 0.0.9 增加公共字段，SystemCard 固定相应兼容包的版本和 SHA-256。
+- Sysal 0.0.9 引入公共字段，SystemCard 持续固定相应兼容包的版本和 SHA-256。
 - CentOS 7/GCC 构建通过，动态库最高 GLIBC 需求为2.14，支持目标为2.17+。
 
 “已实现”指七项代码与文档已交付，不表示所有硬件平台都经过实机验收。

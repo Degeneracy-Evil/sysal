@@ -1,6 +1,6 @@
 # 能力与路线图
 
-Sysal 当前开发版本为 0.0.9。版本唯一来源为 `include/sysal/version.hpp`。
+Sysal 版本唯一来源为 `include/sysal/version.hpp`，当前能力以代码与本文为准。
 本轮七项联合开发的交付清单见 [联合推进计划](../development-plan.md)。
 
 ## 当前能力
