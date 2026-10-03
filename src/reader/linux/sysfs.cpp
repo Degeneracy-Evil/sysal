@@ -6,6 +6,7 @@
 #include "reader/linux/sysfs.hpp"
 #include "reader/linux/file_utils.hpp"
 #include "reader/linux/network_capabilities.hpp"
+#include "reader/linux/pci.hpp"
 #include "reader/linux/sensors.hpp"
 #include "reader/linux/storage_health.hpp"
 
@@ -273,54 +274,6 @@ namespace sysal::reader
             if(!found_any)
             {
                 add_record(raw, RawSource::SysfsNet, net_base.string(), "", CollectStatus::Failed);
-            }
-        }
-
-        /// @brief 采集 PCI 设备信息
-        /// @param raw 原始证据存储
-        /// @details 遍历 /sys/bus/pci/devices，读取 vendor、device、class、numa_node
-        void read_pci_sysfs(RawStore &raw)
-        {
-            const fs::path pci_base = "/sys/bus/pci/devices";
-            if(!fs::exists(pci_base))
-            {
-                add_record(raw, RawSource::SysfsPci, pci_base.string(), "", CollectStatus::Failed);
-                return;
-            }
-
-            bool found_any = false;
-            std::error_code ec;
-            for(const auto &entry : fs::directory_iterator(pci_base, ec))
-            {
-                if(!entry.is_directory() && !entry.is_symlink())
-                {
-                    continue;
-                }
-                auto name = entry.path().filename().string();
-                if(name.empty())
-                {
-                    continue;
-                }
-
-                found_any = true;
-                const auto &dir = entry.path();
-
-                read_sysfs_file(raw, RawSource::SysfsPci, (dir / "vendor").string());
-                read_sysfs_file(raw, RawSource::SysfsPci, (dir / "device").string());
-                read_sysfs_file(raw, RawSource::SysfsPci, (dir / "class").string());
-                read_sysfs_file(raw, RawSource::SysfsPci, (dir / "numa_node").string());
-                static constexpr std::string_view fields[] = {"physical_slot",      "label",
-                                                              "current_link_speed", "max_link_speed",
-                                                              "current_link_width", "max_link_width"};
-                for(auto field : fields)
-                {
-                    read_sysfs_file(raw, RawSource::SysfsPci, (dir / field).string());
-                }
-            }
-
-            if(!found_any)
-            {
-                add_record(raw, RawSource::SysfsPci, pci_base.string(), "", CollectStatus::Failed);
             }
         }
 

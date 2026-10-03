@@ -18,6 +18,7 @@
 #include <chrono>
 #include <cstdint>
 #include <fstream>
+#include <limits>
 #include <sstream>
 #include <string>
 #include <string_view>
@@ -80,6 +81,14 @@ namespace sysal
 
         // ───────────────────────────── PciAddress ─────────────────────────────
 
+        [[nodiscard]] std::uint64_t checked_unsigned(const json &j, std::uint64_t maximum, std::string_view field)
+        {
+            if(!j.is_number_integer() || (!j.is_number_unsigned() && j.get<std::int64_t>() < 0) ||
+               j.get<std::uint64_t>() > maximum)
+                throw SysalError(ErrorKind::DeserializationError, "无效无符号整数: " + std::string(field));
+            return j.get<std::uint64_t>();
+        }
+
         [[nodiscard]] json pci_address_to_json(const PciAddress &addr)
         {
             return json{
@@ -93,10 +102,10 @@ namespace sysal
         [[nodiscard]] PciAddress pci_address_from_json(const json &j)
         {
             PciAddress addr;
-            addr.domain = static_cast<std::uint16_t>(j.at("domain").get<unsigned>());
-            addr.bus = static_cast<std::uint8_t>(j.at("bus").get<unsigned>());
-            addr.device = static_cast<std::uint8_t>(j.at("device").get<unsigned>());
-            addr.function = static_cast<std::uint8_t>(j.at("function").get<unsigned>());
+            addr.domain = static_cast<std::uint16_t>(checked_unsigned(j.at("domain"), 0xffff, "PCI domain"));
+            addr.bus = static_cast<std::uint8_t>(checked_unsigned(j.at("bus"), 0xff, "PCI bus"));
+            addr.device = static_cast<std::uint8_t>(checked_unsigned(j.at("device"), 0x1f, "PCI device"));
+            addr.function = static_cast<std::uint8_t>(checked_unsigned(j.at("function"), 7, "PCI function"));
             return addr;
         }
 
@@ -1804,6 +1813,22 @@ namespace sysal
             {
                 j["max_link_width"] = *pd.max_link_width;
             }
+            if(pd.upstream_address)
+                j["upstream_address"] = pci_address_to_json(*pd.upstream_address);
+            if(pd.physical_function)
+                j["physical_function"] = pci_address_to_json(*pd.physical_function);
+            if(!pd.driver_name.value.empty())
+                j["driver_name"] = pd.driver_name.value;
+            if(!pd.local_cpus.empty())
+            {
+                j["local_cpus"] = json::array();
+                for(const auto cpu : pd.local_cpus)
+                    j["local_cpus"].push_back(cpu.value());
+            }
+            if(pd.maximum_virtual_functions)
+                j["maximum_virtual_functions"] = *pd.maximum_virtual_functions;
+            if(pd.enabled_virtual_functions)
+                j["enabled_virtual_functions"] = *pd.enabled_virtual_functions;
             return j;
         }
 
@@ -1830,6 +1855,21 @@ namespace sysal
             {
                 pd.max_link_width = j.at("max_link_width").get<std::uint32_t>();
             }
+            if(j.contains("upstream_address"))
+                pd.upstream_address = pci_address_from_json(j.at("upstream_address"));
+            if(j.contains("physical_function"))
+                pd.physical_function = pci_address_from_json(j.at("physical_function"));
+            pd.driver_name = PciDriverName{j.value("driver_name", std::string{})};
+            if(j.contains("local_cpus"))
+                for(const auto &cpu : j.at("local_cpus").get_ref<const json::array_t &>())
+                    pd.local_cpus.emplace_back(static_cast<std::uint32_t>(
+                        checked_unsigned(cpu, std::numeric_limits<std::uint32_t>::max(), "PCI local CPU")));
+            if(j.contains("maximum_virtual_functions"))
+                pd.maximum_virtual_functions = static_cast<std::uint32_t>(checked_unsigned(
+                    j.at("maximum_virtual_functions"), std::numeric_limits<std::uint32_t>::max(), "PCI maximum VFs"));
+            if(j.contains("enabled_virtual_functions"))
+                pd.enabled_virtual_functions = static_cast<std::uint32_t>(checked_unsigned(
+                    j.at("enabled_virtual_functions"), std::numeric_limits<std::uint32_t>::max(), "PCI enabled VFs"));
             return pd;
         }
 

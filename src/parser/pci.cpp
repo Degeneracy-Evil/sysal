@@ -4,6 +4,7 @@
 
 #include "pci.hpp"
 
+#include "cpu_details.hpp"
 #include "parse_utils.hpp"
 
 #include <limits>
@@ -183,6 +184,36 @@ namespace sysal::detail
                 {
                     dev.firmware_label = hardware_text(payload);
                 }
+                else if(filename == "sysfs_path")
+                {
+                    const auto components = split(trim(payload), '/');
+                    if(components.size() >= 2 && parse_pci_address(components.back()) == dev.address)
+                        dev.upstream_address = parse_pci_address(components[components.size() - 2]);
+                }
+                else if(filename == "physfn")
+                {
+                    dev.physical_function = parse_pci_address(extract_filename(trim(payload)));
+                }
+                else if(filename == "driver")
+                {
+                    dev.driver_name = PciDriverName{extract_filename(trim(payload))};
+                }
+                else if(filename == "local_cpulist")
+                {
+                    if(auto cpus = parse_cpu_id_list(payload))
+                        dev.local_cpus = std::move(*cpus);
+                }
+                else if(filename == "sriov_totalvfs" || filename == "sriov_numvfs")
+                {
+                    if(const auto number = parse_uint(trim(payload));
+                       number && *number <= std::numeric_limits<std::uint32_t>::max())
+                    {
+                        if(filename == "sriov_totalvfs")
+                            dev.maximum_virtual_functions = static_cast<std::uint32_t>(*number);
+                        else
+                            dev.enabled_virtual_functions = static_cast<std::uint32_t>(*number);
+                    }
+                }
                 else if(filename == "current_link_speed" || filename == "max_link_speed")
                 {
                     const auto value = hardware_text(payload);
@@ -198,7 +229,7 @@ namespace sysal::detail
                 else if(filename == "current_link_width" || filename == "max_link_width")
                 {
                     if(auto number = parse_uint(trim(payload));
-                       number && *number > 0 && *number <= std::numeric_limits<std::uint32_t>::max())
+                       number && *number > 0 && *number != 0xff && *number <= std::numeric_limits<std::uint32_t>::max())
                     {
                         if(filename == "current_link_width")
                         {
@@ -214,7 +245,7 @@ namespace sysal::detail
                 {
                     auto trimmed = trim(payload);
                     auto val = parse_uint(trimmed);
-                    if(val.has_value())
+                    if(val && *val <= std::numeric_limits<std::uint32_t>::max())
                     {
                         dev.numa_node = NumaNodeId{static_cast<std::uint32_t>(*val)};
                     }

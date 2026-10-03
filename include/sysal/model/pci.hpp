@@ -14,6 +14,11 @@
 namespace sysal
 {
 
+    struct PciDriverNameTag
+    {
+    };
+    using PciDriverName = NamedString<PciDriverNameTag>;
+
     /// @brief 单个 PCI 设备
     struct PciDevice
     {
@@ -28,6 +33,12 @@ namespace sysal
         std::string max_link_speed{};
         std::optional<std::uint32_t> current_link_width{};
         std::optional<std::uint32_t> max_link_width{};
+        std::optional<PciAddress> upstream_address{};  ///< 直接父 PCI 设备；主机根目录不是 PCI 地址
+        std::optional<PciAddress> physical_function{}; ///< VF 的 PF 地址，来自 physfn
+        PciDriverName driver_name{};
+        std::vector<LogicalCpuId> local_cpus{}; ///< 内核 local_cpulist，不推断 NUMA
+        std::optional<std::uint32_t> maximum_virtual_functions{};
+        std::optional<std::uint32_t> enabled_virtual_functions{};
     };
 
     /// @brief PCI 子系统聚合
