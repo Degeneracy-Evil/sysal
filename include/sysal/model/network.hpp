@@ -5,6 +5,7 @@
 
 #pragma once
 
+#include "sysal/model/rdma.hpp"
 #include "sysal/types/enums.hpp"
 #include "sysal/types/ids.hpp"
 #include "sysal/types/units.hpp"
@@ -55,6 +56,7 @@ namespace sysal
     struct Network
     {
         std::vector<NetworkInterface> interfaces; ///< 网络接口列表
+        RdmaInventory rdma{};
 
         /// @brief 获取当前进程可见的接口
         /// @return 指向可见接口的指针向量

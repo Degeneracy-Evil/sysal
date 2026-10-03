@@ -144,6 +144,7 @@ namespace sysal
         StorageHealthSysfs, ///< Explicit storage health target/protocol associations
         Smartctl,           ///< Fixed read-only SMART queries
         NvmeSmartLog,       ///< Controller-wide NVMe SMART log query
+        SysfsRdma,          ///< /sys/class/infiniband 基础设备与端口报告
     };
 
     /// @brief 单个原始记录的采集状态

@@ -62,6 +62,7 @@ namespace sysal::detail
             case RawSource::IfAddrs:
             case RawSource::Ethtool:
             case RawSource::ProcNetVlan:
+            case RawSource::SysfsRdma:
                 return "network";
             case RawSource::StorageHealthSysfs:
             case RawSource::Smartctl:

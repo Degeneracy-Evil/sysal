@@ -64,3 +64,19 @@ MAC 是当前接口地址，不能保证永久硬件地址，InfiniBand 等接�
 bridge、bond、vlan 分类；`bond_mode` 来自 bonding/mode。
 `vlan_id` / `vlan_parent` 来自 `/proc/net/vlan/config` 的明确记录。
 这些关系描述当前可见接口，不通过接口名猜测 VLAN、bond 或 bridge。
+
+## RDMA / InfiniBand
+
+`Network.rdma` 是追加的 `RdmaInventory`，保存类目录发现状态和设备清单。
+设备与端口采用独立强类型，详见 `include/sysal/model/rdma.hpp` 和
+[RDMA 端口设计](../../rdma-port-design.md)。
+
+设备报告名称、node type、GUID、固件、驱动、明确 PCI/NUMA 与 backing device 接口。
+端口包含编号、逻辑/物理状态、链路层、完整 rate_report、可解析的 Bandwidth（bps）、
+LID、子网管理器字段、capability mask 和明确 GID 接口关联。LID 类型与内核的 32 位
+字段一致，不截断扩展报告。设备 ID 只在当前快照内有效，端口编号在设备内有效。
+
+不需要网络接口才能存在 RDMA 设备，不将 backing device 接口猜测为具体端口接口。
+读取失败保留未知；发现成功但无设备只说明当前内核未暴露设备，非硬件绝对不存在。
+默认/基本标志不扩展：RDMA 属于现有 Collect::Network。旧快照没有 rdma 时保持
+NotCollected / NotProvided；原始来源追加在枚举末尾，旧编号不变。

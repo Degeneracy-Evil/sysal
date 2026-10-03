@@ -6,6 +6,7 @@
 
 #include "network_details.hpp"
 #include "parse_utils.hpp"
+#include "rdma.hpp"
 
 #include <limits>
 #include <map>
@@ -62,7 +63,7 @@ namespace sysal::detail
     std::optional<Network> parse_network(const RawStore &raw, std::vector<std::string> &warnings)
     {
         auto net_records = raw.get_all(RawSource::SysfsNet);
-        if(net_records.empty())
+        if(net_records.empty() && raw.get_all(RawSource::SysfsRdma).empty())
         {
             warnings.push_back("parse_network: 缺少 SysfsNet 数据");
             return std::nullopt;
@@ -245,6 +246,7 @@ namespace sysal::detail
         }
 
         apply_network_details(network, raw);
+        network.rdma = parse_rdma(raw);
         return network;
     }
 

@@ -168,6 +168,18 @@ namespace sysal::detail
                         dimm.numa_node = controller.numa_node;
 
         // 通过明确的 PCI 地址关联硬件身份；不按接口名或型号猜测设备。
+        for(auto &rdma : info.network.rdma.devices)
+        {
+            if(rdma.pci_address)
+                if(const auto *device = info.pci.find(*rdma.pci_address))
+                {
+                    rdma.vendor = device->vendor;
+                    rdma.device_name = device->device_name;
+                    rdma.numa_node = device->numa_node;
+                    if(rdma.driver.empty())
+                        rdma.driver = device->driver_name.value;
+                }
+        }
         for(auto &iface : info.network.interfaces)
         {
             if(iface.pci_address)

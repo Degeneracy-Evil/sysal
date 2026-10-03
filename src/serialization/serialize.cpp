@@ -5,6 +5,8 @@
 ///          raw 四个字段。使用 nlohmann/json 库进行 JSON 处理。
 
 #include "serialization/hardware.hpp"
+#include "serialization/json_values.hpp"
+#include "serialization/rdma.hpp"
 #include "serialization/storage_health.hpp"
 #include <nlohmann/json.hpp>
 
@@ -79,35 +81,9 @@ namespace sysal
             return static_cast<Enum>(val);
         }
 
-        // ───────────────────────────── PciAddress ─────────────────────────────
-
-        [[nodiscard]] std::uint64_t checked_unsigned(const json &j, std::uint64_t maximum, std::string_view field)
-        {
-            if(!j.is_number_integer() || (!j.is_number_unsigned() && j.get<std::int64_t>() < 0) ||
-               j.get<std::uint64_t>() > maximum)
-                throw SysalError(ErrorKind::DeserializationError, "无效无符号整数: " + std::string(field));
-            return j.get<std::uint64_t>();
-        }
-
-        [[nodiscard]] json pci_address_to_json(const PciAddress &addr)
-        {
-            return json{
-                {"domain", static_cast<unsigned>(addr.domain)},
-                {"bus", static_cast<unsigned>(addr.bus)},
-                {"device", static_cast<unsigned>(addr.device)},
-                {"function", static_cast<unsigned>(addr.function)},
-            };
-        }
-
-        [[nodiscard]] PciAddress pci_address_from_json(const json &j)
-        {
-            PciAddress addr;
-            addr.domain = static_cast<std::uint16_t>(checked_unsigned(j.at("domain"), 0xffff, "PCI domain"));
-            addr.bus = static_cast<std::uint8_t>(checked_unsigned(j.at("bus"), 0xff, "PCI bus"));
-            addr.device = static_cast<std::uint8_t>(checked_unsigned(j.at("device"), 0x1f, "PCI device"));
-            addr.function = static_cast<std::uint8_t>(checked_unsigned(j.at("function"), 7, "PCI function"));
-            return addr;
-        }
+        using detail::checked_unsigned;
+        using detail::pci_address_from_json;
+        using detail::pci_address_to_json;
 
         // ───────────────────────────── RawRecord / RawStore ─────────────────────────────
 
@@ -128,7 +104,7 @@ namespace sysal
         [[nodiscard]] RawRecord raw_record_from_json(const json &j)
         {
             RawRecord rec;
-            rec.source = validate_enum(j.at("source").get<std::uint32_t>(), RawSource::NvmeSmartLog, "source");
+            rec.source = validate_enum(j.at("source").get<std::uint32_t>(), RawSource::SysfsRdma, "source");
             j.at("path_or_command").get_to(rec.path_or_command);
             j.at("payload").get_to(rec.payload);
             rec.status = validate_enum(j.at("status").get<std::uint32_t>(), CollectStatus::NotCollected, "status");
@@ -181,7 +157,7 @@ namespace sysal
         {
             CollectionObservation o;
             o.domain = j.at("domain").get<std::string>();
-            o.source = validate_enum(j.at("source").get<std::uint32_t>(), RawSource::NvmeSmartLog, "source");
+            o.source = validate_enum(j.at("source").get<std::uint32_t>(), RawSource::SysfsRdma, "source");
             o.origin = j.at("origin").get<std::string>();
             o.status = validate_enum(j.at("status").get<std::uint32_t>(), CollectStatus::NotCollected, "status");
             if(j.contains("failure"))
@@ -1496,7 +1472,7 @@ namespace sysal
             {
                 arr.push_back(net_iface_to_json(iface));
             }
-            return json{{"interfaces", std::move(arr)}};
+            return json{{"interfaces", std::move(arr)}, {"rdma", detail::rdma_inventory_to_json(n.rdma)}};
         }
 
         [[nodiscard]] Network network_from_json(const json &j)
@@ -1506,6 +1482,8 @@ namespace sysal
             {
                 n.interfaces.push_back(net_iface_from_json(elem));
             }
+            if(j.contains("rdma"))
+                n.rdma = detail::rdma_inventory_from_json(j.at("rdma"));
             return n;
         }
 

@@ -384,6 +384,8 @@ namespace
             return "Smartctl";
         case sysal::RawSource::NvmeSmartLog:
             return "NvmeSmartLog";
+        case sysal::RawSource::SysfsRdma:
+            return "SysfsRdma";
         case sysal::RawSource::SysfsHwmon:
             return "SysfsHwmon";
         case sysal::RawSource::ProcNetVlan:

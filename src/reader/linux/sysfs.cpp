@@ -7,6 +7,7 @@
 #include "reader/linux/file_utils.hpp"
 #include "reader/linux/network_capabilities.hpp"
 #include "reader/linux/pci.hpp"
+#include "reader/linux/rdma.hpp"
 #include "reader/linux/sensors.hpp"
 #include "reader/linux/storage_health.hpp"
 
@@ -521,6 +522,7 @@ namespace sysal::reader
             {Collect::Cpu, read_cpu_sysfs},
             {Collect::Cpu | Collect::Memory, read_numa_sysfs},
             {Collect::Network, read_net_sysfs},
+            {Collect::Network, read_rdma_sysfs},
             {Collect::Pci | Collect::Network | Collect::Storage | Collect::StorageHealth, read_pci_sysfs},
             {Collect::Storage | Collect::StorageHealth, read_block_sysfs},
             {Collect::Platform, read_dmi_sysfs},
