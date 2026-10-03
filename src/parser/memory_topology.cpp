@@ -28,7 +28,9 @@ namespace sysal::detail
         std::map<std::uint32_t, MemoryController> controllers;
         for(const auto *record : raw.get_all(RawSource::SysfsEdac))
         {
-            if(record->status != CollectStatus::Success || record->path_or_command.find("/dimm") != std::string::npos)
+            if(record->status != CollectStatus::Success ||
+               (record->path_or_command.find("/dimm") != std::string::npos ||
+                record->path_or_command.find("/rank") != std::string::npos))
                 continue;
             const auto index = edac_controller_index(record->path_or_command);
             if(!index)
@@ -38,7 +40,9 @@ namespace sysal::detail
             const auto name = extract_filename(record->path_or_command);
             const auto value = trim(record->payload);
             const auto number = parse_uint(value);
-            if(name == "mc_name")
+            if(name == "max_location")
+                controller.max_location = parse_edac_location(value);
+            else if(name == "mc_name")
                 controller.name = hardware_text(value);
             else if(name == "size_mb" && number &&
                     *number <= std::numeric_limits<std::uint64_t>::max() / (1024ULL * 1024))
@@ -65,6 +69,14 @@ namespace sysal::detail
                 if(controller != memory.controllers.end())
                     dimm.numa_node = controller->numa_node;
             }
+        for(auto &device : memory.edac_devices)
+        {
+            const auto controller =
+                std::find_if(memory.controllers.begin(), memory.controllers.end(),
+                             [&](const auto &item) { return item.index == device.controller_index; });
+            if(controller != memory.controllers.end())
+                device.numa_node = controller->numa_node;
+        }
         for(const auto *record : raw.get_all(RawSource::Udevadm))
             if(record->status == CollectStatus::Success)
                 for(const auto &line : split(record->payload, '\n'))

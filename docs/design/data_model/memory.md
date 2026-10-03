@@ -39,3 +39,16 @@ EDAC DIMM 直接保留所属 `controller_index`；udev DIMM 只有在标签及�
 即使一致也不保证固件描述完整正确。固件 ECC 报告和 EDAC 的实际纠错模式分别展示。
 
 C++ 调用方需要 PCI 辅助关联时请求 `Collect::Memory | Collect::Pci`；SystemCard 的 memory 选择包含该依赖。
+
+## EDAC 位置层级
+
+`Memory.edac_devices` 独立保留 DIMM 与 rank 的控制器内编号、容量和有序位置。
+rank 不是整条 DIMM，不计入 `dimm_count`。`MemoryController.max_location`
+保存各层最大编号；这不表示已安装数量或物理插槽总数。
+
+位置字段保存原始 report 和完全解析后的 coordinates。通道仅采用内核明确提供的
+channel 坐标，固件 Bank 名称不参加推断。`DimmInfo.edac_device_index` 与
+`controller_index` 共同引用 EDAC DIMM；`edac_association` 区分 EDAC 原生库存
+和唯一标签、容量匹配。标签可由管理员修改，后者不是固件句柄关联。
+
+详见[内存位置设计](../../memory-topology-design.md)。

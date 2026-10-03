@@ -167,6 +167,12 @@ namespace sysal::detail
                     if(controller.index == *dimm.controller_index)
                         dimm.numa_node = controller.numa_node;
 
+        for(auto &memory_device : info.memory.edac_devices)
+            if(!memory_device.numa_node)
+                for(const auto &controller : info.memory.controllers)
+                    if(controller.index == memory_device.controller_index)
+                        memory_device.numa_node = controller.numa_node;
+
         // 通过明确的 PCI 地址关联硬件身份；不按接口名或型号猜测设备。
         for(auto &rdma : info.network.rdma.devices)
         {

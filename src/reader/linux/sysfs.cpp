@@ -5,6 +5,7 @@
 
 #include "reader/linux/sysfs.hpp"
 #include "reader/linux/file_utils.hpp"
+#include "reader/linux/memory_topology.hpp"
 #include "reader/linux/network_capabilities.hpp"
 #include "reader/linux/pci.hpp"
 #include "reader/linux/rdma.hpp"
@@ -411,72 +412,6 @@ namespace sysal::reader
         void read_hypervisor_type(RawStore &raw)
         {
             read_sysfs_file(raw, RawSource::SysHypervisor, "/sys/hypervisor/type");
-        }
-
-        /// @brief 采集 EDAC 内存 DIMM 信息
-        /// @param raw 原始证据存储
-        /// @details 遍历 /sys/devices/system/edac/mc/mcN/dimmM/，读取各 DIMM 的
-        ///          mem_type、size、label、location、dev_type、edac_mode。
-        ///          无 EDAC 的系统（容器、消费级硬件）静默跳过。
-        void read_edac_sysfs(RawStore &raw)
-        {
-            const fs::path edac_base = "/sys/devices/system/edac/mc";
-            if(!fs::exists(edac_base))
-            {
-                add_record(raw, RawSource::SysfsEdac, edac_base.string(), "", CollectStatus::NotCollected,
-                           ReadFailure::NotPresent);
-                return;
-            }
-
-            bool found_controller = false;
-            std::error_code ec;
-            for(const auto &mc_entry : fs::directory_iterator(edac_base, ec))
-            {
-                if(!mc_entry.is_directory())
-                {
-                    continue;
-                }
-                auto mc_name = mc_entry.path().filename().string();
-                if(mc_name.size() < 3 || mc_name.substr(0, 2) != "mc" ||
-                   mc_name.find_first_not_of("0123456789", 2) != std::string::npos)
-                {
-                    continue;
-                }
-
-                found_controller = true;
-                for(const auto *field : {"mc_name", "size_mb", "ce_count", "ue_count", "device/numa_node"})
-                    read_sysfs_file(raw, RawSource::SysfsEdac, (mc_entry.path() / field).string());
-                std::error_code device_ec;
-                auto device = fs::read_symlink(mc_entry.path() / "device", device_ec);
-                if(!device_ec)
-                    add_record(raw, RawSource::SysfsEdac, (mc_entry.path() / "device").string(), device.string(),
-                               CollectStatus::Success);
-
-                for(const auto &dimm_entry : fs::directory_iterator(mc_entry.path(), ec))
-                {
-                    if(!dimm_entry.is_directory())
-                    {
-                        continue;
-                    }
-                    auto dimm_name = dimm_entry.path().filename().string();
-                    if(dimm_name.size() < 5 || dimm_name.substr(0, 4) != "dimm" ||
-                       dimm_name.find_first_not_of("0123456789", 4) != std::string::npos)
-                    {
-                        continue;
-                    }
-
-                    const auto &dir = dimm_entry.path();
-                    read_sysfs_file(raw, RawSource::SysfsEdac, (dir / "dimm_mem_type").string());
-                    read_sysfs_file(raw, RawSource::SysfsEdac, (dir / "size").string());
-                    read_sysfs_file(raw, RawSource::SysfsEdac, (dir / "dimm_label").string());
-                    read_sysfs_file(raw, RawSource::SysfsEdac, (dir / "dimm_location").string());
-                    read_sysfs_file(raw, RawSource::SysfsEdac, (dir / "dimm_dev_type").string());
-                    read_sysfs_file(raw, RawSource::SysfsEdac, (dir / "dimm_edac_mode").string());
-                }
-            }
-            if(ec || !found_controller)
-                add_record(raw, RawSource::SysfsEdac, edac_base.string(), "", CollectStatus::NotCollected,
-                           ec ? file_failure(ec.value()) : ReadFailure::NotPresent);
         }
 
         /// @brief 采集温度传感器信息

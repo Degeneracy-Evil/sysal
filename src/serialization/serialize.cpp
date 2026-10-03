@@ -6,6 +6,7 @@
 
 #include "serialization/hardware.hpp"
 #include "serialization/json_values.hpp"
+#include "serialization/memory_topology.hpp"
 #include "serialization/rdma.hpp"
 #include "serialization/storage_health.hpp"
 #include <nlohmann/json.hpp>
@@ -210,6 +211,8 @@ namespace sysal
                 j["numa_node"] = m.numa_node->value();
             if(m.pci_address)
                 j["pci_address"] = pci_address_to_json(*m.pci_address);
+            if(!m.max_location.report.empty() || !m.max_location.coordinates.empty())
+                j["max_location"] = detail::edac_location_to_json(m.max_location);
             return j;
         }
         [[nodiscard]] MemoryController memory_controller_from_json(const json &j)
@@ -227,6 +230,8 @@ namespace sysal
                 m.numa_node = NumaNodeId{j.at("numa_node").get<std::uint32_t>()};
             if(j.contains("pci_address"))
                 m.pci_address = pci_address_from_json(j.at("pci_address"));
+            if(j.contains("max_location"))
+                m.max_location = detail::edac_location_from_json(j.at("max_location"));
             return m;
         }
 
@@ -998,6 +1003,10 @@ namespace sysal
             {
                 j["numa_node"] = d.numa_node->value();
             }
+            if(d.edac_device_index)
+                j["edac_device_index"] = d.edac_device_index->value();
+            if(d.edac_association != DimmEdacAssociation::Unknown)
+                j["edac_association"] = static_cast<std::uint32_t>(d.edac_association);
             return j;
         }
 
@@ -1058,6 +1067,13 @@ namespace sysal
             {
                 d.numa_node = NumaNodeId{j.at("numa_node").get<std::uint32_t>()};
             }
+            if(j.contains("edac_device_index"))
+                d.edac_device_index = EdacMemoryDeviceIndex{static_cast<std::uint32_t>(detail::checked_unsigned(
+                    j.at("edac_device_index"), std::numeric_limits<std::uint32_t>::max(), "EDAC device index"))};
+            if(j.contains("edac_association"))
+                d.edac_association = static_cast<DimmEdacAssociation>(detail::checked_unsigned(
+                    j.at("edac_association"), static_cast<std::uint32_t>(DimmEdacAssociation::LabelAndCapacity),
+                    "EDAC association"));
             return d;
         }
 
@@ -1120,6 +1136,8 @@ namespace sysal
                 j["reported_array_error_correction"] = m.reported_array_error_correction;
             if(m.reported_array_max_capacity)
                 j["reported_array_max_capacity"] = m.reported_array_max_capacity->value;
+            if(!m.edac_devices.empty())
+                j["edac_devices"] = detail::edac_devices_to_json(m.edac_devices);
             return j;
         }
 
@@ -1177,6 +1195,8 @@ namespace sysal
             m.reported_array_error_correction = j.value("reported_array_error_correction", std::string{});
             if(j.contains("reported_array_max_capacity"))
                 m.reported_array_max_capacity = MemorySize{j.at("reported_array_max_capacity").get<std::uint64_t>()};
+            if(j.contains("edac_devices"))
+                m.edac_devices = detail::edac_devices_from_json(j.at("edac_devices"));
             return m;
         }
 

@@ -193,7 +193,7 @@ namespace sysal::detail
                     continue;
                 }
                 auto idx = parse_uint(idx_str);
-                if(!idx.has_value())
+                if(!idx || *idx > std::numeric_limits<std::uint32_t>::max())
                 {
                     warnings.push_back("parse_udevadm_dimms: 索引解析失败: " + key);
                     continue;
@@ -356,83 +356,6 @@ namespace sysal::detail
             return result;
         }
 
-        /// @brief 从 EDAC sysfs 记录解析 DIMM 信息
-        /// @param edac_records SysfsEdac 成功记录指针列表
-        /// @return DIMM 列表
-        std::vector<DimmInfo> parse_edac_dimms(const std::vector<const RawRecord *> &edac_records,
-                                               std::string &out_memory_type)
-        {
-            std::map<std::string, DimmInfo> grouped;
-            for(const auto *rec : edac_records)
-            {
-                if(rec->status != CollectStatus::Success)
-                {
-                    continue;
-                }
-                const auto &path = rec->path_or_command;
-                auto slash = path.find_last_of('/');
-                if(slash == std::string::npos)
-                {
-                    continue;
-                }
-                auto dir = path.substr(0, slash);
-                if(dir.find("/dimm") == std::string::npos)
-                    continue; // Controller records are parsed separately.
-                auto fname = path.substr(slash + 1);
-                auto value = hardware_text(rec->payload);
-
-                auto &dimm = grouped[dir];
-                dimm.controller_index = edac_controller_index(path);
-                // Presence follows size, not the existence of an EDAC slot directory.
-
-                if(fname == "dimm_mem_type")
-                {
-                    dimm.memory_type = value;
-                    if(out_memory_type.empty())
-                    {
-                        out_memory_type = value;
-                    }
-                    else if(out_memory_type != value)
-                    {
-                        out_memory_type = "mixed";
-                    }
-                }
-                else if(fname == "size")
-                {
-                    auto mb = parse_uint(value);
-                    if(mb.has_value() && *mb <= std::numeric_limits<std::uint64_t>::max() / (1024ULL * 1024))
-                    {
-                        dimm.size = MemorySize{*mb * 1024 * 1024};
-                        dimm.present = *mb > 0;
-                    }
-                }
-                else if(fname == "dimm_label")
-                {
-                    dimm.locator = value;
-                }
-                else if(fname == "dimm_edac_mode")
-                {
-                    dimm.edac_mode = value;
-                }
-                else if(fname == "dimm_dev_type")
-                {
-                    dimm.device_width = value;
-                }
-                else if(fname == "dimm_location")
-                {
-                    dimm.bank_locator = value;
-                }
-            }
-
-            std::vector<DimmInfo> result;
-            result.reserve(grouped.size());
-            for(auto &[dir, dimm] : grouped)
-            {
-                result.push_back(std::move(dimm));
-            }
-            return result;
-        }
-
     } // namespace
 
     std::optional<Memory> parse_memory(const RawStore &raw, std::vector<std::string> &warnings)
@@ -527,37 +450,7 @@ namespace sysal::detail
             }
         }
 
-        auto edac_records = raw.get_all(RawSource::SysfsEdac);
-        std::string edac_type;
-        auto edac_dimms = parse_edac_dimms(edac_records, edac_type);
-        if(memory.dimms.empty())
-        {
-            memory.dimms = std::move(edac_dimms);
-            memory_type = std::move(edac_type);
-            if(!memory.dimms.empty())
-                memory.dimm_inventory_source = "edac";
-        }
-        else
-        {
-            // 只合并唯一且明确相同的插槽标签，不按数组顺序猜测 SMBIOS/EDAC 对应关系。
-            for(const auto &edac : edac_dimms)
-            {
-                if(edac.locator.empty())
-                {
-                    continue;
-                }
-                const auto matches = [&](const DimmInfo &dimm)
-                { return dimm.locator == edac.locator && dimm.size == edac.size; };
-                if(std::count_if(memory.dimms.begin(), memory.dimms.end(), matches) == 1 &&
-                   std::count_if(edac_dimms.begin(), edac_dimms.end(), matches) == 1)
-                {
-                    auto dimm = std::find_if(memory.dimms.begin(), memory.dimms.end(), matches);
-                    dimm->edac_mode = edac.edac_mode;
-                    dimm->device_width = edac.device_width;
-                    dimm->controller_index = edac.controller_index;
-                }
-            }
-        }
+        apply_edac_inventory(memory, raw, memory_type);
 
         memory.memory_type = std::move(memory_type);
         memory.configured_speed_mts = configured_speed;

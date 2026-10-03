@@ -24,6 +24,60 @@ namespace sysal
         std::optional<MemorySize> free{};    ///< MemFree，区别于 MemAvailable
     };
 
+    enum class EdacLocationLayer : std::uint32_t
+    {
+        Unknown = 0,
+        Branch = 1,
+        Channel = 2,
+        Slot = 3,
+        ChipSelect = 4,
+        AllMemory = 5,
+    };
+
+    struct EdacLocationCoordinate
+    {
+        EdacLocationLayer layer{EdacLocationLayer::Unknown};
+        std::uint32_t index{};
+    };
+
+    /// @brief 有序的驱动层级坐标；未知格式保留 report，不猜测通道。
+    struct EdacLocation
+    {
+        std::string report;
+        std::vector<EdacLocationCoordinate> coordinates;
+    };
+
+    enum class EdacMemoryDeviceKind : std::uint32_t
+    {
+        Unknown = 0,
+        Dimm = 1,
+        Rank = 2,
+    };
+
+    using EdacMemoryDeviceIndex = StrongId<std::uint32_t, struct EdacMemoryDeviceIndexTag>;
+
+    /// @brief 编号仅在同一控制器与 kind 内唯一；rank 容量不是整条 DIMM 容量。
+    struct EdacMemoryDevice
+    {
+        std::uint32_t controller_index{};
+        EdacMemoryDeviceIndex index;
+        EdacMemoryDeviceKind kind{EdacMemoryDeviceKind::Unknown};
+        std::string label;
+        std::optional<MemorySize> size;
+        EdacLocation location;
+        std::string memory_type;
+        std::string edac_mode;
+        std::string device_width;
+        std::optional<NumaNodeId> numa_node;
+    };
+
+    enum class DimmEdacAssociation : std::uint32_t
+    {
+        Unknown = 0,
+        EdacInventory = 1,
+        LabelAndCapacity = 2, ///< 唯一标签和容量匹配；EDAC 标签可由管理员修改。
+    };
+
     /// @brief EDAC 控制器；编号不是 NUMA/CPU 编号
     struct MemoryController
     {
@@ -34,6 +88,7 @@ namespace sysal
         std::optional<std::uint64_t> uncorrected_errors;
         std::optional<NumaNodeId> numa_node;
         std::optional<PciAddress> pci_address;
+        EdacLocation max_location{}; ///< 各层最大编号，不表示已安装数量。
     };
 
     /// @brief 单条 DIMM 内存条信息
@@ -60,6 +115,8 @@ namespace sysal
         std::string device_width{}; ///< EDAC 报告的 DRAM device type，如 x8
         std::optional<std::uint32_t> controller_index{};
         std::optional<NumaNodeId> numa_node{};
+        std::optional<EdacMemoryDeviceIndex> edac_device_index{};
+        DimmEdacAssociation edac_association{DimmEdacAssociation::Unknown};
     };
 
     /// @brief 内存子系统聚合
@@ -80,6 +137,7 @@ namespace sysal
         std::string reported_array_error_correction{};
         std::optional<MemorySize> reported_array_max_capacity{};
         std::optional<bool> reported_slots_complete{}; ///< 是否覆盖固件报告数；不保证固件正确
+        std::vector<EdacMemoryDevice> edac_devices{};  ///< 包括未关联固件插槽的 DIMM 和 rank。
     };
 
 } // namespace sysal
