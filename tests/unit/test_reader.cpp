@@ -73,7 +73,7 @@ TEST_CASE("test_reader")
     CHECK(raw.has(sysal::RawSource::IfAddrs));
 
     // DfTh（df 命令，Linux 上普遍可用）
-    CHECK(raw.has(sysal::RawSource::DfTh));
+    CHECK(raw.has(sysal::RawSource::StorageMountInfo));
 
     // ---- sysfs 采集测试 ----
 
