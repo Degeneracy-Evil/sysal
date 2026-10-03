@@ -39,7 +39,7 @@ Reader → RawStore → Parser → ParseResult → Resolver → System
 ## 公共 API
 
 ```cpp
-// 采集——一次调用，返回不可变对象
+// 采集——一次调用，返回采集快照
 sysal::System sys = sysal::System::collect();
 
 // 访问——直接成员，无需方法调用
@@ -58,7 +58,7 @@ sys.refresh();
 
 - 不需要全局 `init()`，后端初始化在 `collect()` 内部自动完成
 - 失败时抛出 `SysalError`，部分失败记录到 `sys.warnings`
-- `System` 构造后不可变，多线程 const 访问安全
+- `System` 的公开成员可修改；没有并发修改或刷新时，多线程读取同一快照安全
 
 ## 与其他项目的关系
 

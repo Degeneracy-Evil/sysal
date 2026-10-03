@@ -4,8 +4,8 @@
 ///          交叉校验便利索引与资源级 visible_to_current_process 的一致性。
 
 #include "resolver/resolve.hpp"
-#include "parser/storage_connections.hpp"
 #include "resolver/accelerator_visibility.hpp"
+#include "resolver/storage_connections.hpp"
 
 #include <algorithm>
 #include <cstdint>

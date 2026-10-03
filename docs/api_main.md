@@ -46,7 +46,7 @@ sysal::System partial = sysal::System::collect(
 
 ## 设计原则
 
-- **一次采集，不可变结果** — `System` 构造后 const 访问，多线程安全
+- **采集快照** — `System` 可修改；共享读取要求没有并发修改或刷新
 - **强类型** — `StrongId<T, Tag>` 防止 ID 误用，`ScalarUnit<Tag>` 防止单位误用
 - **可见性感知** — 不只报告整机有什么，还报告当前进程能看到什么
 - **数据源优先级** — syscall > 文件读取 > 命令执行

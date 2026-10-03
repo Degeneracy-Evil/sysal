@@ -1,6 +1,6 @@
 # sysal
 
-C++ 系统信息抽象库。采集服务器硬件与软件信息，归一化为强类型数据结构，一次调用返回不可变对象。
+C++ 系统信息抽象库。采集服务器硬件与软件信息，归一化为强类型数据结构，一次调用返回采集快照。
 
 ## 快速开始
 
@@ -27,7 +27,7 @@ sysal::System partial = sysal::System::collect(
 );
 ```
 
-`System` 构造后不可变，多线程 const 访问安全。采集失败抛出 `SysalError`，部分失败记录到 `sys.warnings`。调用 `sys.refresh()` 重新采集。
+`System` 的公开成员可修改；没有并发修改或刷新时，多线程读取同一快照安全。采集失败抛出 `SysalError`，部分失败记录到 `sys.warnings`。调用 `sys.refresh()` 重新采集。
 
 ## 数据模型
 

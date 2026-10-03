@@ -128,7 +128,7 @@ namespace sysal
         std::optional<TransferRate> configured_speed_mts; ///< 实际配置速率（MT/s）
         std::vector<NumaMemory> numa_memory;              ///< 各 NUMA 节点内存信息
         std::vector<DimmInfo> dimms;                      ///< 各 DIMM 内存条信息
-        std::optional<std::uint32_t> dimm_count;          ///< DIMM 插槽总数
+        std::optional<std::uint32_t> dimm_count;          ///< 当前数据源观察到的 DIMM 条目数
         std::optional<std::uint32_t> populated_dimms;     ///< 已安装内存条的 DIMM 数
         std::vector<MemoryController> controllers{};
         std::string dimm_inventory_source{}; ///< udev/edac

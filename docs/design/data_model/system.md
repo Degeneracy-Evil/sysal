@@ -31,8 +31,7 @@ public:
 }  // namespace sysal
 ```
 
-`System` 采用公开成员而非 accessor 方法——构造后不可变（`refresh()` 除外），
-无需封装突变控制。`collect()` 是静态工厂，`refresh()` 在已有对象上重新采集。
+`System` 的成员公开且可修改；共享读取要求没有并发修改或刷新。`collect()` 是静态工厂，`refresh()` 在已有对象上重新采集。
 
 ## SystemInfo 结构体
 
@@ -53,6 +52,8 @@ struct SystemInfo
     Pci              pci;          // PCI 拓扑
     SoftwareStack    software;     // 软件栈
     ExecutionContext execution;    // 当前进程的执行上下文
+    Sensors sensors;               // 传感器
+    HardwareHealth hardware_health; // 已采集证据的派生发现
 };
 
 }  // namespace sysal
@@ -91,6 +92,7 @@ struct SnapshotMeta
     Collect                               requested_flags;   // 请求的采集域
     std::vector<std::string>              succeeded_collectors; // 成功的采集器
     std::vector<std::string>              failed_collectors;    // 失败的采集器
+    std::vector<CollectionObservation> observations;           // 来源状态
 };
 
 }  // namespace sysal
@@ -109,7 +111,9 @@ System
 │   ├── storage
 │   ├── pci
 │   ├── software
-│   └── execution
+│   ├── execution
+│   ├── sensors
+│   └── hardware_health
 ├── meta                ← 采集元数据
 ├── warnings            ← 警告信息
 └── raw                 ← 原始证据（可选）
@@ -123,5 +127,5 @@ System
   `Expected<T, E>` 或其他非抛出式结果类型。
 * 不需要全局 `init()`：procfs / sysfs 读取无需初始化，NVML 等后端的初始化
   在 `collect()` 内部按需自动完成，对调用方透明。
-* `System` 对象在采集完成后是不可变的（`refresh()` 除外）。
+* `System` 是可修改的采集快照；调用方负责同步共享对象的修改与刷新。
 * 部分子域失败不会中断整体采集，而是记录到 `sys.warnings` 中。

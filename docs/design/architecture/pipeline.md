@@ -30,6 +30,7 @@ struct ParseResult
     std::optional<Storage>           storage;
     std::optional<SoftwareStack>     software;
     std::optional<ExecutionContext>  execution;
+    std::optional<Sensors>           sensors;
 };
 
 }  // namespace sysal::detail
@@ -39,97 +40,21 @@ struct ParseResult
 每个字段都是 `optional` —— 该域可能失败或未被请求。
 各字段直接使用公共 API 中定义的类型，不再使用私有 `*Facts` 结构。
 
-## 源码布局
-
-```txt
-sysal/
-├── include/sysal/
-│   ├── sysal.hpp                    # 总入口（顶层，不在 core/ 下）
-│   ├── core/                        # 库核心
-│   │   ├── system.hpp               # System 类 + SystemInfo
-│   │   ├── collect.hpp              # Collect 位掩码枚举
-│   │   └── error.hpp                # SysalError
-│   ├── model/                       # 数据模型
-│   │   ├── snapshot_meta.hpp
-│   │   ├── platform.hpp
-│   │   ├── cpu.hpp
-│   │   ├── memory.hpp
-│   │   ├── accelerator.hpp
-│   │   ├── network.hpp
-│   │   ├── storage.hpp
-│   │   ├── pci.hpp
-│   │   ├── software.hpp
-│   │   ├── execution.hpp
-│   │   └── raw_store.hpp
-│   ├── types/                       # 基础类型
-│   │   ├── enums.hpp
-│   │   ├── ids.hpp
-│   │   ├── units.hpp
-│   │   ├── value_types.hpp
-│   │   └── strong_id.hpp
-│   ├── serialization/
-│   │   └── serialization.hpp        # 可选
-│   └── test/
-│       └── replay.hpp               # 测试工具
-│
-└── src/
-    ├── api/                     # 公共 API 实现
-    │   └── system.cpp           # System::collect() / refresh()
-    │
-    ├── model/                   # 数据模型实现
-    │   ├── raw_store.cpp        # RawStore 方法
-    │   └── resource.cpp            # 便利查询方法
-    │
-    ├── reader/linux/            # 平台相关 Reader
-    │   ├── procfs.hpp / procfs.cpp
-    │   ├── sysfs.hpp / sysfs.cpp
-    │   └── file_utils.hpp
-    │
-    ├── parser/                  # 原始数据 → 结构化事实
-    │   ├── parse_utils.hpp
-    │   ├── parse_result.hpp     # ParseResult 定义
-    │   ├── platform.hpp / platform.cpp
-    │   ├── cpu.hpp / cpu.cpp
-    │   ├── memory.hpp / memory.cpp
-    │   ├── pci.hpp / pci.cpp
-    │   ├── network.hpp / network.cpp
-    │   ├── accelerator.hpp / accelerator.cpp
-    │   ├── storage.hpp / storage.cpp
-    │   ├── software.hpp / software.cpp
-    │   └── execution.hpp / execution.cpp
-    │
-    ├── resolver/                # 结构化事实 → 最终快照
-    │   └── resolve.hpp / resolve.cpp
-    │
-    ├── serialization/           # JSON 序列化
-    │   └── serialize.cpp         # System ↔ JSON
-    │
-    └── pipeline/                # 流程编排
-        └── pipeline.hpp / pipeline.cpp
-```
-
-### 目录职责
+## 源码职责
 
 | 目录 | 职责 |
-|---|---|
-| `include/sysal/`（顶层） | `sysal.hpp` 总入口 |
-| `include/sysal/core/` | `System` 类、`Collect` 枚举、错误类型 |
-| `include/sysal/model/` | 各子系统的数据模型定义 |
-| `include/sysal/types/` | 基础类型（枚举、强类型 ID、单位、值包装） |
-| `include/sysal/serialization/` | 可选的 JSON 序列化头 |
-| `include/sysal/test/` | 测试工具 |
-| `src/api/` | `System::collect()` / `refresh()` 实现 |
-| `src/model/` | `RawStore` 等数据模型的方法实现 |
-| `reader/linux/` | 平台相关的原始数据采集（procfs / sysfs / syscall / 命令执行） |
-| `parser/` | 从 `RawStore` 解析出 `ParseResult`（按域独立） |
-| `resolver/` | 从 `ParseResult` 组装 `System`（可见性、冲突解决） |
-| `serialization/` | JSON 序列化引擎与 `System` 的序列化实现 |
-| `pipeline/` | 编排 Reader → Parser → Resolver 的完整流程 |
+| --- | --- |
+| include/sysal/core | System、Collect、错误契约 |
+| include/sysal/model、types | 公共领域模型、强类型 ID 与单位 |
+| src/reader | 只读采集与后端适配，生成 RawStore |
+| src/parser | 各域解析与来源归一化 |
+| src/resolver | 跨域关联、可见性与派生健康证据 |
+| src/pipeline | 域分派、采集状态、警告和快照元数据 |
+| src/serialization | 各领域 JSON 转换与共享值验证；serialize.cpp 组装顶层快照 |
+| src/api、model | 公共入口与模型查询实现 |
 
-平台相关的 reader 位于 `src/reader/<platform>/` 下。
-xmake 在构建时选择平台目录。
+存储控制器与 PCI/NUMA 的关联由 resolver/storage_connections 处理，
+parser/storage_connections 仅解析原始协议库存。领域序列化函数是内部接口；
+公共序列化入口仍位于 include/sysal/serialization/serialization.hpp。
 
-### 外部依赖
-
-- **nlohmann/json**：JSON 序列化依赖，通过 xmake `add_requires("nlohmann_json")`
-  从 xrepo 管理。v0.0.4 之前为 vendor 方式管理，v0.0.4 迁移至 xrepo。
+完整字段契约以公共头文件为准，避免在设计文档复制全部文件列表。

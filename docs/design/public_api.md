@@ -7,7 +7,7 @@ sysal 暴露一个精简且稳定的公共 API。
 
 sysal 的公共入口是一个 `System` 类，采用**对象持有模式**而非全局单例：
 
-* `System::collect()` 是静态工厂方法，一次性完成采集，返回一个不可变的 `System` 对象。
+* `System::collect()` 是静态工厂方法，一次性完成采集，返回一个持有采集快照的 `System` 对象。
 * `System` 对象持有该次采集的全部子系统模型、元数据、警告和可选的原始证据。
 * `refresh()` 在已有对象上重新采集，替换内部状态。
 
@@ -42,12 +42,14 @@ enum class Collect : uint32_t {
     Software    = 1 << 7,
     Execution   = 1 << 8,
     Raw         = 1 << 9,
+    Sensors     = 1 << 10,
+    StorageHealth = 1 << 11,
 };
 
 // 按位或，组合多个采集域
 constexpr Collect operator|(Collect a, Collect b);
 
-// 测试 flags 中是否包含 test 位
+// 测试 flags 与 test 是否有任意重叠位
 constexpr bool has(Collect flags, Collect test);
 
 // 预设：基本子集
@@ -67,7 +69,7 @@ constexpr Collect full = /* 所有位置位 */;
 
 ## System 类接口
 
-`System` 采用公开成员而非 accessor 方法——构造后不可变，无需封装突变控制。
+`System` 的成员公开且可修改。共享读取要求没有并发修改；修改或刷新由调用方同步。
 
 ```cpp
 namespace sysal
@@ -85,6 +87,8 @@ struct SystemInfo
     Pci               pci;
     SoftwareStack     software;
     ExecutionContext  execution;
+    Sensors           sensors;
+    HardwareHealth    hardware_health;
 };
 
 class System
@@ -140,7 +144,9 @@ System
 │   ├── storage
 │   ├── pci
 │   ├── software
-│   └── execution
+│   ├── execution
+│   ├── sensors
+│   └── hardware_health
 ├── meta                ← 采集元数据
 ├── warnings            ← 警告信息
 └── raw                 ← 原始证据（可选）
@@ -173,7 +179,7 @@ try {
 sysal::System sys = sysal::System::collect();
 
 // 2) 使用预设
-sysal::System basic = sysal::System::collect(sysal::Collect::basic);
+sysal::System basic = sysal::System::collect(sysal::basic);
 
 // 3) 链式按位组合
 using namespace sysal;
@@ -193,7 +199,7 @@ const auto& gpus = sys.info.accelerators;
 
 // 6) 读取警告与元信息
 for (const auto& w : sys.warnings) {
-    std::println("warning: {}", w);
+    std::cout << "warning: " << w << '\n';
 }
 
 // 7) 在已有对象上刷新
@@ -203,8 +209,13 @@ sys.refresh();
 ## 设计约束
 
 * 公共 API 不暴露内部 reader、parser、backend。
-* `System` 对象在采集完成后是不可变的（除 `refresh()` 外）。
-* `SystemInfo`、`SnapshotMeta` 等结构体成员均为公开，构造后直接 const 访问。
+* `System` 是可修改快照；并发读取只在没有并发修改或刷新时安全。
+* `SystemInfo`、`SnapshotMeta` 等结构体成员均为公开，调用方可选择 const 访问。
 * `Collect` 是值类型枚举，可复制、可组合，无生命周期约束。
 * 预设常量 `basic` / `full` 为 `constexpr`，编译期可用。
 * 不需要全局 `init()`，后端初始化在 `collect()` 内部自动完成。
+
+部分失败域由 `meta.failed_collectors` 标记；未请求域与失败域都可能有默认空模型。
+判断空库存时必须结合采集状态。`meta.observations` 描述来源状态，域成功不保证字段完整。
+
+StorageHealth 请求只读设备健康查询；库的 full 预设包含这些查询，概要用途宜显式选择域。
