@@ -531,6 +531,7 @@ namespace sysal::detail
         {
             // 按 zone 名称分组：zone_name → {type, temp}
             std::map<std::string, ThermalZone> zone_map;
+            std::set<std::string> measured_zones;
             auto thermal_records = raw.get_all(RawSource::SysfsThermal);
             for(const auto *rec : thermal_records)
             {
@@ -562,6 +563,7 @@ namespace sysal::detail
                     if(auto v = parse_uint(rec->payload))
                     {
                         zone.temp = Temperature{*v};
+                        measured_zones.insert(zone_name);
                     }
                 }
             }
@@ -570,7 +572,8 @@ namespace sysal::detail
             zones.reserve(zone_map.size());
             for(auto &[name, zone] : zone_map)
             {
-                zones.push_back(std::move(zone));
+                if(measured_zones.contains(name))
+                    zones.push_back(std::move(zone));
             }
             return zones;
         }

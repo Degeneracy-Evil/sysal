@@ -140,6 +140,7 @@ namespace sysal
         StorageMountInfo,   ///< 当前进程的完整 mountinfo
         Ethtool,            ///< ethtool 只读能力/驱动/永久地址查询
         ProcNetVlan,        ///< VLAN 配置
+        SysfsHwmon,         ///< /sys/class/hwmon 只读传感器
     };
 
     /// @brief 单个原始记录的采集状态

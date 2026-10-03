@@ -198,6 +198,8 @@ namespace sysal::detail
             }
         }
 
+        info.sensors = std::move(result.sensors).value_or(Sensors{});
+
         // 计算可见性：以 ExecutionContext 中的便利索引为依据，
         // 设置各资源子域的 visible_to_current_process 字段。
         compute_cpu_visibility(info.cpu, info.execution);

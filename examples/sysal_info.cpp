@@ -378,6 +378,8 @@ namespace
             return "StorageMountInfo";
         case sysal::RawSource::Ethtool:
             return "Ethtool";
+        case sysal::RawSource::SysfsHwmon:
+            return "SysfsHwmon";
         case sysal::RawSource::ProcNetVlan:
             return "ProcNetVlan";
         }

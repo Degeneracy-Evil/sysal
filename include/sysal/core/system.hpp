@@ -11,11 +11,13 @@
 #include "sysal/model/accelerator.hpp"
 #include "sysal/model/cpu.hpp"
 #include "sysal/model/execution.hpp"
+#include "sysal/model/hardware_health.hpp"
 #include "sysal/model/memory.hpp"
 #include "sysal/model/network.hpp"
 #include "sysal/model/pci.hpp"
 #include "sysal/model/platform.hpp"
 #include "sysal/model/raw_store.hpp"
+#include "sysal/model/sensors.hpp"
 #include "sysal/model/snapshot_meta.hpp"
 #include "sysal/model/software.hpp"
 #include "sysal/model/storage.hpp"
@@ -40,6 +42,8 @@ namespace sysal
         Pci pci;                    ///< PCI 拓扑
         SoftwareStack software;     ///< 软件栈
         ExecutionContext execution; ///< 当前进程的执行上下文
+        Sensors sensors{};
+        HardwareHealth hardware_health{};
     };
 
     /// @brief 顶层采集结果载体

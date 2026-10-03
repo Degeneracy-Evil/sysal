@@ -14,6 +14,7 @@
 #include "sysal/model/network.hpp"
 #include "sysal/model/pci.hpp"
 #include "sysal/model/platform.hpp"
+#include "sysal/model/sensors.hpp"
 #include "sysal/model/software.hpp"
 #include "sysal/model/storage.hpp"
 
@@ -35,6 +36,7 @@ namespace sysal::detail
         std::optional<Storage> storage;
         std::optional<SoftwareStack> software;
         std::optional<ExecutionContext> execution;
+        std::optional<Sensors> sensors;
         std::vector<RuntimeVisibility> accelerator_runtime_visibility;
     };
 

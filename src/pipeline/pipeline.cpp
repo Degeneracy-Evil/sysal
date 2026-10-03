@@ -12,10 +12,12 @@
 #include "parser/network.hpp"
 #include "parser/pci.hpp"
 #include "parser/platform.hpp"
+#include "parser/sensors.hpp"
 #include "parser/software.hpp"
 #include "parser/storage.hpp"
 #include "reader/linux/procfs.hpp"
 #include "reader/linux/sysfs.hpp"
+#include "resolver/hardware_health.hpp"
 #include "resolver/resolve.hpp"
 
 #include "parser/parse_utils.hpp"
@@ -41,6 +43,9 @@ namespace sysal::detail
         {
             switch(source)
             {
+            case RawSource::SysfsHwmon:
+            case RawSource::SysfsThermal:
+                return "sensors";
             case RawSource::SysfsDmi:
                 return "system";
             case RawSource::ProcCpuInfo:
@@ -85,6 +90,8 @@ namespace sysal::detail
                 }
             };
 
+            if(has(flags, Collect::Sensors))
+                check("sensors", result.sensors);
             if(has(flags, Collect::Platform))
             {
                 check("platform", result.platform);
@@ -131,6 +138,8 @@ namespace sysal::detail
 
         // + 运算符将无捕获 lambda 转换为函数指针，避免 std::function 开销
         static const ParserDispatch parser_dispatch[] = {
+            {Collect::Sensors,
+             +[](ParseResult &r, const RawStore &raw, std::vector<std::string> &) { r.sensors = parse_sensors(raw); }},
             {Collect::Platform, +[](ParseResult &r, const RawStore &raw, std::vector<std::string> &w)
                                 { r.platform = parse_platform(raw, w); }},
             {Collect::Cpu,
@@ -187,6 +196,7 @@ namespace sysal::detail
 
         // Resolver：合并、冲突解决、可见性计算
         auto info = resolve(std::move(result), warnings);
+        info.hardware_health = hardware_health(info, flags, raw);
 
         const auto end = std::chrono::system_clock::now();
 

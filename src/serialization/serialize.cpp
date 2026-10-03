@@ -4,6 +4,7 @@
 ///          save/load 操作。System 序列化输出顶层对象含 info、meta、warnings、
 ///          raw 四个字段。使用 nlohmann/json 库进行 JSON 处理。
 
+#include "serialization/hardware.hpp"
 #include <nlohmann/json.hpp>
 
 #include "sysal/core/error.hpp"
@@ -117,7 +118,7 @@ namespace sysal
         [[nodiscard]] RawRecord raw_record_from_json(const json &j)
         {
             RawRecord rec;
-            rec.source = validate_enum(j.at("source").get<std::uint32_t>(), RawSource::ProcNetVlan, "source");
+            rec.source = validate_enum(j.at("source").get<std::uint32_t>(), RawSource::SysfsHwmon, "source");
             j.at("path_or_command").get_to(rec.path_or_command);
             j.at("payload").get_to(rec.payload);
             rec.status = validate_enum(j.at("status").get<std::uint32_t>(), CollectStatus::NotCollected, "status");
@@ -170,7 +171,7 @@ namespace sysal
         {
             CollectionObservation o;
             o.domain = j.at("domain").get<std::string>();
-            o.source = validate_enum(j.at("source").get<std::uint32_t>(), RawSource::ProcNetVlan, "source");
+            o.source = validate_enum(j.at("source").get<std::uint32_t>(), RawSource::SysfsHwmon, "source");
             o.origin = j.at("origin").get<std::string>();
             o.status = validate_enum(j.at("status").get<std::uint32_t>(), CollectStatus::NotCollected, "status");
             if(j.contains("failure"))
@@ -2356,6 +2357,8 @@ namespace sysal
                 {"pci", pci_to_json(info.pci)},
                 {"software", software_to_json(info.software)},
                 {"execution", execution_to_json(info.execution)},
+                {"sensors", detail::sensors_to_json(info.sensors)},
+                {"hardware_health", detail::health_to_json(info.hardware_health)},
             };
         }
 
@@ -2371,6 +2374,10 @@ namespace sysal
             info.pci = pci_from_json(j.at("pci"));
             info.software = software_from_json(j.at("software"));
             info.execution = execution_from_json(j.at("execution"));
+            if(j.contains("sensors"))
+                info.sensors = detail::sensors_from_json(j.at("sensors"));
+            if(j.contains("hardware_health"))
+                info.hardware_health = detail::health_from_json(j.at("hardware_health"));
             return info;
         }
 

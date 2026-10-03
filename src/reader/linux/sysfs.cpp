@@ -6,6 +6,7 @@
 #include "reader/linux/sysfs.hpp"
 #include "reader/linux/file_utils.hpp"
 #include "reader/linux/network_capabilities.hpp"
+#include "reader/linux/sensors.hpp"
 
 #include <filesystem>
 #include <string>
@@ -571,7 +572,7 @@ namespace sysal::reader
             {Collect::Platform, read_dmi_sysfs},
             {Collect::Platform, read_hypervisor_type},
             {Collect::Memory, read_edac_sysfs},
-            {Collect::Cpu, read_thermal_sysfs},
+            {Collect::Sensors, read_sensors},
         };
 
         for(const auto &entry : reader_dispatch)
@@ -581,6 +582,8 @@ namespace sysal::reader
                 entry.read(raw);
             }
         }
+        if(has(flags, Collect::Cpu) && !has(flags, Collect::Sensors))
+            read_thermal_sysfs(raw);
     }
 
 } // namespace sysal::reader
