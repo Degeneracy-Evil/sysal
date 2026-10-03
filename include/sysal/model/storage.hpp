@@ -76,8 +76,8 @@ namespace sysal
     struct Storage
     {
         std::vector<StorageDevice> devices; ///< 存储设备列表
-        std::vector<StorageHealthReport> health{};
         std::vector<StorageMount> mounts{}; ///< 完整挂载清单
+        std::vector<StorageHealthReport> health{};
     };
 
 } // namespace sysal

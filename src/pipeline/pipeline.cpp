@@ -162,7 +162,7 @@ namespace sysal::detail
              +[](ParseResult &r, const RawStore &raw, std::vector<std::string> &w) { r.cpu = parse_cpu(raw, w); }},
             {Collect::Memory, +[](ParseResult &r, const RawStore &raw, std::vector<std::string> &w)
                               { r.memory = parse_memory(raw, w); }},
-            {Collect::Pci | Collect::Network | Collect::Storage,
+            {Collect::Pci | Collect::Network | Collect::Storage | Collect::StorageHealth,
              +[](ParseResult &r, const RawStore &raw, std::vector<std::string> &w) { r.pci = parse_pci(raw, w); }},
             {Collect::Network, +[](ParseResult &r, const RawStore &raw, std::vector<std::string> &w)
                                { r.network = parse_network(raw, w); }},
