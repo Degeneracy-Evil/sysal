@@ -18,6 +18,7 @@
 #include "reader/linux/sysfs.hpp"
 #include "resolver/resolve.hpp"
 
+#include "parser/parse_utils.hpp"
 #include "sysal/core/collect.hpp"
 #include "sysal/core/error.hpp"
 #include "sysal/core/system.hpp"
@@ -35,6 +36,36 @@ namespace sysal::detail
 
     namespace
     {
+
+        std::string observation_domain(RawSource source)
+        {
+            switch(source)
+            {
+            case RawSource::SysfsDmi:
+                return "system";
+            case RawSource::ProcCpuInfo:
+            case RawSource::SysfsCpu:
+                return "cpu";
+            case RawSource::ProcMemInfo:
+            case RawSource::SysfsNuma:
+            case RawSource::SysfsEdac:
+            case RawSource::Udevadm:
+                return "memory";
+            case RawSource::SysfsNet:
+            case RawSource::IfAddrs:
+            case RawSource::Ethtool:
+            case RawSource::ProcNetVlan:
+                return "network";
+            case RawSource::SysfsBlock:
+            case RawSource::StorageMountInfo:
+                return "storage";
+            case RawSource::SysfsPci:
+            case RawSource::Lspci:
+                return "pci";
+            default:
+                return {};
+            }
+        }
 
         /// @brief 记录成功/失败的采集器
         /// @details 根据 ParseResult 各域是否为 nullopt 判断成功与否。
@@ -167,6 +198,24 @@ namespace sysal::detail
         meta.requested_flags = flags;
         meta.succeeded_collectors = std::move(succeeded_collectors);
         meta.failed_collectors = std::move(failed_collectors);
+
+        for(const auto &record : raw.records)
+        {
+            auto domain = observation_domain(record.source);
+            if(!domain.empty())
+            {
+                auto status = record.status;
+                auto failure = record.failure;
+                if(record.source == RawSource::SysfsDmi && status == CollectStatus::Success &&
+                   hardware_text(record.payload).empty())
+                {
+                    status = CollectStatus::Partial;
+                    failure = ReadFailure::NotProvided;
+                }
+                meta.observations.push_back(
+                    CollectionObservation{std::move(domain), record.source, record.path_or_command, status, failure});
+            }
+        }
 
         // 组装 System
         System sys;

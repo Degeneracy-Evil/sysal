@@ -5,6 +5,7 @@
 
 #include "reader/linux/sysfs.hpp"
 #include "reader/linux/file_utils.hpp"
+#include "reader/linux/network_capabilities.hpp"
 
 #include <filesystem>
 #include <string>
@@ -23,15 +24,7 @@ namespace sysal::reader
         /// @param path 文件路径
         void read_sysfs_file(RawStore &raw, RawSource source, const std::string &path)
         {
-            auto content = read_file(path);
-            if(content)
-            {
-                add_record(raw, source, path, *content, CollectStatus::Success);
-            }
-            else
-            {
-                add_record(raw, source, path, "", CollectStatus::Failed);
-            }
+            read_file_record(raw, source, path);
         }
 
         void read_frequency_files(RawStore &raw, const fs::path &directory)
@@ -238,6 +231,33 @@ namespace sysal::reader
                                CollectStatus::Success);
                 }
 
+                std::error_code master_ec;
+                const auto master = fs::read_symlink(dir / "master", master_ec);
+                if(!master_ec)
+                    add_record(raw, RawSource::SysfsNet, (dir / "master").string(), master.filename().string(),
+                               CollectStatus::Success);
+                std::error_code lowers_ec;
+                std::string lowers;
+                for(const auto &link : fs::directory_iterator(dir, lowers_ec))
+                {
+                    const auto filename = link.path().filename().string();
+                    if(filename.starts_with("lower_"))
+                        lowers += filename.substr(6) + "\n";
+                }
+                add_record(raw, RawSource::SysfsNet, (dir / "lower_interfaces").string(), lowers,
+                           lowers_ec ? CollectStatus::Failed : CollectStatus::Success,
+                           lowers_ec ? std::optional{file_failure(lowers_ec.value())} : std::nullopt);
+                const bool physical = fs::exists(dir / "device");
+                const auto kind = fs::exists(dir / "bridge")    ? "bridge"
+                                  : fs::exists(dir / "bonding") ? "bond"
+                                  : physical                    ? "physical"
+                                                                : "virtual";
+                add_record(raw, RawSource::SysfsNet, (dir / "kind").string(), kind, CollectStatus::Success);
+                if(std::string_view(kind) == "bond")
+                    read_sysfs_file(raw, RawSource::SysfsNet, (dir / "bonding" / "mode").string());
+                if(physical)
+                    read_network_capabilities(raw, name);
+
                 // device 符号链接 → PCI 地址（虚拟接口如 lo 无此链接，静默跳过）
                 std::error_code link_ec;
                 auto device_target = fs::read_symlink(dir / "device", link_ec);
@@ -307,7 +327,7 @@ namespace sysal::reader
         /// @details 遍历 /sys/block，读取 size 和 device/ 子目录
         void read_block_sysfs(RawStore &raw)
         {
-            const fs::path block_base = "/sys/block";
+            const fs::path block_base = "/sys/class/block";
             if(!fs::exists(block_base))
             {
                 add_record(raw, RawSource::SysfsBlock, block_base.string(), "", CollectStatus::Failed);
@@ -357,6 +377,25 @@ namespace sysal::reader
                     read_sysfs_file(raw, RawSource::SysfsBlock, (dir / field).string());
                 }
 
+                for(const auto *field : {"dev", "partition", "dm/name", "dm/uuid", "md/level", "md/array_state",
+                                         "md/raid_disks", "md/degraded"})
+                    read_sysfs_file(raw, RawSource::SysfsBlock, (dir / field).string());
+                if(fs::exists(dir / "partition"))
+                {
+                    std::error_code parent_ec;
+                    const auto target = fs::canonical(dir, parent_ec);
+                    if(!parent_ec)
+                        add_record(raw, RawSource::SysfsBlock, (dir / "parent").string(),
+                                   target.parent_path().filename().string(), CollectStatus::Success);
+                }
+                std::error_code slaves_ec;
+                std::string slaves;
+                for(const auto &slave : fs::directory_iterator(dir / "slaves", slaves_ec))
+                    slaves += slave.path().filename().string() + "\n";
+                add_record(raw, RawSource::SysfsBlock, (dir / "slaves").string(), slaves,
+                           slaves_ec ? CollectStatus::Failed : CollectStatus::Success,
+                           slaves_ec ? std::optional{file_failure(slaves_ec.value())} : std::nullopt);
+
                 // 块设备入口本身是符号链接，目标指向 PCI 设备树，如
                 //   /sys/block/nvme0n1 -> ../devices/pci0000:e2/0000:e2:04.0/0000:e4:00.0/nvme/nvme0/nvme0n1
                 // 该目标的最后一个 PCI 地址段（如 0000:e4:00.0）即设备所属的 PCI 控制器。
@@ -385,7 +424,8 @@ namespace sysal::reader
             const fs::path dmi_base = "/sys/class/dmi/id";
             if(!fs::exists(dmi_base))
             {
-                add_record(raw, RawSource::SysfsDmi, dmi_base.string(), "", CollectStatus::Failed);
+                add_record(raw, RawSource::SysfsDmi, dmi_base.string(), "", CollectStatus::NotCollected,
+                           ReadFailure::NotPresent);
                 return;
             }
 
@@ -427,9 +467,12 @@ namespace sysal::reader
             const fs::path edac_base = "/sys/devices/system/edac/mc";
             if(!fs::exists(edac_base))
             {
+                add_record(raw, RawSource::SysfsEdac, edac_base.string(), "", CollectStatus::NotCollected,
+                           ReadFailure::NotPresent);
                 return;
             }
 
+            bool found_controller = false;
             std::error_code ec;
             for(const auto &mc_entry : fs::directory_iterator(edac_base, ec))
             {
@@ -443,6 +486,15 @@ namespace sysal::reader
                 {
                     continue;
                 }
+
+                found_controller = true;
+                for(const auto *field : {"mc_name", "size_mb", "ce_count", "ue_count", "device/numa_node"})
+                    read_sysfs_file(raw, RawSource::SysfsEdac, (mc_entry.path() / field).string());
+                std::error_code device_ec;
+                auto device = fs::read_symlink(mc_entry.path() / "device", device_ec);
+                if(!device_ec)
+                    add_record(raw, RawSource::SysfsEdac, (mc_entry.path() / "device").string(), device.string(),
+                               CollectStatus::Success);
 
                 for(const auto &dimm_entry : fs::directory_iterator(mc_entry.path(), ec))
                 {
@@ -466,6 +518,9 @@ namespace sysal::reader
                     read_sysfs_file(raw, RawSource::SysfsEdac, (dir / "dimm_edac_mode").string());
                 }
             }
+            if(ec || !found_controller)
+                add_record(raw, RawSource::SysfsEdac, edac_base.string(), "", CollectStatus::NotCollected,
+                           ec ? file_failure(ec.value()) : ReadFailure::NotPresent);
         }
 
         /// @brief 采集温度传感器信息

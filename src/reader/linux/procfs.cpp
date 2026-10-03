@@ -31,15 +31,7 @@ namespace sysal::reader
         /// @param path 文件路径
         void read_proc_file(RawStore &raw, RawSource source, const std::string &path)
         {
-            auto content = read_file(path);
-            if(content)
-            {
-                add_record(raw, source, path, *content, CollectStatus::Success);
-            }
-            else
-            {
-                add_record(raw, source, path, "", CollectStatus::Failed);
-            }
+            read_file_record(raw, source, path);
         }
 
         /// @brief 采集单个命令输出
@@ -62,7 +54,7 @@ namespace sysal::reader
                     failure["signal"] = *result.signal;
                 payload = failure.dump();
             }
-            add_record(raw, source, cmd, payload, status);
+            add_record(raw, source, cmd, payload, status, command_failure(result));
         }
 
         /// @brief 通过 uname() 系统调用采集架构与内核信息
@@ -244,12 +236,13 @@ namespace sysal::reader
         {
             read_cmd(raw, RawSource::Lspci, "lspci -nn");
             read_ifaddrs(raw);
+            read_proc_file(raw, RawSource::ProcNetVlan, "/proc/net/vlan/config");
         }
 
         // ---- Storage 域 ----
         if(has(flags, Collect::Storage))
         {
-            read_cmd(raw, RawSource::DfTh, "df -Th");
+            read_proc_file(raw, RawSource::StorageMountInfo, "/proc/self/mountinfo");
         }
 
         // ---- Pci 域 ----

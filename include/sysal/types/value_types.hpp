@@ -10,6 +10,13 @@
 
 namespace sysal
 {
+    /// @brief Linux 块设备号，避免将路径别名视为设备身份
+    struct DeviceNumber
+    {
+        std::uint32_t major{};
+        std::uint32_t minor{};
+        bool operator==(const DeviceNumber &) const = default;
+    };
 
     /// @brief PCI 设备地址
     struct PciAddress

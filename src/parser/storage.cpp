@@ -5,6 +5,7 @@
 #include "storage.hpp"
 
 #include "parse_utils.hpp"
+#include "storage_topology.hpp"
 
 #include <cctype>
 #include <limits>
@@ -53,12 +54,14 @@ namespace sysal::detail
         std::string extract_device_name(std::string_view path)
         {
             // 路径格式: /sys/block/DEVNAME/file 或 /sys/block/DEVNAME/subdir/file
-            auto block_pos = path.find("/sys/block/");
+            const auto prefix = path.starts_with("/sys/class/block/") ? std::string_view{"/sys/class/block/"}
+                                                                      : std::string_view{"/sys/block/"};
+            auto block_pos = path.find(prefix);
             if(block_pos == std::string_view::npos)
             {
                 return {};
             }
-            const auto start = block_pos + 11; // "/sys/block/" 长度
+            const auto start = block_pos + prefix.size(); // "/sys/block/" 长度
             // 在原始视图中查找，避免 GCC 11 对子视图长度的错误越界诊断。
             const auto slash_pos = path.find('/', start);
             const auto end = slash_pos == std::string_view::npos ? path.size() : slash_pos;
@@ -229,6 +232,38 @@ namespace sysal::detail
                 }
             }
 
+            const auto attribute = [&](const char *field)
+            {
+                const auto found = attrs.find(field);
+                return found == attrs.end() ? std::string{} : trim(found->second);
+            };
+            dev.device_number = parse_device_number(attribute("dev"));
+            const auto partition = parse_uint(attribute("partition"));
+            if(partition && *partition <= std::numeric_limits<std::uint32_t>::max())
+                dev.partition_number = static_cast<std::uint32_t>(*partition);
+            const auto parent = attribute("parent");
+            if(!parent.empty())
+                dev.parent = DeviceName{parent};
+            for(const auto &slave : split(attribute("slaves"), '\n'))
+                if(!slave.empty())
+                    dev.slaves.push_back(DeviceName{slave});
+            dev.mapper_name = hardware_text(attribute("name"));
+            dev.mapper_uuid = hardware_text(attribute("uuid"));
+            dev.raid_level = hardware_text(attribute("level"));
+            dev.raid_state = hardware_text(attribute("array_state"));
+            for(const auto &[field, destination] :
+                {std::pair{"raid_disks", &dev.raid_disks}, std::pair{"degraded", &dev.raid_degraded}})
+                if(auto number = parse_uint(attribute(field));
+                   number && *number <= std::numeric_limits<std::uint32_t>::max())
+                    *destination = static_cast<std::uint32_t>(*number);
+            const auto target = attribute("device");
+            dev.layer = dev.partition_number                                   ? "partition"
+                        : !dev.mapper_uuid.empty() || !dev.mapper_name.empty() ? "device-mapper"
+                        : !dev.raid_level.empty()                              ? "md"
+                        : target.find("/virtual/") != std::string::npos        ? "virtual"
+                        : target.empty()                                       ? "unknown"
+                                                                               : "disk";
+
             const std::pair<std::string_view, std::string *> text_fields[] = {{"model", &dev.model},
                                                                               {"vendor", &dev.vendor.value},
                                                                               {"serial", &dev.serial},
@@ -325,6 +360,7 @@ namespace sysal::detail
             ++seq;
         }
 
+        apply_storage_mounts(storage, raw, warnings);
         return storage;
     }
 

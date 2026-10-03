@@ -9,6 +9,7 @@
 
 #include <chrono>
 #include <cstddef>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -24,6 +25,7 @@ namespace sysal
         std::string payload;                                ///< 原始内容
         CollectStatus status;                               ///< 采集状态
         std::chrono::system_clock::time_point collected_at; ///< 采集时刻
+        std::optional<ReadFailure> failure{};               ///< 缺失原因；无原因不等于权限不足
     };
 
     /// @brief 原始证据存储

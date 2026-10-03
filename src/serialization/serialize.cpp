@@ -102,23 +102,28 @@ namespace sysal
 
         [[nodiscard]] json raw_record_to_json(const RawRecord &rec)
         {
-            return json{
+            json j{
                 {"source", static_cast<std::uint64_t>(rec.source)},
                 {"path_or_command", rec.path_or_command},
                 {"payload", rec.payload},
                 {"status", static_cast<std::uint64_t>(rec.status)},
                 {"collected_at", time_point_to_ms(rec.collected_at)},
             };
+            if(rec.failure)
+                j["failure"] = static_cast<std::uint32_t>(*rec.failure);
+            return j;
         }
 
         [[nodiscard]] RawRecord raw_record_from_json(const json &j)
         {
             RawRecord rec;
-            rec.source = validate_enum(j.at("source").get<std::uint32_t>(), RawSource::AcceleratorRuntime, "source");
+            rec.source = validate_enum(j.at("source").get<std::uint32_t>(), RawSource::ProcNetVlan, "source");
             j.at("path_or_command").get_to(rec.path_or_command);
             j.at("payload").get_to(rec.payload);
             rec.status = validate_enum(j.at("status").get<std::uint32_t>(), CollectStatus::NotCollected, "status");
             rec.collected_at = ms_to_time_point(j.at("collected_at").get<std::int64_t>());
+            if(j.contains("failure"))
+                rec.failure = validate_enum(j.at("failure").get<std::uint32_t>(), ReadFailure::NotProvided, "failure");
             return rec;
         }
 
@@ -140,6 +145,102 @@ namespace sysal
                 store.records.push_back(raw_record_from_json(elem));
             }
             return store;
+        }
+
+        [[nodiscard]] json device_number_to_json(const DeviceNumber &number)
+        {
+            return json{{"major", number.major}, {"minor", number.minor}};
+        }
+        [[nodiscard]] DeviceNumber device_number_from_json(const json &j)
+        {
+            return DeviceNumber{j.at("major").get<std::uint32_t>(), j.at("minor").get<std::uint32_t>()};
+        }
+
+        [[nodiscard]] json observation_to_json(const CollectionObservation &o)
+        {
+            json j{{"domain", o.domain},
+                   {"source", static_cast<std::uint32_t>(o.source)},
+                   {"origin", o.origin},
+                   {"status", static_cast<std::uint32_t>(o.status)}};
+            if(o.failure)
+                j["failure"] = static_cast<std::uint32_t>(*o.failure);
+            return j;
+        }
+        [[nodiscard]] CollectionObservation observation_from_json(const json &j)
+        {
+            CollectionObservation o;
+            o.domain = j.at("domain").get<std::string>();
+            o.source = validate_enum(j.at("source").get<std::uint32_t>(), RawSource::ProcNetVlan, "source");
+            o.origin = j.at("origin").get<std::string>();
+            o.status = validate_enum(j.at("status").get<std::uint32_t>(), CollectStatus::NotCollected, "status");
+            if(j.contains("failure"))
+                o.failure = validate_enum(j.at("failure").get<std::uint32_t>(), ReadFailure::NotProvided, "failure");
+            return o;
+        }
+
+        [[nodiscard]] json storage_mount_to_json(const StorageMount &m)
+        {
+            json j{{"mount_id", m.mount_id},
+                   {"parent_mount_id", m.parent_mount_id},
+                   {"device_number", device_number_to_json(m.device_number)},
+                   {"root", m.root},
+                   {"path", m.path.value},
+                   {"filesystem", m.filesystem.value},
+                   {"source", m.source},
+                   {"options", m.options},
+                   {"read_only", m.read_only}};
+            if(m.block_device)
+                j["block_device"] = m.block_device->value;
+            return j;
+        }
+        [[nodiscard]] StorageMount storage_mount_from_json(const json &j)
+        {
+            StorageMount m;
+            m.mount_id = j.at("mount_id").get<std::uint32_t>();
+            m.parent_mount_id = j.at("parent_mount_id").get<std::uint32_t>();
+            m.device_number = device_number_from_json(j.at("device_number"));
+            m.root = j.at("root").get<std::string>();
+            m.path = MountPoint{j.at("path").get<std::string>()};
+            m.filesystem = FilesystemType{j.at("filesystem").get<std::string>()};
+            m.source = j.at("source").get<std::string>();
+            m.options = str_array_from_json(j.at("options"));
+            m.read_only = j.at("read_only").get<bool>();
+            if(j.contains("block_device"))
+                m.block_device = DeviceName{j.at("block_device").get<std::string>()};
+            return m;
+        }
+
+        [[nodiscard]] json memory_controller_to_json(const MemoryController &m)
+        {
+            json j{{"index", m.index}, {"name", m.name}};
+            if(m.capacity)
+                j["capacity"] = m.capacity->value;
+            if(m.corrected_errors)
+                j["corrected_errors"] = *m.corrected_errors;
+            if(m.uncorrected_errors)
+                j["uncorrected_errors"] = *m.uncorrected_errors;
+            if(m.numa_node)
+                j["numa_node"] = m.numa_node->value();
+            if(m.pci_address)
+                j["pci_address"] = pci_address_to_json(*m.pci_address);
+            return j;
+        }
+        [[nodiscard]] MemoryController memory_controller_from_json(const json &j)
+        {
+            MemoryController m;
+            m.index = j.at("index").get<std::uint32_t>();
+            m.name = j.value("name", std::string{});
+            if(j.contains("capacity"))
+                m.capacity = MemorySize{j.at("capacity").get<std::uint64_t>()};
+            if(j.contains("corrected_errors"))
+                m.corrected_errors = j.at("corrected_errors").get<std::uint64_t>();
+            if(j.contains("uncorrected_errors"))
+                m.uncorrected_errors = j.at("uncorrected_errors").get<std::uint64_t>();
+            if(j.contains("numa_node"))
+                m.numa_node = NumaNodeId{j.at("numa_node").get<std::uint32_t>()};
+            if(j.contains("pci_address"))
+                m.pci_address = pci_address_from_json(j.at("pci_address"));
+            return m;
         }
 
         // ───────────────────────────── Platform ─────────────────────────────
@@ -902,6 +1003,14 @@ namespace sysal
             {
                 j["configured_voltage_mv"] = d.configured_voltage_mv->value;
             }
+            if(d.controller_index)
+            {
+                j["controller_index"] = *d.controller_index;
+            }
+            if(d.numa_node)
+            {
+                j["numa_node"] = d.numa_node->value();
+            }
             return j;
         }
 
@@ -954,6 +1063,14 @@ namespace sysal
             {
                 d.configured_voltage_mv = Millivolts{j.at("configured_voltage_mv").get<std::uint64_t>()};
             }
+            if(j.contains("controller_index"))
+            {
+                d.controller_index = j.at("controller_index").get<std::uint32_t>();
+            }
+            if(j.contains("numa_node"))
+            {
+                d.numa_node = NumaNodeId{j.at("numa_node").get<std::uint32_t>()};
+            }
             return d;
         }
 
@@ -992,6 +1109,30 @@ namespace sysal
             {
                 j["populated_dimms"] = *m.populated_dimms;
             }
+            if(!m.dimm_inventory_source.empty())
+            {
+                j["dimm_inventory_source"] = m.dimm_inventory_source;
+            }
+            if(m.reported_slot_count)
+            {
+                j["reported_slot_count"] = *m.reported_slot_count;
+            }
+            if(m.reported_slots_complete)
+            {
+                j["reported_slots_complete"] = *m.reported_slots_complete;
+            }
+            if(!m.controllers.empty())
+            {
+                j["controllers"] = json::array();
+                for(const auto &controller : m.controllers)
+                    j["controllers"].push_back(memory_controller_to_json(controller));
+            }
+            if(!m.reported_array_location.empty())
+                j["reported_array_location"] = m.reported_array_location;
+            if(!m.reported_array_error_correction.empty())
+                j["reported_array_error_correction"] = m.reported_array_error_correction;
+            if(m.reported_array_max_capacity)
+                j["reported_array_max_capacity"] = m.reported_array_max_capacity->value;
             return j;
         }
 
@@ -1033,6 +1174,22 @@ namespace sysal
             {
                 m.populated_dimms = j.at("populated_dimms").get<std::uint32_t>();
             }
+            m.dimm_inventory_source = j.value("dimm_inventory_source", std::string{});
+            if(j.contains("reported_slot_count"))
+            {
+                m.reported_slot_count = j.at("reported_slot_count").get<std::uint32_t>();
+            }
+            if(j.contains("reported_slots_complete"))
+            {
+                m.reported_slots_complete = j.at("reported_slots_complete").get<bool>();
+            }
+            if(j.contains("controllers"))
+                for(const auto &controller : j.at("controllers"))
+                    m.controllers.push_back(memory_controller_from_json(controller));
+            m.reported_array_location = j.value("reported_array_location", std::string{});
+            m.reported_array_error_correction = j.value("reported_array_error_correction", std::string{});
+            if(j.contains("reported_array_max_capacity"))
+                m.reported_array_max_capacity = MemorySize{j.at("reported_array_max_capacity").get<std::uint64_t>()};
             return m;
         }
 
@@ -1189,6 +1346,54 @@ namespace sysal
             {
                 j["device_name"] = ni.device_name.value;
             }
+            if(!ni.firmware_version.empty())
+            {
+                j["firmware_version"] = ni.firmware_version;
+            }
+            if(!ni.driver_version.empty())
+            {
+                j["driver_version"] = ni.driver_version;
+            }
+            if(!ni.interface_kind.empty())
+            {
+                j["interface_kind"] = ni.interface_kind;
+            }
+            if(!ni.bond_mode.empty())
+            {
+                j["bond_mode"] = ni.bond_mode;
+            }
+            if(ni.permanent_mac)
+            {
+                j["permanent_mac"] = ni.permanent_mac->value;
+            }
+            if(ni.autonegotiation)
+            {
+                j["autonegotiation"] = *ni.autonegotiation;
+            }
+            if(ni.master)
+            {
+                j["master"] = ni.master->value;
+            }
+            if(ni.vlan_id)
+            {
+                j["vlan_id"] = *ni.vlan_id;
+            }
+            if(ni.vlan_parent)
+            {
+                j["vlan_parent"] = ni.vlan_parent->value;
+            }
+            if(!ni.lower_interfaces.empty())
+            {
+                j["lower_interfaces"] = json::array();
+                for(const auto &item : ni.lower_interfaces)
+                    j["lower_interfaces"].push_back(item.value);
+            }
+            if(!ni.supported_link_modes.empty())
+                j["supported_link_modes"] = ni.supported_link_modes;
+            if(!ni.advertised_link_modes.empty())
+                j["advertised_link_modes"] = ni.advertised_link_modes;
+            if(!ni.peer_link_modes.empty())
+                j["peer_link_modes"] = ni.peer_link_modes;
             return j;
         }
 
@@ -1237,6 +1442,39 @@ namespace sysal
             }
             ni.vendor = Vendor{j.value("vendor", std::string{})};
             ni.device_name = DeviceName{j.value("device_name", std::string{})};
+            ni.firmware_version = j.value("firmware_version", std::string{});
+            ni.driver_version = j.value("driver_version", std::string{});
+            ni.interface_kind = j.value("interface_kind", std::string{});
+            ni.bond_mode = j.value("bond_mode", std::string{});
+            if(j.contains("permanent_mac"))
+            {
+                ni.permanent_mac = MacAddress{j.at("permanent_mac").get<std::string>()};
+            }
+            if(j.contains("autonegotiation"))
+            {
+                ni.autonegotiation = j.at("autonegotiation").get<bool>();
+            }
+            if(j.contains("master"))
+            {
+                ni.master = InterfaceName{j.at("master").get<std::string>()};
+            }
+            if(j.contains("vlan_id"))
+            {
+                ni.vlan_id = j.at("vlan_id").get<std::uint32_t>();
+            }
+            if(j.contains("vlan_parent"))
+            {
+                ni.vlan_parent = InterfaceName{j.at("vlan_parent").get<std::string>()};
+            }
+            if(j.contains("lower_interfaces"))
+                for(const auto &item : j.at("lower_interfaces"))
+                    ni.lower_interfaces.push_back(InterfaceName{item.get<std::string>()});
+            if(j.contains("supported_link_modes"))
+                ni.supported_link_modes = str_array_from_json(j.at("supported_link_modes"));
+            if(j.contains("advertised_link_modes"))
+                ni.advertised_link_modes = str_array_from_json(j.at("advertised_link_modes"));
+            if(j.contains("peer_link_modes"))
+                ni.peer_link_modes = str_array_from_json(j.at("peer_link_modes"));
             return ni;
         }
 
@@ -1349,6 +1587,50 @@ namespace sysal
             {
                 j["controller_name"] = sd.controller_name;
             }
+            if(!sd.layer.empty())
+            {
+                j["layer"] = sd.layer;
+            }
+            if(!sd.mapper_name.empty())
+            {
+                j["mapper_name"] = sd.mapper_name;
+            }
+            if(!sd.mapper_uuid.empty())
+            {
+                j["mapper_uuid"] = sd.mapper_uuid;
+            }
+            if(!sd.raid_level.empty())
+            {
+                j["raid_level"] = sd.raid_level;
+            }
+            if(!sd.raid_state.empty())
+            {
+                j["raid_state"] = sd.raid_state;
+            }
+            if(sd.partition_number)
+            {
+                j["partition_number"] = *sd.partition_number;
+            }
+            if(sd.parent)
+            {
+                j["parent"] = sd.parent->value;
+            }
+            if(sd.raid_disks)
+            {
+                j["raid_disks"] = *sd.raid_disks;
+            }
+            if(sd.raid_degraded)
+            {
+                j["raid_degraded"] = *sd.raid_degraded;
+            }
+            if(!sd.slaves.empty())
+            {
+                j["slaves"] = json::array();
+                for(const auto &item : sd.slaves)
+                    j["slaves"].push_back(item.value);
+            }
+            if(sd.device_number)
+                j["device_number"] = device_number_to_json(*sd.device_number);
             return j;
         }
 
@@ -1414,6 +1696,32 @@ namespace sysal
             }
             sd.transport = j.value("transport", std::string{});
             sd.controller_name = j.value("controller_name", std::string{});
+            sd.layer = j.value("layer", std::string{});
+            sd.mapper_name = j.value("mapper_name", std::string{});
+            sd.mapper_uuid = j.value("mapper_uuid", std::string{});
+            sd.raid_level = j.value("raid_level", std::string{});
+            sd.raid_state = j.value("raid_state", std::string{});
+            if(j.contains("partition_number"))
+            {
+                sd.partition_number = j.at("partition_number").get<std::uint32_t>();
+            }
+            if(j.contains("parent"))
+            {
+                sd.parent = DeviceName{j.at("parent").get<std::string>()};
+            }
+            if(j.contains("raid_disks"))
+            {
+                sd.raid_disks = j.at("raid_disks").get<std::uint32_t>();
+            }
+            if(j.contains("raid_degraded"))
+            {
+                sd.raid_degraded = j.at("raid_degraded").get<std::uint32_t>();
+            }
+            if(j.contains("slaves"))
+                for(const auto &item : j.at("slaves"))
+                    sd.slaves.push_back(DeviceName{item.get<std::string>()});
+            if(j.contains("device_number"))
+                sd.device_number = device_number_from_json(j.at("device_number"));
             return sd;
         }
 
@@ -1424,7 +1732,14 @@ namespace sysal
             {
                 arr.push_back(storage_dev_to_json(dev));
             }
-            return json{{"devices", std::move(arr)}};
+            json j{{"devices", std::move(arr)}};
+            if(!s.mounts.empty())
+            {
+                j["mounts"] = json::array();
+                for(const auto &mount : s.mounts)
+                    j["mounts"].push_back(storage_mount_to_json(mount));
+            }
+            return j;
         }
 
         [[nodiscard]] Storage storage_from_json(const json &j)
@@ -1434,6 +1749,9 @@ namespace sysal
             {
                 s.devices.push_back(storage_dev_from_json(elem));
             }
+            if(j.contains("mounts"))
+                for(const auto &mount : j.at("mounts"))
+                    s.mounts.push_back(storage_mount_from_json(mount));
             return s;
         }
 
@@ -2081,6 +2399,12 @@ namespace sysal
             }
             j["failed_collectors"] = std::move(fail);
 
+            if(!m.observations.empty())
+            {
+                j["observations"] = json::array();
+                for(const auto &observation : m.observations)
+                    j["observations"].push_back(observation_to_json(observation));
+            }
             return j;
         }
 
@@ -2093,6 +2417,9 @@ namespace sysal
             m.requested_flags = static_cast<Collect>(j.at("requested_flags").get<std::uint32_t>());
             m.succeeded_collectors = str_array_from_json(j.at("succeeded_collectors"));
             m.failed_collectors = str_array_from_json(j.at("failed_collectors"));
+            if(j.contains("observations"))
+                for(const auto &observation : j.at("observations"))
+                    m.observations.push_back(observation_from_json(observation));
             return m;
         }
 

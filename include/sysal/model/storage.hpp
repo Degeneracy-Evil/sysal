@@ -17,6 +17,21 @@
 namespace sysal
 {
 
+    /// @brief 当前进程看到的一条挂载；同一文件系统可有多条记录
+    struct StorageMount
+    {
+        std::uint32_t mount_id{};
+        std::uint32_t parent_mount_id{};
+        DeviceNumber device_number;
+        std::string root;
+        MountPoint path;
+        FilesystemType filesystem;
+        std::string source;
+        std::vector<std::string> options;
+        std::optional<DeviceName> block_device;
+        bool read_only{};
+    };
+
     /// @brief 单个存储设备
     struct StorageDevice
     {
@@ -43,12 +58,24 @@ namespace sysal
         std::string transport{};       ///< 仅保留驱动明确报告的 transport
         std::string controller_name{}; ///< 关联 PCI 控制器名称
         std::string scheduler{};       ///< 当前内核 I/O scheduler
+        std::optional<DeviceNumber> device_number{};
+        std::optional<std::uint32_t> partition_number{};
+        std::optional<DeviceName> parent{};
+        std::vector<DeviceName> slaves{}; ///< 下层块设备，由 sysfs 提供
+        std::string layer{};              ///< disk/partition/device-mapper/md/virtual
+        std::string mapper_name{};
+        std::string mapper_uuid{};
+        std::string raid_level{};
+        std::string raid_state{};
+        std::optional<std::uint32_t> raid_disks{};
+        std::optional<std::uint32_t> raid_degraded{};
     };
 
     /// @brief 存储子系统聚合
     struct Storage
     {
         std::vector<StorageDevice> devices; ///< 存储设备列表
+        std::vector<StorageMount> mounts{}; ///< 完整挂载清单
     };
 
 } // namespace sysal

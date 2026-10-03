@@ -50,3 +50,17 @@ MAC 是当前接口地址，不能保证永久硬件地址，InfiniBand 等接�
 不改变 meta 中用户请求的 flags。虚拟接口没有 PCI 地址时不猜测型号或 NUMA 关联。
 
 来源：[Linux network sysfs ABI](https://github.com/torvalds/linux/blob/master/Documentation/ABI/testing/sysfs-class-net)。
+
+## 驱动能力与接口关系
+
+物理接口通过可选的只读 ethtool 查询补充 `driver_version`、`firmware_version`、
+`permanent_mac`、`autonegotiation`，以及 supported/advertised/peer link modes。
+永久地址未知或全零时保持缺失，不能由当前 MAC 替代。
+链路模式来自驱动能力报告，与当前 `speed` 分开；不会从当前速率推断最大能力。
+查询可能在提供部分数据的同时报告权限错误：保留可用输出，来源状态标为 Partial。
+工具不存在、内核不支持、权限不足或超时均允许缺失，不自动提权。
+
+`master` 与 `lower_interfaces` 来自 sysfs 链接；`interface_kind` 保留 physical、virtual、
+bridge、bond、vlan 分类；`bond_mode` 来自 bonding/mode。
+`vlan_id` / `vlan_parent` 来自 `/proc/net/vlan/config` 的明确记录。
+这些关系描述当前可见接口，不通过接口名猜测 VLAN、bond 或 bridge。

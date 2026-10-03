@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <cctype>
 #include <charconv>
+#include <limits>
 #include <utility>
 
 namespace sysal::detail
@@ -105,6 +106,19 @@ namespace sysal::detail
             return std::nullopt; // 部分消费：剩余字符非数字
         }
         return value;
+    }
+
+    std::optional<DeviceNumber> parse_device_number(std::string_view s)
+    {
+        const auto colon = s.find(':');
+        if(colon == std::string_view::npos)
+            return std::nullopt;
+        const auto major = parse_uint(s.substr(0, colon));
+        const auto minor = parse_uint(s.substr(colon + 1));
+        if(!major || !minor || *major > std::numeric_limits<std::uint32_t>::max() ||
+           *minor > std::numeric_limits<std::uint32_t>::max())
+            return std::nullopt;
+        return DeviceNumber{static_cast<std::uint32_t>(*major), static_cast<std::uint32_t>(*minor)};
     }
 
     std::optional<std::uint64_t> parse_hex(std::string_view s)

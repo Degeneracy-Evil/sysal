@@ -4,6 +4,7 @@
 
 #include "memory.hpp"
 
+#include "memory_topology.hpp"
 #include "parse_utils.hpp"
 
 #include <algorithm>
@@ -375,10 +376,13 @@ namespace sysal::detail
                     continue;
                 }
                 auto dir = path.substr(0, slash);
+                if(dir.find("/dimm") == std::string::npos)
+                    continue; // Controller records are parsed separately.
                 auto fname = path.substr(slash + 1);
                 auto value = hardware_text(rec->payload);
 
                 auto &dimm = grouped[dir];
+                dimm.controller_index = edac_controller_index(path);
                 // Presence follows size, not the existence of an EDAC slot directory.
 
                 if(fname == "dimm_mem_type")
@@ -518,6 +522,7 @@ namespace sysal::detail
             if(!dimms.empty())
             {
                 memory.dimms = std::move(dimms);
+                memory.dimm_inventory_source = "udev";
                 break;
             }
         }
@@ -529,6 +534,8 @@ namespace sysal::detail
         {
             memory.dimms = std::move(edac_dimms);
             memory_type = std::move(edac_type);
+            if(!memory.dimms.empty())
+                memory.dimm_inventory_source = "edac";
         }
         else
         {
@@ -541,11 +548,13 @@ namespace sysal::detail
                 }
                 const auto matches = [&](const DimmInfo &dimm)
                 { return dimm.locator == edac.locator && dimm.size == edac.size; };
-                if(std::count_if(memory.dimms.begin(), memory.dimms.end(), matches) == 1)
+                if(std::count_if(memory.dimms.begin(), memory.dimms.end(), matches) == 1 &&
+                   std::count_if(edac_dimms.begin(), edac_dimms.end(), matches) == 1)
                 {
                     auto dimm = std::find_if(memory.dimms.begin(), memory.dimms.end(), matches);
                     dimm->edac_mode = edac.edac_mode;
                     dimm->device_width = edac.device_width;
+                    dimm->controller_index = edac.controller_index;
                 }
             }
         }
@@ -567,6 +576,7 @@ namespace sysal::detail
             memory.populated_dimms = populated;
         }
 
+        apply_memory_topology(memory, raw);
         return memory;
     }
 

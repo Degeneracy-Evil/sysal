@@ -137,6 +137,9 @@ namespace sysal
         RocmVersion,        ///< ROCm / HIP 版本与路径
         PackageLibrary,     ///< pkg-config 库版本与路径
         AcceleratorRuntime, ///< CUDA Driver / HIP / Level Zero 的当前进程设备枚举
+        StorageMountInfo,   ///< 当前进程的完整 mountinfo
+        Ethtool,            ///< ethtool 只读能力/驱动/永久地址查询
+        ProcNetVlan,        ///< VLAN 配置
     };
 
     /// @brief 单个原始记录的采集状态
@@ -146,6 +149,18 @@ namespace sysal
         Partial,
         Failed,
         NotCollected
+    };
+
+    /// @brief 原始读取缺失原因，旧记录可能没有原因
+    enum class ReadFailure
+    {
+        NotPresent,
+        PermissionDenied,
+        Unsupported,
+        IoError,
+        ToolUnavailable,
+        TimedOut,
+        NotProvided
     };
 
     /// @brief 虚拟化类型

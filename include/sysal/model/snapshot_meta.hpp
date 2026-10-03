@@ -6,6 +6,7 @@
 #pragma once
 
 #include "sysal/core/collect.hpp"
+#include "sysal/model/raw_store.hpp"
 
 #include <chrono>
 #include <string>
@@ -13,6 +14,16 @@
 
 namespace sysal
 {
+
+    /// @brief 无 payload 的硬件采集观察，可在不保留 RawStore 时解释来源
+    struct CollectionObservation
+    {
+        std::string domain; ///< system/cpu/memory/storage/network/pci
+        RawSource source;
+        std::string origin;
+        CollectStatus status;
+        std::optional<ReadFailure> failure{};
+    };
 
     /// @brief 采集元数据
     struct SnapshotMeta
@@ -23,6 +34,7 @@ namespace sysal
         Collect requested_flags;                            ///< 请求的采集域
         std::vector<std::string> succeeded_collectors;      ///< 成功的采集器
         std::vector<std::string> failed_collectors;         ///< 失败的采集器
+        std::vector<CollectionObservation> observations{};
     };
 
 } // namespace sysal

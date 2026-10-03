@@ -24,6 +24,18 @@ namespace sysal
         std::optional<MemorySize> free{};    ///< MemFree，区别于 MemAvailable
     };
 
+    /// @brief EDAC 控制器；编号不是 NUMA/CPU 编号
+    struct MemoryController
+    {
+        std::uint32_t index{};
+        std::string name;
+        std::optional<MemorySize> capacity;
+        std::optional<std::uint64_t> corrected_errors;
+        std::optional<std::uint64_t> uncorrected_errors;
+        std::optional<NumaNodeId> numa_node;
+        std::optional<PciAddress> pci_address;
+    };
+
     /// @brief 单条 DIMM 内存条信息
     struct DimmInfo
     {
@@ -46,6 +58,8 @@ namespace sysal
         std::optional<Millivolts> configured_voltage_mv{};
         std::string edac_mode{};    ///< EDAC 报告的纠错模式
         std::string device_width{}; ///< EDAC 报告的 DRAM device type，如 x8
+        std::optional<std::uint32_t> controller_index{};
+        std::optional<NumaNodeId> numa_node{};
     };
 
     /// @brief 内存子系统聚合
@@ -59,6 +73,13 @@ namespace sysal
         std::vector<DimmInfo> dimms;                      ///< 各 DIMM 内存条信息
         std::optional<std::uint32_t> dimm_count;          ///< DIMM 插槽总数
         std::optional<std::uint32_t> populated_dimms;     ///< 已安装内存条的 DIMM 数
+        std::vector<MemoryController> controllers{};
+        std::string dimm_inventory_source{}; ///< udev/edac
+        std::optional<std::uint32_t> reported_slot_count{};
+        std::string reported_array_location{};
+        std::string reported_array_error_correction{};
+        std::optional<MemorySize> reported_array_max_capacity{};
+        std::optional<bool> reported_slots_complete{}; ///< 是否覆盖固件报告数；不保证固件正确
     };
 
 } // namespace sysal

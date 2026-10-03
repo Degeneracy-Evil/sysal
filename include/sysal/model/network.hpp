@@ -35,6 +35,19 @@ namespace sysal
         std::optional<std::uint32_t> interface_index{};
         Vendor vendor{};          ///< PCI 厂商标识（通常为数值 ID）
         DeviceName device_name{}; ///< 系统 PCI 数据库提供的名称
+        std::string firmware_version{};
+        std::string driver_version{};
+        std::optional<MacAddress> permanent_mac{};
+        std::optional<bool> autonegotiation{};
+        std::vector<std::string> supported_link_modes{};
+        std::vector<std::string> advertised_link_modes{};
+        std::vector<std::string> peer_link_modes{};
+        std::optional<InterfaceName> master{};
+        std::vector<InterfaceName> lower_interfaces{};
+        std::string interface_kind{};
+        std::string bond_mode{};
+        std::optional<std::uint32_t> vlan_id{};
+        std::optional<InterfaceName> vlan_parent{};
     };
 
     /// @brief 网络子系统聚合

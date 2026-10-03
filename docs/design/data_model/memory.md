@@ -23,3 +23,19 @@ EDAC 的插槽目录存在不代表安装内存，presence 根据有效 size 判
 udev 没有属性、旧内核没有 EDAC 或权限不足时，DIMM 字段允许缺失，不自动提权。
 
 来源：[systemd DMI memory 属性导出](https://github.com/systemd/systemd/blob/main/src/udev/dmi_memory_id/dmi_memory_id.c)。
+
+## 控制器、ECC 与清单完整程度
+
+`Memory.controllers` 保存 EDAC mcN 的编号、名称、容量和 CE/UE 计数，
+以及驱动明确提供的 PCI/NUMA 关联。计数是自驱动初始化或计数器重置以来的累计值，
+不是当前错误速率。控制器编号不等于 NUMA 节点或 CPU 编号。
+EDAC DIMM 直接保留所属 `controller_index`；udev DIMM 只有在标签及容量明确匹配且唯一时
+才补充此关系。NUMA 关联沿明确控制器/PCI 关系解析，不按 Bank 或槽位名字猜 CPU。
+
+`dimm_inventory_source` 为 udev 或 edac。
+固件的 MEMORY_ARRAY 属性保留为 `reported_array_location`、
+`reported_array_error_correction`、`reported_array_max_capacity` 和 `reported_slot_count`。
+`reported_slots_complete` 仅比较 udev 清单与固件报告槽数；缺少报告时保持未知，
+即使一致也不保证固件描述完整正确。固件 ECC 报告和 EDAC 的实际纠错模式分别展示。
+
+C++ 调用方需要 PCI 辅助关联时请求 `Collect::Memory | Collect::Pci`；SystemCard 的 memory 选择包含该依赖。

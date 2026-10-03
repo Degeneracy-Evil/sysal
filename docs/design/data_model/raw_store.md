@@ -58,6 +58,9 @@ enum class RawSource
     RocmVersion,    ///< ROCm 版本 / HIP 路径命令与文件
     PackageLibrary, ///< pkg-config 版本 / libdir
     AcceleratorRuntime, ///< CUDA Driver / HIP / Level Zero 枚举
+    StorageMountInfo, ///< /proc/self/mountinfo
+    Ethtool,         ///< 网卡只读能力查询
+    ProcNetVlan,     ///< /proc/net/vlan/config
 };
 
 enum class CollectStatus
@@ -75,6 +78,7 @@ struct RawRecord
     std::string payload;
     CollectStatus status;
     std::chrono::system_clock::time_point collected_at;
+    std::optional<ReadFailure> failure{};
 };
 
 struct RawStore
@@ -96,3 +100,15 @@ struct RawStore
 `RawStore` 在 `System` 中是可选的。通过在 `System::collect()` 时
 将 `Collect::Raw` 加入请求的 `Collect` 位掩码来启用采集；未设置该标志时
 `System::raw` 为 `std::nullopt`。
+
+## 读取结果与来源观察
+
+`ReadFailure` 区分 NotPresent、PermissionDenied、Unsupported、IoError、
+ToolUnavailable、TimedOut、NotProvided。不存在分类证据时保持缺失，不推断原因。
+读取失败保留原来源与路径，不将失败值当作有效硬件配置。
+
+`SnapshotMeta.observations` 保留普通硬件采集的 domain、source、origin、status、failure，
+不包含 payload，因此无需请求 `Collect::Raw` 也能查看采集来源。
+它记录的是来源查询结果，并非每个字段的完整追踪：Success 不保证来源提供全部字段；
+DMI 空值及占位文本记为 Partial / NotProvided。旧 JSON 没有这些新字段时使用默认值。
+Sysal 枚举的新值仅追加，保留已有序列化编号。

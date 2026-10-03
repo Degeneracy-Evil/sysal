@@ -40,6 +40,9 @@ namespace sysal::detail
     /// @brief 解析 PCI 地址（十六进制格式 DDDD:BB:DD.F）
     std::optional<PciAddress> parse_pci_address(std::string_view s);
 
+    /// @brief 解析 major:minor 设备号
+    std::optional<DeviceNumber> parse_device_number(std::string_view s);
+
     /// @brief 将 KB 单位的值转换为字节数
     std::optional<MemorySize> parse_kb_to_bytes(std::string_view s);
 

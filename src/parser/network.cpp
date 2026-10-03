@@ -4,6 +4,7 @@
 
 #include "network.hpp"
 
+#include "network_details.hpp"
 #include "parse_utils.hpp"
 
 #include <limits>
@@ -198,6 +199,20 @@ namespace sysal::detail
                         }
                     }
                 }
+                else if(filename == "master")
+                {
+                    iface.master = InterfaceName{trim(payload)};
+                }
+                else if(filename == "lower_interfaces")
+                {
+                    for(const auto &name : split(payload, '\n'))
+                        if(!name.empty())
+                            iface.lower_interfaces.push_back(InterfaceName{name});
+                }
+                else if(filename == "kind")
+                    iface.interface_kind = trim(payload);
+                else if(filename == "mode")
+                    iface.bond_mode = trim(payload);
                 else if(filename == "device")
                 {
                     // payload 是符号链接目标，如 "../../../0000:41:00.0"
@@ -229,6 +244,7 @@ namespace sysal::detail
             network.interfaces.push_back(iface);
         }
 
+        apply_network_details(network, raw);
         return network;
     }
 

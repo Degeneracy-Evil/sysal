@@ -157,6 +157,16 @@ namespace sysal::detail
         info.software = std::move(result.software).value_or(SoftwareStack{});
         info.execution = std::move(result.execution).value_or(ExecutionContext{});
 
+        for(auto &controller : info.memory.controllers)
+            if(!controller.numa_node && controller.pci_address)
+                if(const auto *device = info.pci.find(*controller.pci_address))
+                    controller.numa_node = device->numa_node;
+        for(auto &dimm : info.memory.dimms)
+            if(!dimm.numa_node && dimm.controller_index)
+                for(const auto &controller : info.memory.controllers)
+                    if(controller.index == *dimm.controller_index)
+                        dimm.numa_node = controller.numa_node;
+
         // 通过明确的 PCI 地址关联硬件身份；不按接口名或型号猜测设备。
         for(auto &iface : info.network.interfaces)
         {

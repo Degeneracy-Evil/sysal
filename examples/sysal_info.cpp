@@ -374,6 +374,12 @@ namespace
             return "PackageLibrary";
         case sysal::RawSource::AcceleratorRuntime:
             return "AcceleratorRuntime";
+        case sysal::RawSource::StorageMountInfo:
+            return "StorageMountInfo";
+        case sysal::RawSource::Ethtool:
+            return "Ethtool";
+        case sysal::RawSource::ProcNetVlan:
+            return "ProcNetVlan";
         }
         return "?";
     }
