@@ -72,7 +72,7 @@ TEST_CASE("test_reader")
     // IfAddrs（getifaddrs 系统调用，始终可用）
     CHECK(raw.has(sysal::RawSource::IfAddrs));
 
-    // DfTh（df 命令，Linux 上普遍可用）
+    // StorageMountInfo（当前进程命名空间的挂载清单）
     CHECK(raw.has(sysal::RawSource::StorageMountInfo));
 
     // ---- sysfs 采集测试 ----
