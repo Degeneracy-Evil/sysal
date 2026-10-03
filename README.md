@@ -39,6 +39,7 @@ sysal::System partial = sysal::System::collect(
 | accelerators | Accelerators | GPU、NPU、FPGA |
 | network | Network | 网卡、链路状态、IP、PCI 地址 |
 | storage | Storage | 块设备、容量、类型、挂载点 |
+| storage health | StorageHealth | 只读 NVMe / SMART 报告、明确设备关联与失败原因 |
 | pci | Pci | PCI 设备清单 |
 | software | SoftwareStack | 驱动、运行时、CUDA、ROCm、MPI、RDMA |
 | execution | ExecutionContext | 进程环境、cgroup、cpuset、容器、可见性 |

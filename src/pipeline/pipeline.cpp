@@ -15,6 +15,7 @@
 #include "parser/sensors.hpp"
 #include "parser/software.hpp"
 #include "parser/storage.hpp"
+#include "parser/storage_health.hpp"
 #include "reader/linux/procfs.hpp"
 #include "reader/linux/sysfs.hpp"
 #include "resolver/hardware_health.hpp"
@@ -28,6 +29,7 @@
 #include "sysal/test/replay.hpp"
 #include "sysal/version.hpp"
 
+#include <algorithm>
 #include <chrono>
 #include <string>
 #include <utility>
@@ -61,6 +63,10 @@ namespace sysal::detail
             case RawSource::Ethtool:
             case RawSource::ProcNetVlan:
                 return "network";
+            case RawSource::StorageHealthSysfs:
+            case RawSource::Smartctl:
+            case RawSource::NvmeSmartLog:
+                return "storage_health";
             case RawSource::SysfsBlock:
             case RawSource::StorageMountInfo:
                 return "storage";
@@ -120,6 +126,16 @@ namespace sysal::detail
             {
                 check("storage", result.storage);
             }
+            if(has(flags, Collect::StorageHealth))
+            {
+                const bool available =
+                    result.storage && std::any_of(result.storage->health.begin(), result.storage->health.end(),
+                                                  [](const auto &report) {
+                                                      return report.status == CollectStatus::Success ||
+                                                             report.status == CollectStatus::Partial;
+                                                  });
+                (available ? succeeded : failed).push_back("storage_health");
+            }
             if(has(flags, Collect::Software))
             {
                 check("software", result.software);
@@ -157,8 +173,9 @@ namespace sysal::detail
                  if(r.accelerators.has_value())
                      r.accelerator_runtime_visibility = parse_accelerator_runtime_visibility(raw, *r.accelerators);
              }},
-            {Collect::Storage, +[](ParseResult &r, const RawStore &raw, std::vector<std::string> &w)
-                               { r.storage = parse_storage(raw, w); }},
+            {Collect::Storage | Collect::StorageHealth,
+             +[](ParseResult &r, const RawStore &raw, std::vector<std::string> &w)
+             { r.storage = parse_storage(raw, w); }},
             {Collect::Software, +[](ParseResult &r, const RawStore &raw, std::vector<std::string> &w)
                                 { r.software = parse_software(raw, w); }},
             {Collect::Execution, +[](ParseResult &r, const RawStore &raw, std::vector<std::string> &w)
@@ -181,6 +198,9 @@ namespace sysal::detail
                 entry.parse(result, raw, warnings);
             }
         }
+
+        if(has(flags, Collect::StorageHealth) && result.storage)
+            parse_storage_health(*result.storage, raw, warnings);
 
         // 记录成功/失败的采集器（在 resolve 移动之前）
         std::vector<std::string> succeeded_collectors;

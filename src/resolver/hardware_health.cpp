@@ -1,4 +1,5 @@
 #include "resolver/hardware_health.hpp"
+#include "resolver/storage_health.hpp"
 
 #include <algorithm>
 
@@ -112,6 +113,7 @@ namespace sysal::detail
         }
         memory.status = status(has(flags, Collect::Memory), memory.usable_readings, incomplete_edac);
         health.coverage.push_back(memory);
+        storage_findings(health, info.storage, flags, raw);
         return health;
     }
 } // namespace sysal::detail

@@ -61,11 +61,31 @@ namespace sysal
         std::uint32_t usable_readings{};
         std::uint32_t alarm_reports{};
     };
+    enum class DriveFindingKind
+    {
+        SmartFailed,
+        NvmeWarning,
+        SpareLow,
+        EnduranceEstimate,
+        AtaCurrent,
+        AtaHistorical,
+        NvmeMediaHistory,
+        ScsiHistory
+    };
+    struct DriveFinding
+    {
+        DeviceName target;
+        DriveFindingKind kind{};
+        HealthSeverity severity{};
+        std::string origin;
+        std::optional<std::uint8_t> attribute_id;
+    };
     struct HardwareHealth
     {
         std::vector<SensorAlert> sensor_alerts;
         std::vector<StorageAlert> storage_alerts;
         std::vector<MemoryErrorEvent> memory_events;
         std::vector<HealthCoverage> coverage;
+        std::vector<DriveFinding> drive_findings;
     };
 } // namespace sysal

@@ -14,9 +14,9 @@ namespace sysal
     inline constexpr int VERSION_MINOR = 0;
 
     /// @brief 修订版本号
-    inline constexpr int VERSION_PATCH = 15;
+    inline constexpr int VERSION_PATCH = 16;
 
     /// @brief 完整版本字符串（如 "0.0.1"）
-    inline constexpr const char *VERSION_STRING = "0.0.15";
+    inline constexpr const char *VERSION_STRING = "0.0.16";
 
 } // namespace sysal

@@ -5,6 +5,7 @@
 ///          raw 四个字段。使用 nlohmann/json 库进行 JSON 处理。
 
 #include "serialization/hardware.hpp"
+#include "serialization/storage_health.hpp"
 #include <nlohmann/json.hpp>
 
 #include "sysal/core/error.hpp"
@@ -118,13 +119,13 @@ namespace sysal
         [[nodiscard]] RawRecord raw_record_from_json(const json &j)
         {
             RawRecord rec;
-            rec.source = validate_enum(j.at("source").get<std::uint32_t>(), RawSource::SysfsHwmon, "source");
+            rec.source = validate_enum(j.at("source").get<std::uint32_t>(), RawSource::NvmeSmartLog, "source");
             j.at("path_or_command").get_to(rec.path_or_command);
             j.at("payload").get_to(rec.payload);
             rec.status = validate_enum(j.at("status").get<std::uint32_t>(), CollectStatus::NotCollected, "status");
             rec.collected_at = ms_to_time_point(j.at("collected_at").get<std::int64_t>());
             if(j.contains("failure"))
-                rec.failure = validate_enum(j.at("failure").get<std::uint32_t>(), ReadFailure::NotProvided, "failure");
+                rec.failure = validate_enum(j.at("failure").get<std::uint32_t>(), ReadFailure::LowPower, "failure");
             return rec;
         }
 
@@ -171,11 +172,11 @@ namespace sysal
         {
             CollectionObservation o;
             o.domain = j.at("domain").get<std::string>();
-            o.source = validate_enum(j.at("source").get<std::uint32_t>(), RawSource::SysfsHwmon, "source");
+            o.source = validate_enum(j.at("source").get<std::uint32_t>(), RawSource::NvmeSmartLog, "source");
             o.origin = j.at("origin").get<std::string>();
             o.status = validate_enum(j.at("status").get<std::uint32_t>(), CollectStatus::NotCollected, "status");
             if(j.contains("failure"))
-                o.failure = validate_enum(j.at("failure").get<std::uint32_t>(), ReadFailure::NotProvided, "failure");
+                o.failure = validate_enum(j.at("failure").get<std::uint32_t>(), ReadFailure::LowPower, "failure");
             return o;
         }
 
@@ -1734,6 +1735,12 @@ namespace sysal
                 arr.push_back(storage_dev_to_json(dev));
             }
             json j{{"devices", std::move(arr)}};
+            if(!s.health.empty())
+            {
+                j["health"] = json::array();
+                for(const auto &report : s.health)
+                    j["health"].push_back(detail::storage_health_to_json(report));
+            }
             if(!s.mounts.empty())
             {
                 j["mounts"] = json::array();
@@ -1750,6 +1757,9 @@ namespace sysal
             {
                 s.devices.push_back(storage_dev_from_json(elem));
             }
+            if(j.contains("health"))
+                for(const auto &report : j.at("health"))
+                    s.health.push_back(detail::storage_health_from_json(report));
             if(j.contains("mounts"))
                 for(const auto &mount : j.at("mounts"))
                     s.mounts.push_back(storage_mount_from_json(mount));

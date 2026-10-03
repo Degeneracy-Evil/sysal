@@ -5,6 +5,7 @@
 
 #pragma once
 
+#include "sysal/model/storage_health.hpp"
 #include "sysal/types/enums.hpp"
 #include "sysal/types/ids.hpp"
 #include "sysal/types/units.hpp"
@@ -75,6 +76,7 @@ namespace sysal
     struct Storage
     {
         std::vector<StorageDevice> devices; ///< 存储设备列表
+        std::vector<StorageHealthReport> health{};
         std::vector<StorageMount> mounts{}; ///< 完整挂载清单
     };
 

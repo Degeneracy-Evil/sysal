@@ -378,6 +378,12 @@ namespace
             return "StorageMountInfo";
         case sysal::RawSource::Ethtool:
             return "Ethtool";
+        case sysal::RawSource::StorageHealthSysfs:
+            return "StorageHealthSysfs";
+        case sysal::RawSource::Smartctl:
+            return "Smartctl";
+        case sysal::RawSource::NvmeSmartLog:
+            return "NvmeSmartLog";
         case sysal::RawSource::SysfsHwmon:
             return "SysfsHwmon";
         case sysal::RawSource::ProcNetVlan:

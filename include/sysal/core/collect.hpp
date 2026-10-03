@@ -25,6 +25,7 @@ namespace sysal
         Execution = 1 << 8,
         Raw = 1 << 9,
         Sensors = 1 << 10,
+        StorageHealth = 1 << 11,
     };
 
     /// @brief 按位或，组合多个采集域
@@ -53,6 +54,6 @@ namespace sysal
     /// @brief 预设：全部域
     constexpr Collect full = Collect::Platform | Collect::Cpu | Collect::Memory | Collect::Accelerator |
                              Collect::Network | Collect::Storage | Collect::Pci | Collect::Software |
-                             Collect::Execution | Collect::Raw | Collect::Sensors;
+                             Collect::Execution | Collect::Raw | Collect::Sensors | Collect::StorageHealth;
 
 } // namespace sysal

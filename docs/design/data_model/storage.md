@@ -51,7 +51,7 @@ scheduler 是 queue/scheduler 中方括号标出的当前调度器，none 保留
 size 永远按 Linux 定义的 512 字节扇区换算，与 logical_block_size 无关；乘法先检查溢出。
 
 RAID 暴露的块设备是控制器提供的逻辑设备，型号与 rotational 等信息不能用来断言底层每块硬盘的情况。
-旧 mount_point/fs_type 继续表示选取的挂载位置，不代表完整分区树；本层不执行 SMART 或介质扫描。
+旧 mount_point/fs_type 继续表示选取的挂载位置，不代表完整分区树；基础块设备采集不执行 SMART；独立 StorageHealth 域仅执行只读健康查询，不执行介质扫描。
 
 来源：[Linux block sysfs ABI](https://github.com/torvalds/linux/blob/master/Documentation/ABI/stable/sysfs-block)。
 
@@ -71,3 +71,20 @@ md 保留 `raid_level`、`raid_state`、`raid_disks`、`raid_degraded`，不执�
 
 容量属于各层独立设备，不能将整盘、分区与 device-mapper/md 容量相加。
 SystemCard 的容量摘要只加总 disk 层；这是系统暴露的容量，硬件 RAID 后面的物理盘容量可能不可见。
+
+## 设备健康报告
+
+追加 `Storage.health`，由独立 `Collect::StorageHealth` 请求，完整预设包含该域。
+报告的 target 是 NVMe 控制器或 ATA/SCSI 整盘，devices 仅保存 sysfs 明确关联的块设备。
+不关联分区，不将控制器累计计数重复分配给命名空间。
+每条报告带 protocol/source/origin/status/failure；失败时保存身份和原因，数值保持未知。
+
+`NvmeHealth` 使用有符号毫摄氏度、百分数和 critical_warning 位掩码。StorageCounter
+保留精确 uint128 十进制字符串；数据单位计数以 1000 * 512 字节为单位。寿命估计允许
+超过 100，累计介质错误属于历史证据，不代表当前 I/O 正在出错。ATA 属性保留工具
+报告的归一化值、阈值和厂商 raw 文本，不按 ID 猜测通用物理意义。SCSI 保留明确的
+read/write/verify 不可纠正错误累计计数。
+
+`hardware_health.drive_findings` 区分当前设备告警、寿命估计和历史事件，
+storage_health 覆盖状态不等于硬件健康结论。旧 JSON 缺少上述字段时默认空集合。
+查询参数、安全边界与模块划分见 [存储健康设计](../../storage-health-design.md)。

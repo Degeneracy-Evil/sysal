@@ -141,6 +141,9 @@ namespace sysal
         Ethtool,            ///< ethtool 只读能力/驱动/永久地址查询
         ProcNetVlan,        ///< VLAN 配置
         SysfsHwmon,         ///< /sys/class/hwmon 只读传感器
+        StorageHealthSysfs, ///< Explicit storage health target/protocol associations
+        Smartctl,           ///< Fixed read-only SMART queries
+        NvmeSmartLog,       ///< Controller-wide NVMe SMART log query
     };
 
     /// @brief 单个原始记录的采集状态
@@ -161,7 +164,8 @@ namespace sysal
         IoError,
         ToolUnavailable,
         TimedOut,
-        NotProvided
+        NotProvided,
+        LowPower
     };
 
     /// @brief 虚拟化类型

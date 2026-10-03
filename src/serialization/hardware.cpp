@@ -148,7 +148,8 @@ namespace sysal::detail
         json j{{"sensor_alerts", json::array()},
                {"storage_alerts", json::array()},
                {"memory_events", json::array()},
-               {"coverage", json::array()}};
+               {"coverage", json::array()},
+               {"drive_findings", json::array()}};
         for(const auto &alert : health.sensor_alerts)
             j["sensor_alerts"].push_back({{"sensor", alert.sensor.value},
                                           {"kind", static_cast<unsigned>(alert.kind)},
@@ -170,6 +171,16 @@ namespace sysal::detail
             if(event.uncorrected)
                 e["uncorrected"] = *event.uncorrected;
             j["memory_events"].push_back(e);
+        }
+        for(const auto &finding : health.drive_findings)
+        {
+            json f{{"target", finding.target.value},
+                   {"kind", static_cast<unsigned>(finding.kind)},
+                   {"severity", static_cast<unsigned>(finding.severity)},
+                   {"origin", finding.origin}};
+            if(finding.attribute_id)
+                f["attribute_id"] = *finding.attribute_id;
+            j["drive_findings"].push_back(f);
         }
         for(const auto &coverage : health.coverage)
             j["coverage"].push_back({{"domain", coverage.domain},
@@ -203,6 +214,23 @@ namespace sysal::detail
                 event.severity = checked(e, "severity", HealthSeverity::Critical);
                 event.origin = e.at("origin").get<std::string>();
                 health.memory_events.push_back(event);
+            }
+        if(j.contains("drive_findings"))
+            for(const auto &f : j.at("drive_findings"))
+            {
+                DriveFinding finding{DeviceName{f.at("target").get<std::string>()},
+                                     checked(f, "kind", DriveFindingKind::ScsiHistory),
+                                     checked(f, "severity", HealthSeverity::Critical),
+                                     f.at("origin").get<std::string>(),
+                                     {}};
+                if(f.contains("attribute_id"))
+                {
+                    const auto value = f.at("attribute_id").get<std::uint64_t>();
+                    if(value == 0 || value > 255)
+                        throw SysalError(ErrorKind::DeserializationError, "invalid finding attribute ID");
+                    finding.attribute_id = static_cast<std::uint8_t>(value);
+                }
+                health.drive_findings.push_back(finding);
             }
         if(j.contains("coverage"))
             for(const auto &c : j.at("coverage"))
