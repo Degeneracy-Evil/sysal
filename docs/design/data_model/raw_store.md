@@ -112,3 +112,6 @@ ToolUnavailable、TimedOut、NotProvided。不存在分类证据时保持缺失�
 它记录的是来源查询结果，并非每个字段的完整追踪：Success 不保证来源提供全部字段；
 DMI 空值及占位文本记为 Partial / NotProvided。旧 JSON 没有这些新字段时使用默认值。
 Sysal 枚举的新值仅追加，保留已有序列化编号。
+
+`SysfsStorageConnections`（55）记录 NVMe 控制器、SCSI host、整盘协议属性与
+实际 sysfs 连接路径，归属 storage 域；既有 RawSource 编号保持不变。

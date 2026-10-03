@@ -68,6 +68,7 @@ namespace sysal::detail
             case RawSource::Smartctl:
             case RawSource::NvmeSmartLog:
                 return "storage_health";
+            case RawSource::SysfsStorageConnections:
             case RawSource::SysfsBlock:
             case RawSource::StorageMountInfo:
                 return "storage";

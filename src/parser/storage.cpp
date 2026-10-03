@@ -3,6 +3,7 @@
 /// @details 从 sysfs 块设备数据解析存储设备信息。
 
 #include "storage.hpp"
+#include "parser/storage_connections.hpp"
 
 #include "parse_utils.hpp"
 #include "storage_topology.hpp"
@@ -109,7 +110,7 @@ namespace sysal::detail
     std::optional<Storage> parse_storage(const RawStore &raw, std::vector<std::string> &warnings)
     {
         auto block_records = raw.get_all(RawSource::SysfsBlock);
-        if(block_records.empty())
+        if(block_records.empty() && raw.get_all(RawSource::SysfsStorageConnections).empty())
         {
             warnings.push_back("parse_storage: 缺少 SysfsBlock 数据");
             return std::nullopt;
@@ -136,7 +137,8 @@ namespace sysal::detail
         if(device_attrs.empty())
         {
             warnings.push_back("parse_storage: SysfsBlock 记录中无有效块设备");
-            return std::nullopt;
+            if(raw.get_all(RawSource::SysfsStorageConnections).empty())
+                return std::nullopt;
         }
 
         // 解析 df -Th 输出：设备名 → {mount_point, fs_type}
@@ -360,6 +362,7 @@ namespace sysal::detail
             ++seq;
         }
 
+        apply_storage_connections(storage, raw);
         apply_storage_mounts(storage, raw, warnings);
         return storage;
     }

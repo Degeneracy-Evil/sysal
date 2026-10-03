@@ -88,3 +88,18 @@ read/write/verify 不可纠正错误累计计数。
 `hardware_health.drive_findings` 区分当前设备告警、寿命估计和历史事件，
 storage_health 覆盖状态不等于硬件健康结论。旧 JSON 缺少上述字段时默认空集合。
 查询参数、安全边界与模块划分见 [存储健康设计](../../storage-health-design.md)。
+
+## 控制器与协议连接
+
+`Storage.controllers` 保存 mass-storage PCI 功能；`nvme_controllers` 和
+`scsi_hosts` 分别保存内核 NVMe 控制器和 SCSI host，数量不能混作物理卡数量。
+
+整盘的 `nvme_namespace` 保留 NSID、NGUID、EUI 和明确控制器列表；不同子系统的
+同一 NSID 不会合并。multipath 仅沿真实 sysfs links 关联。内核 uuid 属性可能
+回退成 NGUID 且产生警告，本库不读取或宣称该值为真实 UUID。
+
+`scsi_device` 保留 H:C:T:L 地址、类型和状态，LUN 为 uint64。SCSI host 的
+`ata_port` 是内核端口编号，不是背板槽位。硬件 RAID 逻辑卷不代表后台物理盘清单。
+分区沿现有 parent 关系关联整盘，不重复协议对象。
+
+详见[存储连接设计](../../storage-connections-design.md)。

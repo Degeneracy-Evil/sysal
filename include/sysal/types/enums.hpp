@@ -113,38 +113,39 @@ namespace sysal
         HwinfoOutput, ///< hwinfo 命令输出
 
         // 新增来源（追加在末尾以保持枚举值稳定性）
-        ProcHostname,       ///< /proc/sys/kernel/hostname
-        IfAddrs,            ///< getifaddrs() 网络接口地址
-        DfTh,               ///< df -Th 文件系统挂载信息
-        Udevadm,            ///< udevadm info -e 硬件数据库
-        SysfsEdac,          ///< /sys/devices/system/edac 内存 DIMM 信息
-        SysHypervisor,      ///< /sys/hypervisor/type
-        CompilerVersion,    ///< 编译器 --version 命令输出
-        CompilerPath,       ///< 编译器通用命令查找路径（command -v）
-        CompilerTarget,     ///< 编译器 -dumpmachine 目标架构输出
-        MpiVersion,         ///< MPI 实现 --version 命令输出
-        MpiPath,            ///< MPI 可执行文件路径（command -v）
-        IbverbsVersion,     ///< libibverbs 版本（pkg-config）
-        IbverbsLibdir,      ///< libibverbs 库目录（pkg-config）
-        UcxVersion,         ///< UCX 版本（pkg-config）
-        NvccPath,           ///< nvcc 可执行文件路径（command -v nvcc）
-        CudaHome,           ///< CUDA_HOME 环境变量
-        SysfsThermal,       ///< /sys/class/thermal 温度传感器
-        CgroupMountInfo,    ///< /proc/self/mountinfo：cgroup 挂载与命名空间根
-        CgroupFile,         ///< 当前 cgroup 及祖先的资源限制文件
-        SysfsDrm,           ///< DRM 设备信息（AMD / Intel / NVIDIA 降级）
-        NvidiaMigList,      ///< nvidia-smi -L：UUID 与 MIG 实例
-        RocmVersion,        ///< ROCm / HIP 版本与路径
-        PackageLibrary,     ///< pkg-config 库版本与路径
-        AcceleratorRuntime, ///< CUDA Driver / HIP / Level Zero 的当前进程设备枚举
-        StorageMountInfo,   ///< 当前进程的完整 mountinfo
-        Ethtool,            ///< ethtool 只读能力/驱动/永久地址查询
-        ProcNetVlan,        ///< VLAN 配置
-        SysfsHwmon,         ///< /sys/class/hwmon 只读传感器
-        StorageHealthSysfs, ///< Explicit storage health target/protocol associations
-        Smartctl,           ///< Fixed read-only SMART queries
-        NvmeSmartLog,       ///< Controller-wide NVMe SMART log query
-        SysfsRdma,          ///< /sys/class/infiniband 基础设备与端口报告
+        ProcHostname,            ///< /proc/sys/kernel/hostname
+        IfAddrs,                 ///< getifaddrs() 网络接口地址
+        DfTh,                    ///< df -Th 文件系统挂载信息
+        Udevadm,                 ///< udevadm info -e 硬件数据库
+        SysfsEdac,               ///< /sys/devices/system/edac 内存 DIMM 信息
+        SysHypervisor,           ///< /sys/hypervisor/type
+        CompilerVersion,         ///< 编译器 --version 命令输出
+        CompilerPath,            ///< 编译器通用命令查找路径（command -v）
+        CompilerTarget,          ///< 编译器 -dumpmachine 目标架构输出
+        MpiVersion,              ///< MPI 实现 --version 命令输出
+        MpiPath,                 ///< MPI 可执行文件路径（command -v）
+        IbverbsVersion,          ///< libibverbs 版本（pkg-config）
+        IbverbsLibdir,           ///< libibverbs 库目录（pkg-config）
+        UcxVersion,              ///< UCX 版本（pkg-config）
+        NvccPath,                ///< nvcc 可执行文件路径（command -v nvcc）
+        CudaHome,                ///< CUDA_HOME 环境变量
+        SysfsThermal,            ///< /sys/class/thermal 温度传感器
+        CgroupMountInfo,         ///< /proc/self/mountinfo：cgroup 挂载与命名空间根
+        CgroupFile,              ///< 当前 cgroup 及祖先的资源限制文件
+        SysfsDrm,                ///< DRM 设备信息（AMD / Intel / NVIDIA 降级）
+        NvidiaMigList,           ///< nvidia-smi -L：UUID 与 MIG 实例
+        RocmVersion,             ///< ROCm / HIP 版本与路径
+        PackageLibrary,          ///< pkg-config 库版本与路径
+        AcceleratorRuntime,      ///< CUDA Driver / HIP / Level Zero 的当前进程设备枚举
+        StorageMountInfo,        ///< 当前进程的完整 mountinfo
+        Ethtool,                 ///< ethtool 只读能力/驱动/永久地址查询
+        ProcNetVlan,             ///< VLAN 配置
+        SysfsHwmon,              ///< /sys/class/hwmon 只读传感器
+        StorageHealthSysfs,      ///< Explicit storage health target/protocol associations
+        Smartctl,                ///< Fixed read-only SMART queries
+        NvmeSmartLog,            ///< Controller-wide NVMe SMART log query
+        SysfsRdma,               ///< /sys/class/infiniband 基础设备与端口报告
+        SysfsStorageConnections, ///< NVMe/SCSI host 和块设备的明确 sysfs 连接
     };
 
     /// @brief 单个原始记录的采集状态

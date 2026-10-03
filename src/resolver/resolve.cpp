@@ -4,6 +4,7 @@
 ///          交叉校验便利索引与资源级 visible_to_current_process 的一致性。
 
 #include "resolver/resolve.hpp"
+#include "parser/storage_connections.hpp"
 #include "resolver/accelerator_visibility.hpp"
 
 #include <algorithm>
@@ -153,6 +154,7 @@ namespace sysal::detail
         info.pci = std::move(result.pci).value_or(Pci{});
         info.network = std::move(result.network).value_or(Network{});
         info.accelerators = std::move(result.accelerators).value_or(Accelerators{});
+        const bool storage_collected = result.storage.has_value();
         info.storage = std::move(result.storage).value_or(Storage{});
         info.software = std::move(result.software).value_or(SoftwareStack{});
         info.execution = std::move(result.execution).value_or(ExecutionContext{});
@@ -201,6 +203,9 @@ namespace sysal::detail
                 }
             }
         }
+        if(storage_collected)
+            resolve_storage_connections(info.storage, info.pci);
+
         for(auto &storage : info.storage.devices)
         {
             if(storage.pci_address)

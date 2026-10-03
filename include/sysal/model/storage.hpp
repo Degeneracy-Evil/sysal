@@ -5,6 +5,7 @@
 
 #pragma once
 
+#include "sysal/model/storage_connections.hpp"
 #include "sysal/model/storage_health.hpp"
 #include "sysal/types/enums.hpp"
 #include "sysal/types/ids.hpp"
@@ -70,6 +71,8 @@ namespace sysal
         std::string raid_state{};
         std::optional<std::uint32_t> raid_disks{};
         std::optional<std::uint32_t> raid_degraded{};
+        std::optional<NvmeNamespaceInfo> nvme_namespace{};
+        std::optional<ScsiDeviceInfo> scsi_device{};
     };
 
     /// @brief 存储子系统聚合
@@ -78,6 +81,9 @@ namespace sysal
         std::vector<StorageDevice> devices; ///< 存储设备列表
         std::vector<StorageMount> mounts{}; ///< 完整挂载清单
         std::vector<StorageHealthReport> health{};
+        std::vector<StorageController> controllers{};
+        std::vector<NvmeController> nvme_controllers{};
+        std::vector<ScsiHost> scsi_hosts{};
     };
 
 } // namespace sysal

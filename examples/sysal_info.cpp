@@ -386,6 +386,8 @@ namespace
             return "NvmeSmartLog";
         case sysal::RawSource::SysfsRdma:
             return "SysfsRdma";
+        case sysal::RawSource::SysfsStorageConnections:
+            return "SysfsStorageConnections";
         case sysal::RawSource::SysfsHwmon:
             return "SysfsHwmon";
         case sysal::RawSource::ProcNetVlan:

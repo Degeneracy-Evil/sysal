@@ -10,6 +10,7 @@
 #include "reader/linux/pci.hpp"
 #include "reader/linux/rdma.hpp"
 #include "reader/linux/sensors.hpp"
+#include "reader/linux/storage_connections.hpp"
 #include "reader/linux/storage_health.hpp"
 
 #include <filesystem>
@@ -460,6 +461,7 @@ namespace sysal::reader
             {Collect::Network, read_rdma_sysfs},
             {Collect::Pci | Collect::Network | Collect::Storage | Collect::StorageHealth, read_pci_sysfs},
             {Collect::Storage | Collect::StorageHealth, read_block_sysfs},
+            {Collect::Storage | Collect::StorageHealth, read_storage_connections},
             {Collect::Platform, read_dmi_sysfs},
             {Collect::Platform, read_hypervisor_type},
             {Collect::Memory, read_edac_sysfs},

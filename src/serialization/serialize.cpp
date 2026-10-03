@@ -8,6 +8,7 @@
 #include "serialization/json_values.hpp"
 #include "serialization/memory_topology.hpp"
 #include "serialization/rdma.hpp"
+#include "serialization/storage_connections.hpp"
 #include "serialization/storage_health.hpp"
 #include <nlohmann/json.hpp>
 
@@ -105,7 +106,8 @@ namespace sysal
         [[nodiscard]] RawRecord raw_record_from_json(const json &j)
         {
             RawRecord rec;
-            rec.source = validate_enum(j.at("source").get<std::uint32_t>(), RawSource::SysfsRdma, "source");
+            rec.source =
+                validate_enum(j.at("source").get<std::uint32_t>(), RawSource::SysfsStorageConnections, "source");
             j.at("path_or_command").get_to(rec.path_or_command);
             j.at("payload").get_to(rec.payload);
             rec.status = validate_enum(j.at("status").get<std::uint32_t>(), CollectStatus::NotCollected, "status");
@@ -158,7 +160,7 @@ namespace sysal
         {
             CollectionObservation o;
             o.domain = j.at("domain").get<std::string>();
-            o.source = validate_enum(j.at("source").get<std::uint32_t>(), RawSource::SysfsRdma, "source");
+            o.source = validate_enum(j.at("source").get<std::uint32_t>(), RawSource::SysfsStorageConnections, "source");
             o.origin = j.at("origin").get<std::string>();
             o.status = validate_enum(j.at("status").get<std::uint32_t>(), CollectStatus::NotCollected, "status");
             if(j.contains("failure"))
@@ -1640,6 +1642,7 @@ namespace sysal
             }
             if(sd.device_number)
                 j["device_number"] = device_number_to_json(*sd.device_number);
+            detail::storage_device_connections_to_json(j, sd);
             return j;
         }
 
@@ -1731,6 +1734,7 @@ namespace sysal
                     sd.slaves.push_back(DeviceName{item.get<std::string>()});
             if(j.contains("device_number"))
                 sd.device_number = device_number_from_json(j.at("device_number"));
+            detail::storage_device_connections_from_json(j, sd);
             return sd;
         }
 
@@ -1754,6 +1758,7 @@ namespace sysal
                 for(const auto &mount : s.mounts)
                     j["mounts"].push_back(storage_mount_to_json(mount));
             }
+            detail::storage_connections_to_json(j, s);
             return j;
         }
 
@@ -1770,6 +1775,7 @@ namespace sysal
             if(j.contains("mounts"))
                 for(const auto &mount : j.at("mounts"))
                     s.mounts.push_back(storage_mount_from_json(mount));
+            detail::storage_connections_from_json(j, s);
             return s;
         }
 
