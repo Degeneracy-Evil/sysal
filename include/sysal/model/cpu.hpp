@@ -73,11 +73,11 @@ namespace sysal
     /// @brief 逻辑 CPU（硬件线程）
     struct LogicalCpu
     {
-        LogicalCpuId id;                     ///< 逻辑 CPU ID
-        CpuCoreId core_id;                   ///< 所属物理核 ID
-        CpuPackageId package_id;             ///< 所属封装 ID（反范式化）
-        std::optional<NumaNodeId> numa_node; ///< 所属 NUMA 节点（可能未知）
-        bool visible_to_current_process{};   ///< 当前进程是否可见
+        LogicalCpuId id;                                  ///< 逻辑 CPU ID
+        CpuCoreId core_id;                                ///< 所属物理核 ID
+        CpuPackageId package_id;                          ///< 所属封装 ID（反范式化）
+        std::optional<NumaNodeId> numa_node;              ///< 所属 NUMA 节点（可能未知）
+        std::optional<bool> visible_to_current_process{}; ///< 当前进程是否可见；缺少亲和性证据时未知
         CpuIdentification identification{};
         std::optional<bool> online{}; ///< 内核明确报告的在线状态
     };

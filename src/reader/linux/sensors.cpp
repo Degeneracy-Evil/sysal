@@ -41,8 +41,8 @@ namespace sysal::reader
         void scan(RawStore &raw, const fs::path &base, RawSource source)
         {
             std::error_code ec;
-            fs::directory_iterator entries(base, ec);
-            if(ec)
+            const auto entries = directory_entries(base, ec);
+            if(ec && entries.empty())
             {
                 add_record(raw, source, base.string(), "", CollectStatus::NotCollected, file_failure(ec.value()));
                 return;
@@ -77,7 +77,7 @@ namespace sysal::reader
                     }
 
                 std::error_code attributes_ec;
-                fs::directory_iterator attributes(entry.path(), attributes_ec);
+                const auto attributes = directory_entries(entry.path(), attributes_ec);
                 for(const auto &attribute : attributes)
                 {
                     const auto field = attribute.path().filename().string();
@@ -93,7 +93,8 @@ namespace sysal::reader
                     add_record(raw, source, entry.path().string(), "", CollectStatus::Failed,
                                file_failure(attributes_ec.value()));
             }
-            if(!found)
+            record_directory_failure(raw, source, base, ec);
+            if(!found && !ec)
                 add_record(raw, source, base.string(), "", CollectStatus::NotCollected, ReadFailure::NotPresent);
         }
     } // namespace

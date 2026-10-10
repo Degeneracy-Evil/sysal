@@ -20,15 +20,15 @@ namespace sysal
     /// @brief 单个网络接口
     struct NetworkInterface
     {
-        InterfaceName name;                    ///< 接口名称
-        MacAddress mac;                        ///< MAC 地址
-        InterfaceState state{};                ///< 链路状态
-        std::optional<Bandwidth> speed;        ///< 链路速率（可能未知）
-        std::vector<IpAddress> addresses;      ///< 绑定的 IP 地址列表
-        std::optional<PciAddress> pci_address; ///< PCI 地址（可能无）
-        bool visible_to_current_process{};     ///< 当前进程是否可见
-        std::optional<MemorySize> mtu{};       ///< 当前 MTU（字节）
-        std::optional<bool> carrier{};         ///< 内核报告的链路 carrier
+        InterfaceName name;                            ///< 接口名称
+        MacAddress mac;                                ///< MAC 地址
+        InterfaceState state{InterfaceState::Unknown}; ///< 链路状态
+        std::optional<Bandwidth> speed;                ///< 链路速率（可能未知）
+        std::vector<IpAddress> addresses;              ///< 绑定的 IP 地址列表
+        std::optional<PciAddress> pci_address;         ///< PCI 地址（可能无）
+        bool visible_to_current_process{};             ///< 当前进程是否可见
+        std::optional<MemorySize> mtu{};               ///< 当前 MTU（字节）
+        std::optional<bool> carrier{};                 ///< 内核报告的链路 carrier
         std::string duplex{};
         std::string driver{};
         std::string physical_port_name{};

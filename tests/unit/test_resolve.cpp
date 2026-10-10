@@ -56,7 +56,7 @@ TEST_CASE("test_resolve")
         CHECK(!has_visibility_mismatch);
     }
 
-    // ---- 测试 2: CPU 可见性——无 cpuset 约束（全部可见） ----
+    // ---- 测试 2: CPU 可见性——缺少亲和性证据（未知） ----
     {
         ParseResult result;
 
@@ -72,7 +72,7 @@ TEST_CASE("test_resolve")
         }
         result.cpu = std::move(cpu);
 
-        // 空 visible_logical_cpu_ids → 无约束，全部可见
+        // 空 visible_logical_cpu_ids 且未报告亲和性 → 未知
         ExecutionContext exec;
         result.execution = std::move(exec);
 
@@ -81,7 +81,7 @@ TEST_CASE("test_resolve")
 
         for(const auto &lc : info.cpu.logical_cpus)
         {
-            CHECK(lc.visible_to_current_process == true);
+            CHECK(!lc.visible_to_current_process.has_value());
         }
     }
 

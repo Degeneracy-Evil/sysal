@@ -20,10 +20,11 @@ namespace sysal::reader
         void read_devices(RawStore &raw, const fs::path &controller)
         {
             std::error_code ec;
-            for(const auto &entry : fs::directory_iterator(controller, ec))
+            for(const auto &entry : directory_entries(controller, ec))
             {
                 const auto name = entry.path().filename().string();
-                if((!numbered(name, "dimm") && !numbered(name, "rank")) || !entry.is_directory(ec))
+                if((!numbered(name, "dimm") && !numbered(name, "rank")) ||
+                   !directory_entry_is_directory(raw, RawSource::SysfsEdac, entry))
                     continue;
                 for(const auto *field :
                     {"dimm_mem_type", "size", "dimm_label", "dimm_location", "dimm_dev_type", "dimm_edac_mode"})
@@ -46,9 +47,10 @@ namespace sysal::reader
             return;
         }
         bool found = false;
-        for(const auto &entry : fs::directory_iterator(root, ec))
+        for(const auto &entry : directory_entries(root, ec))
         {
-            if(!numbered(entry.path().filename().string(), "mc") || !entry.is_directory(ec))
+            if(!numbered(entry.path().filename().string(), "mc") ||
+               !directory_entry_is_directory(raw, RawSource::SysfsEdac, entry))
                 continue;
             found = true;
             for(const auto *field : {"mc_name", "size_mb", "ce_count", "ue_count", "device/numa_node", "max_location"})

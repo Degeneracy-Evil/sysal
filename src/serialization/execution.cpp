@@ -188,6 +188,7 @@ namespace sysal::detail
             vcpu.push_back(id.value());
         }
         j["visible_logical_cpu_ids"] = std::move(vcpu);
+        j["cpu_visibility_known"] = e.cpu_visibility_known;
 
         json vacc = json::array();
         for(const auto &id : e.visible_accelerator_ids)
@@ -212,6 +213,7 @@ namespace sysal::detail
         ExecutionContext e;
         e.process = process_from_json(j.at("process"));
         e.environment = environment_from_json(j.at("environment"));
+        e.cpu_visibility_known = j.value("cpu_visibility_known", false);
         e.accelerator_visibility_restricted = j.value("accelerator_visibility_restricted", false);
         e.cgroup = cgroup_from_json(j.at("cgroup"));
         e.cpuset = cpuset_from_json(j.at("cpuset"));

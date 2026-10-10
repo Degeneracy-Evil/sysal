@@ -20,18 +20,9 @@ namespace sysal::detail
         /// @brief 计算逻辑 CPU 可见性
         /// @details 根据 ExecutionContext.cpuset 中的可见 CPU ID 列表，
         ///          设置每个 LogicalCpu 的 visible_to_current_process。
-        ///          若 cpuset 为空（无约束），所有 CPU 均可见。
+        ///          缺少完整的 CPU 亲和性证据时不推断可见性。
         void compute_cpu_visibility(Cpu &cpu, const ExecutionContext &exec)
         {
-            if(exec.visible_logical_cpu_ids.empty())
-            {
-                for(auto &lc : cpu.logical_cpus)
-                {
-                    lc.visible_to_current_process = lc.online != false;
-                }
-                return;
-            }
-
             std::unordered_set<std::uint32_t> visible_set;
             visible_set.reserve(exec.visible_logical_cpu_ids.size());
             for(const auto &id : exec.visible_logical_cpu_ids)
@@ -41,7 +32,12 @@ namespace sysal::detail
 
             for(auto &lc : cpu.logical_cpus)
             {
-                lc.visible_to_current_process = lc.online != false && visible_set.count(lc.id.value()) != 0;
+                if(lc.online == false)
+                    lc.visible_to_current_process = false;
+                else if(exec.cpu_visibility_known || !visible_set.empty())
+                    lc.visible_to_current_process = visible_set.count(lc.id.value()) != 0;
+                else
+                    lc.visible_to_current_process.reset();
             }
         }
 

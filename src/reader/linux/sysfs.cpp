@@ -50,9 +50,12 @@ namespace sysal::reader
         void read_cpu_sysfs(RawStore &raw)
         {
             const fs::path cpu_base = "/sys/devices/system/cpu";
-            if(!fs::exists(cpu_base))
+            const auto exists = path_exists(raw, RawSource::SysfsCpu, cpu_base);
+            if(!exists || !*exists)
             {
-                add_record(raw, RawSource::SysfsCpu, cpu_base.string(), "", CollectStatus::Failed);
+                if(exists)
+                    add_record(raw, RawSource::SysfsCpu, cpu_base.string(), "", CollectStatus::Failed,
+                               ReadFailure::NotPresent);
                 return;
             }
 
@@ -65,7 +68,7 @@ namespace sysal::reader
             std::error_code policy_ec;
             if(fs::is_directory(policy_base, policy_ec))
             {
-                for(const auto &policy : fs::directory_iterator(policy_base, policy_ec))
+                for(const auto &policy : directory_entries(policy_base, policy_ec))
                 {
                     const auto name = policy.path().filename().string();
                     if(name.size() <= 6 || !name.starts_with("policy") ||
@@ -77,12 +80,13 @@ namespace sysal::reader
                     read_frequency_files(raw, policy.path());
                 }
             }
+            record_directory_failure(raw, RawSource::SysfsCpu, policy_base, policy_ec);
 
             bool found_any = false;
             std::error_code ec;
-            for(const auto &entry : fs::directory_iterator(cpu_base, ec))
+            for(const auto &entry : directory_entries(cpu_base, ec))
             {
-                if(!entry.is_directory())
+                if(!directory_entry_is_directory(raw, RawSource::SysfsCpu, entry))
                 {
                     continue;
                 }
@@ -110,6 +114,7 @@ namespace sysal::reader
                     std::error_code frequency_ec;
                     if(fs::is_directory(dir / "cpufreq", frequency_ec))
                         read_frequency_files(raw, dir / "cpufreq");
+                    record_directory_failure(raw, RawSource::SysfsCpu, dir / "cpufreq", frequency_ec);
                 }
                 else
                 {
@@ -122,7 +127,7 @@ namespace sysal::reader
                 const auto cache_dir = dir / "cache";
                 if(fs::is_directory(cache_dir, cache_ec))
                 {
-                    for(const auto &cache_entry : fs::directory_iterator(cache_dir, cache_ec))
+                    for(const auto &cache_entry : directory_entries(cache_dir, cache_ec))
                     {
                         const auto &cache_name = cache_entry.path().filename().string();
                         if(cache_name.size() < 6 || cache_name.substr(0, 5) != "index")
@@ -142,9 +147,11 @@ namespace sysal::reader
                                         (cache_entry.path() / "coherency_line_size").string());
                     }
                 }
+                record_directory_failure(raw, RawSource::SysfsCpu, cache_dir, cache_ec);
             }
+            record_directory_failure(raw, RawSource::SysfsCpu, cpu_base, ec);
 
-            if(!found_any)
+            if(!found_any && !ec)
             {
                 add_record(raw, RawSource::SysfsCpu, cpu_base.string(), "", CollectStatus::Failed);
             }
@@ -156,17 +163,20 @@ namespace sysal::reader
         void read_numa_sysfs(RawStore &raw)
         {
             const fs::path node_base = "/sys/devices/system/node";
-            if(!fs::exists(node_base))
+            const auto exists = path_exists(raw, RawSource::SysfsNuma, node_base);
+            if(!exists || !*exists)
             {
-                add_record(raw, RawSource::SysfsNuma, node_base.string(), "", CollectStatus::Failed);
+                if(exists)
+                    add_record(raw, RawSource::SysfsNuma, node_base.string(), "", CollectStatus::Failed,
+                               ReadFailure::NotPresent);
                 return;
             }
 
             bool found_any = false;
             std::error_code ec;
-            for(const auto &entry : fs::directory_iterator(node_base, ec))
+            for(const auto &entry : directory_entries(node_base, ec))
             {
-                if(!entry.is_directory())
+                if(!directory_entry_is_directory(raw, RawSource::SysfsNuma, entry))
                 {
                     continue;
                 }
@@ -183,8 +193,9 @@ namespace sysal::reader
                 read_sysfs_file(raw, RawSource::SysfsNuma, (dir / "cpulist").string());
                 read_sysfs_file(raw, RawSource::SysfsNuma, (dir / "meminfo").string());
             }
+            record_directory_failure(raw, RawSource::SysfsNuma, node_base, ec);
 
-            if(!found_any)
+            if(!found_any && !ec)
             {
                 add_record(raw, RawSource::SysfsNuma, node_base.string(), "", CollectStatus::Failed);
             }
@@ -196,17 +207,20 @@ namespace sysal::reader
         void read_net_sysfs(RawStore &raw)
         {
             const fs::path net_base = "/sys/class/net";
-            if(!fs::exists(net_base))
+            const auto exists = path_exists(raw, RawSource::SysfsNet, net_base);
+            if(!exists || !*exists)
             {
-                add_record(raw, RawSource::SysfsNet, net_base.string(), "", CollectStatus::Failed);
+                if(exists)
+                    add_record(raw, RawSource::SysfsNet, net_base.string(), "", CollectStatus::Failed,
+                               ReadFailure::NotPresent);
                 return;
             }
 
             bool found_any = false;
             std::error_code ec;
-            for(const auto &entry : fs::directory_iterator(net_base, ec))
+            for(const auto &entry : directory_entries(net_base, ec))
             {
-                if(!entry.is_directory() && !entry.is_symlink())
+                if(!directory_entry_is_directory(raw, RawSource::SysfsNet, entry))
                 {
                     continue;
                 }
@@ -244,7 +258,7 @@ namespace sysal::reader
                                CollectStatus::Success);
                 std::error_code lowers_ec;
                 std::string lowers;
-                for(const auto &link : fs::directory_iterator(dir, lowers_ec))
+                for(const auto &link : directory_entries(dir, lowers_ec))
                 {
                     const auto filename = link.path().filename().string();
                     if(filename.starts_with("lower_"))
@@ -253,16 +267,18 @@ namespace sysal::reader
                 add_record(raw, RawSource::SysfsNet, (dir / "lower_interfaces").string(), lowers,
                            lowers_ec ? CollectStatus::Failed : CollectStatus::Success,
                            lowers_ec ? std::optional{file_failure(lowers_ec.value())} : std::nullopt);
-                const bool physical = fs::exists(dir / "device");
-                const auto kind = fs::exists(dir / "bridge")    ? "bridge"
-                                  : fs::exists(dir / "bonding") ? "bond"
-                                  : physical                    ? "physical"
-                                                                : "virtual";
-                add_record(raw, RawSource::SysfsNet, (dir / "kind").string(), kind, CollectStatus::Success);
-                if(std::string_view(kind) == "bond")
-                    read_sysfs_file(raw, RawSource::SysfsNet, (dir / "bonding" / "mode").string());
-                if(physical)
-                    read_network_capabilities(raw, name);
+                const auto physical = path_exists(raw, RawSource::SysfsNet, dir / "device");
+                const auto bridge = path_exists(raw, RawSource::SysfsNet, dir / "bridge");
+                const auto bond = path_exists(raw, RawSource::SysfsNet, dir / "bonding");
+                if(physical && bridge && bond)
+                {
+                    const auto kind = *bridge ? "bridge" : *bond ? "bond" : *physical ? "physical" : "virtual";
+                    add_record(raw, RawSource::SysfsNet, (dir / "kind").string(), kind, CollectStatus::Success);
+                    if(*bond)
+                        read_sysfs_file(raw, RawSource::SysfsNet, (dir / "bonding" / "mode").string());
+                    if(*physical)
+                        read_network_capabilities(raw, name);
+                }
 
                 // device 符号链接 → PCI 地址（虚拟接口如 lo 无此链接，静默跳过）
                 std::error_code link_ec;
@@ -274,7 +290,8 @@ namespace sysal::reader
                 }
             }
 
-            if(!found_any)
+            record_directory_failure(raw, RawSource::SysfsNet, net_base, ec);
+            if(!found_any && !ec)
             {
                 add_record(raw, RawSource::SysfsNet, net_base.string(), "", CollectStatus::Failed);
             }
@@ -286,17 +303,20 @@ namespace sysal::reader
         void read_block_sysfs(RawStore &raw)
         {
             const fs::path block_base = "/sys/class/block";
-            if(!fs::exists(block_base))
+            const auto exists = path_exists(raw, RawSource::SysfsBlock, block_base);
+            if(!exists || !*exists)
             {
-                add_record(raw, RawSource::SysfsBlock, block_base.string(), "", CollectStatus::Failed);
+                if(exists)
+                    add_record(raw, RawSource::SysfsBlock, block_base.string(), "", CollectStatus::Failed,
+                               ReadFailure::NotPresent);
                 return;
             }
 
             bool found_any = false;
             std::error_code ec;
-            for(const auto &entry : fs::directory_iterator(block_base, ec))
+            for(const auto &entry : directory_entries(block_base, ec))
             {
-                if(!entry.is_directory() && !entry.is_symlink())
+                if(!directory_entry_is_directory(raw, RawSource::SysfsBlock, entry))
                 {
                     continue;
                 }
@@ -338,7 +358,7 @@ namespace sysal::reader
                 for(const auto *field : {"dev", "partition", "dm/name", "dm/uuid", "md/level", "md/array_state",
                                          "md/raid_disks", "md/degraded"})
                     read_sysfs_file(raw, RawSource::SysfsBlock, (dir / field).string());
-                if(fs::exists(dir / "partition"))
+                if(path_exists(raw, RawSource::SysfsBlock, dir / "partition").value_or(false))
                 {
                     std::error_code parent_ec;
                     const auto target = fs::canonical(dir, parent_ec);
@@ -348,7 +368,7 @@ namespace sysal::reader
                 }
                 std::error_code slaves_ec;
                 std::string slaves;
-                for(const auto &slave : fs::directory_iterator(dir / "slaves", slaves_ec))
+                for(const auto &slave : directory_entries(dir / "slaves", slaves_ec))
                     slaves += slave.path().filename().string() + "\n";
                 add_record(raw, RawSource::SysfsBlock, (dir / "slaves").string(), slaves,
                            slaves_ec ? CollectStatus::Failed : CollectStatus::Success,
@@ -368,7 +388,8 @@ namespace sysal::reader
                 }
             }
 
-            if(!found_any)
+            record_directory_failure(raw, RawSource::SysfsBlock, block_base, ec);
+            if(!found_any && !ec)
             {
                 add_record(raw, RawSource::SysfsBlock, block_base.string(), "", CollectStatus::Failed);
             }
@@ -380,10 +401,12 @@ namespace sysal::reader
         void read_dmi_sysfs(RawStore &raw)
         {
             const fs::path dmi_base = "/sys/class/dmi/id";
-            if(!fs::exists(dmi_base))
+            const auto exists = path_exists(raw, RawSource::SysfsDmi, dmi_base);
+            if(!exists || !*exists)
             {
-                add_record(raw, RawSource::SysfsDmi, dmi_base.string(), "", CollectStatus::NotCollected,
-                           ReadFailure::NotPresent);
+                if(exists)
+                    add_record(raw, RawSource::SysfsDmi, dmi_base.string(), "", CollectStatus::NotCollected,
+                               ReadFailure::NotPresent);
                 return;
             }
 
@@ -400,7 +423,7 @@ namespace sysal::reader
             }
 
             // UEFI 检测：/sys/firmware/efi 在 UEFI 系统上存在
-            if(fs::exists("/sys/firmware/efi"))
+            if(path_exists(raw, RawSource::SysfsDmi, "/sys/firmware/efi").value_or(false))
             {
                 add_record(raw, RawSource::SysfsDmi, "/sys/firmware/efi", "1", CollectStatus::Success);
             }
@@ -422,15 +445,15 @@ namespace sysal::reader
         void read_thermal_sysfs(RawStore &raw)
         {
             const fs::path thermal_base = "/sys/class/thermal";
-            if(!fs::exists(thermal_base))
+            if(!path_exists(raw, RawSource::SysfsThermal, thermal_base).value_or(false))
             {
                 return;
             }
 
             std::error_code ec;
-            for(const auto &entry : fs::directory_iterator(thermal_base, ec))
+            for(const auto &entry : directory_entries(thermal_base, ec))
             {
-                if(!entry.is_directory())
+                if(!directory_entry_is_directory(raw, RawSource::SysfsThermal, entry))
                 {
                     continue;
                 }
@@ -442,6 +465,7 @@ namespace sysal::reader
                 read_sysfs_file(raw, RawSource::SysfsThermal, (entry.path() / "type").string());
                 read_sysfs_file(raw, RawSource::SysfsThermal, (entry.path() / "temp").string());
             }
+            record_directory_failure(raw, RawSource::SysfsThermal, thermal_base, ec);
         }
 
     } // namespace

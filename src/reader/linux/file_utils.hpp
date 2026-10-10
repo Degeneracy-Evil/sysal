@@ -16,6 +16,7 @@
 #include <sstream>
 #include <string>
 #include <string_view>
+#include <vector>
 
 namespace sysal::reader
 {
@@ -61,7 +62,8 @@ namespace sysal::reader
     /// @return 存在返回 true
     inline bool file_exists(const std::string &path)
     {
-        return std::filesystem::exists(path);
+        std::error_code error;
+        return std::filesystem::exists(path, error);
     }
 
     /// @brief 向 RawStore 添加一条记录
@@ -100,6 +102,48 @@ namespace sysal::reader
         if(error == EOPNOTSUPP || error == ENODEV || error == ENXIO || error == EINVAL)
             return ReadFailure::Unsupported;
         return ReadFailure::IoError;
+    }
+
+    /// @brief Enumerate with nonthrowing increments and retain entries read before an error.
+    inline std::vector<std::filesystem::directory_entry> directory_entries(const std::filesystem::path &path,
+                                                                           std::error_code &error)
+    {
+        std::vector<std::filesystem::directory_entry> entries;
+        std::filesystem::directory_iterator entry(path, error);
+        const std::filesystem::directory_iterator end;
+        for(; entry != end && !error; entry.increment(error))
+            entries.push_back(*entry);
+        return entries;
+    }
+
+    inline void record_directory_failure(RawStore &raw, RawSource source, const std::filesystem::path &path,
+                                         const std::error_code &error)
+    {
+        if(error)
+            add_record(raw, source, path.string(), "", CollectStatus::Partial, file_failure(error.value()));
+    }
+
+    inline bool directory_entry_is_directory(RawStore &raw, RawSource source,
+                                             const std::filesystem::directory_entry &entry)
+    {
+        std::error_code error;
+        const bool result = entry.is_directory(error);
+        if(error)
+            add_record(raw, source, entry.path().string(), "", CollectStatus::Failed, file_failure(error.value()));
+        return result;
+    }
+
+    /// @brief Absence is false; inability to determine existence is unknown.
+    inline std::optional<bool> path_exists(RawStore &raw, RawSource source, const std::filesystem::path &path)
+    {
+        std::error_code error;
+        const bool result = std::filesystem::exists(path, error);
+        if(error)
+        {
+            add_record(raw, source, path.string(), "", CollectStatus::Failed, file_failure(error.value()));
+            return std::nullopt;
+        }
+        return result;
     }
 
     inline void read_file_record(RawStore &raw, RawSource source, const std::string &path)

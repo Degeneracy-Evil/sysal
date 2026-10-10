@@ -166,7 +166,7 @@ namespace sysal::reader
             const fs::path root{"/sys/class/drm"};
             if(!fs::exists(root, error))
                 return;
-            const fs::directory_iterator cards(root, error);
+            const auto cards = directory_entries(root, error);
             add_record(raw, RawSource::SysfsDrm, root.string(), "{}",
                        error ? CollectStatus::Failed : CollectStatus::Success);
             for(const auto &entry : cards)

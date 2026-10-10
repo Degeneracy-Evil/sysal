@@ -6,9 +6,11 @@
 
 #include "parse_utils.hpp"
 #include "parser/cgroup.hpp"
+#include "parser/cpu_details.hpp"
 
 #include <cstdint>
 #include <string_view>
+#include <utility>
 
 namespace sysal::detail
 {
@@ -64,62 +66,11 @@ namespace sysal::detail
             return caps;
         }
 
-        /// @brief 解析范围格式字符串为整数列表
-        /// @param s 范围格式字符串，如 "0-3,5,7-9"
-        /// @return 展开后的整数列表（最多 MAX_IDS 个，超出截断）
-        std::vector<std::uint32_t> parse_range_list(std::string_view s)
-        {
-            constexpr std::size_t MAX_IDS = 1024;
-            std::vector<std::uint32_t> result;
-            auto parts = split(s, ',');
-            for(const auto &part : parts)
-            {
-                auto trimmed = trim(part);
-                if(trimmed.empty())
-                {
-                    continue;
-                }
-                auto dash = trimmed.find('-');
-                if(dash != std::string::npos)
-                {
-                    auto lo = parse_uint(trimmed.substr(0, dash));
-                    auto hi = parse_uint(trimmed.substr(dash + 1));
-                    if(lo.has_value() && hi.has_value())
-                    {
-                        const auto first_id = *lo;
-                        const auto last_id = *hi;
-                        for(auto i = first_id; i <= last_id && result.size() < MAX_IDS; ++i)
-                        {
-                            result.push_back(static_cast<std::uint32_t>(i));
-                        }
-                        if(result.size() >= MAX_IDS && last_id > result.back())
-                        {
-                            break;
-                        }
-                    }
-                }
-                else
-                {
-                    auto val = parse_uint(trimmed);
-                    if(val.has_value())
-                    {
-                        if(result.size() >= MAX_IDS)
-                        {
-                            break;
-                        }
-                        result.push_back(static_cast<std::uint32_t>(*val));
-                    }
-                }
-            }
-            return result;
-        }
-
         /// @brief 解析 /proc/self/status 内容
         /// @param payload /proc/self/status 文件内容
         /// @param ctx ExecutionContext（填充 process、cpuset、permission）
         /// @param warnings 警告列表
-        void parse_proc_self_status(std::string_view payload, ExecutionContext &ctx,
-                                    [[maybe_unused]] std::vector<std::string> &warnings)
+        void parse_proc_self_status(std::string_view payload, ExecutionContext &ctx, std::vector<std::string> &warnings)
         {
             // 格式: "Key:\tValue" 每行
             auto lines = split(payload, '\n');
@@ -199,11 +150,14 @@ namespace sysal::detail
                 {
                     ctx.cpuset.cpus = value;
                     ctx.cpuset.cpus_effective = value;
-                    auto ids = parse_range_list(value);
-                    for(auto id : ids)
+                    if(auto ids = parse_cpu_id_list(value))
                     {
-                        ctx.visible_logical_cpu_ids.push_back(LogicalCpuId{id});
+                        ctx.visible_logical_cpu_ids = std::move(*ids);
+                        ctx.cpu_visibility_known = true;
                     }
+                    else
+                        warnings.push_back(
+                            "parse_execution: invalid or oversized Cpus_allowed_list; CPU visibility unknown");
                 }
                 else if(key == "Mems_allowed_list")
                 {

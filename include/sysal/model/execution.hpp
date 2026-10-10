@@ -90,6 +90,7 @@ namespace sysal
         std::vector<LogicalCpuId> visible_logical_cpu_ids;          ///< 可见逻辑 CPU ID
         std::vector<AcceleratorId> visible_accelerator_ids;         ///< 可见加速器 ID
         std::vector<InterfaceName> visible_network_interface_names; ///< 可见网络接口名
+        bool cpu_visibility_known{};              ///< 已完整解析 Cpus_allowed_list，空索引表示无可用 CPU
         bool accelerator_visibility_restricted{}; ///< 有显式加速器选择约束，空索引表示全部隐藏
     };
 

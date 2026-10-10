@@ -189,6 +189,7 @@ namespace sysal::detail
     System run_replay(const RawStore &raw, Collect flags, std::vector<std::string> &warnings)
     {
         const auto start = std::chrono::system_clock::now();
+        const auto timer = std::chrono::steady_clock::now();
 
         ParseResult result;
 
@@ -220,13 +221,13 @@ namespace sysal::detail
         auto info = resolve(std::move(result), warnings);
         info.hardware_health = hardware_health(info, flags, raw);
 
-        const auto end = std::chrono::system_clock::now();
+        const auto end = std::chrono::steady_clock::now();
 
         // 构建 SnapshotMeta
         SnapshotMeta meta;
         meta.collect_time = start;
         meta.sysal_version = sysal::VERSION_STRING;
-        meta.collect_duration = end - start;
+        meta.collect_duration = end - timer;
         meta.requested_flags = flags;
         meta.succeeded_collectors = std::move(succeeded_collectors);
         meta.failed_collectors = std::move(failed_collectors);
@@ -260,6 +261,8 @@ namespace sysal::detail
 
     System run_pipeline(Collect flags, std::vector<std::string> &warnings)
     {
+        const auto start = std::chrono::system_clock::now();
+        const auto timer = std::chrono::steady_clock::now();
         // Reader 阶段：采集原始数据
         RawStore raw;
         reader::read_procfs(raw, flags);
@@ -274,6 +277,8 @@ namespace sysal::detail
             sys.raw = std::move(raw);
         }
 
+        sys.meta.collect_time = start;
+        sys.meta.collect_duration = std::chrono::steady_clock::now() - timer;
         return sys;
     }
 

@@ -193,12 +193,13 @@ namespace sysal::reader
             read_hostname(raw);
 
             // /.dockerenv 容器标记文件
-            if(file_exists("/.dockerenv"))
+            const auto docker_marker = path_exists(raw, RawSource::RootDockerenv, "/.dockerenv");
+            if(docker_marker == true)
             {
                 auto content = read_file("/.dockerenv");
                 add_record(raw, RawSource::RootDockerenv, "/.dockerenv", content.value_or(""), CollectStatus::Success);
             }
-            else
+            else if(docker_marker)
             {
                 add_record(raw, RawSource::RootDockerenv, "/.dockerenv", "", CollectStatus::NotCollected);
             }

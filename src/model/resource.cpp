@@ -78,7 +78,7 @@ namespace sysal
 
     std::vector<const LogicalCpu *> Cpu::visible_logical_cpus() const
     {
-        return filter_by(logical_cpus, [](const LogicalCpu &cpu) { return cpu.visible_to_current_process; });
+        return filter_by(logical_cpus, [](const LogicalCpu &cpu) { return cpu.visible_to_current_process == true; });
     }
 
     // ---- Accelerators ----

@@ -200,8 +200,9 @@ namespace sysal::detail
                 {"id", lc.id.value()},
                 {"core_id", lc.core_id.value()},
                 {"package_id", lc.package_id.value()},
-                {"visible_to_current_process", lc.visible_to_current_process},
             };
+            if(lc.visible_to_current_process)
+                j["visible_to_current_process"] = *lc.visible_to_current_process;
             if(lc.numa_node)
             {
                 j["numa_node"] = lc.numa_node->value();
@@ -222,7 +223,8 @@ namespace sysal::detail
             {
                 lc.numa_node = NumaNodeId(uint32_from_json(j.at("numa_node"), "numa_node"));
             }
-            lc.visible_to_current_process = j.at("visible_to_current_process").get<bool>();
+            if(j.contains("visible_to_current_process"))
+                lc.visible_to_current_process = j.at("visible_to_current_process").get<bool>();
             if(j.contains("identification"))
                 lc.identification = cpu_identification_from_json(j.at("identification"));
             if(j.contains("online"))

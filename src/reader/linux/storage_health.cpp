@@ -70,7 +70,7 @@ namespace sysal::reader
         std::map<fs::path, std::string> controllers;
         std::map<std::string, std::string> targets;
         std::error_code ec;
-        for(const auto &entry : fs::directory_iterator("/sys/class/nvme", ec))
+        for(const auto &entry : directory_entries("/sys/class/nvme", ec))
         {
             const auto name = entry.path().filename().string();
             if(!numbered(name, "nvme"))
@@ -83,8 +83,9 @@ namespace sysal::reader
                 targets.emplace(name, "nvme");
             }
         }
+        record_directory_failure(raw, RawSource::StorageHealthSysfs, "/sys/class/nvme", ec);
         ec.clear();
-        for(const auto &entry : fs::directory_iterator("/sys/class/block", ec))
+        for(const auto &entry : directory_entries("/sys/class/block", ec))
         {
             std::error_code entry_ec;
             if(fs::exists(entry.path() / "partition", entry_ec) || entry_ec)
