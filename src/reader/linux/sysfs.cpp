@@ -280,14 +280,17 @@ namespace sysal::reader
                         read_network_capabilities(raw, name);
                 }
 
-                // device 符号链接 → PCI 地址（虚拟接口如 lo 无此链接，静默跳过）
+                // Resolve the complete device ancestry; virtio nodes may sit below a PCI function.
                 std::error_code link_ec;
-                auto device_target = fs::read_symlink(dir / "device", link_ec);
+                auto device_target = fs::canonical(dir / "device", link_ec);
                 if(!link_ec)
                 {
                     add_record(raw, RawSource::SysfsNet, (dir / "device").string(), device_target.string(),
                                CollectStatus::Success);
                 }
+                else if(link_ec.value() != ENOENT && link_ec.value() != ENOTDIR)
+                    add_record(raw, RawSource::SysfsNet, (dir / "device").string(), "", CollectStatus::Failed,
+                               file_failure(link_ec.value()));
             }
 
             record_directory_failure(raw, RawSource::SysfsNet, net_base, ec);

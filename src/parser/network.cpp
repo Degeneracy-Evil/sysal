@@ -216,19 +216,10 @@ namespace sysal::detail
                     iface.bond_mode = trim(payload);
                 else if(filename == "device")
                 {
-                    // payload 是符号链接目标，如 "../../../0000:41:00.0"
-                    auto last_slash = payload.rfind('/');
-                    auto pci_str =
-                        last_slash == std::string::npos ? trim(payload) : trim(payload.substr(last_slash + 1));
-                    auto pci = parse_pci_address(pci_str);
-                    if(pci.has_value())
-                    {
-                        iface.pci_address = pci;
-                    }
-                    else if(!pci_str.empty())
-                    {
-                        warnings.push_back("parse_network: PCI 地址解析失败: " + pci_str);
-                    }
+                    // Keep the closest PCI ancestor; non-PCI device nodes are valid too.
+                    for(const auto &segment : split(trim(payload), '/'))
+                        if(auto pci = parse_pci_address(segment))
+                            iface.pci_address = pci;
                 }
             }
 
