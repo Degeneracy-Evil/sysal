@@ -25,6 +25,7 @@ namespace sysal::detail
         /// @brief 单个 /proc/cpuinfo 条目的中间表示
         struct CpuInfoEntry
         {
+            bool processor_set{false};    ///< Only valid, explicit processor IDs establish identity.
             std::uint32_t processor{};    ///< 逻辑 CPU 编号
             std::uint32_t physical_id{0}; ///< 物理封装 ID（缺失默认 0）
             std::uint32_t core_id{0};     ///< 物理核 ID（缺失默认为 processor）
@@ -45,22 +46,25 @@ namespace sysal::detail
             CpuInfoEntry current;
             bool has_entry = false;
 
+            const auto finish_entry = [&]
+            {
+                if(has_entry && current.processor_set)
+                {
+                    if(!current.core_id_set)
+                        current.core_id = current.processor;
+                    entries.push_back(std::move(current));
+                }
+                current = CpuInfoEntry{};
+                has_entry = false;
+            };
+
             auto lines = split(payload, '\n');
             for(const auto &line : lines)
             {
                 auto trimmed = trim(line);
                 if(trimmed.empty())
                 {
-                    if(has_entry)
-                    {
-                        if(!current.core_id_set)
-                        {
-                            current.core_id = current.processor;
-                        }
-                        entries.push_back(std::move(current));
-                        current = CpuInfoEntry{};
-                        has_entry = false;
-                    }
+                    finish_entry();
                     continue;
                 }
 
@@ -70,7 +74,8 @@ namespace sysal::detail
                 if(key == "processor")
                 {
                     auto v = parse_uint(value);
-                    if(v.has_value())
+                    current.processor_set = v && *v <= std::numeric_limits<std::uint32_t>::max();
+                    if(current.processor_set)
                     {
                         current.processor = static_cast<std::uint32_t>(*v);
                     }
@@ -82,7 +87,7 @@ namespace sysal::detail
                 else if(key == "physical id")
                 {
                     auto v = parse_uint(value);
-                    if(v.has_value())
+                    if(v && *v <= std::numeric_limits<std::uint32_t>::max())
                     {
                         current.physical_id = static_cast<std::uint32_t>(*v);
                     }
@@ -90,7 +95,7 @@ namespace sysal::detail
                 else if(key == "core id")
                 {
                     auto v = parse_uint(value);
-                    if(v.has_value())
+                    if(v && *v <= std::numeric_limits<std::uint32_t>::max())
                     {
                         current.core_id = static_cast<std::uint32_t>(*v);
                         current.core_id_set = true;
@@ -106,6 +111,7 @@ namespace sysal::detail
                 }
                 else if(key == "flags" || key == "Features")
                 {
+                    current.identification.features_reported = true;
                     current.flags = value;
                     current.identification.features = split(value, ' ');
                     std::erase_if(current.identification.features, [](const auto &feature) { return feature.empty(); });
@@ -148,15 +154,7 @@ namespace sysal::detail
                 }
             }
 
-            // 处理最后一个条目（文件末尾无空行的情况）
-            if(has_entry)
-            {
-                if(!current.core_id_set)
-                {
-                    current.core_id = current.processor;
-                }
-                entries.push_back(std::move(current));
-            }
+            finish_entry();
 
             return entries;
         }

@@ -564,9 +564,17 @@ int main()
         }
     }
 
+    const auto features = sys.info.cpu.feature_summary();
+    label("Feature scope (CPUs)", features.logical_cpu_ids.size());
+    label("Complete feature reports", features.complete_cpu_ids.size());
+    label("Observed feature union", features.observed_union.size());
+    label("Common feature set", features.common ? std::to_string(features.common->size()) : "unknown");
+    const auto sse3 = sys.info.cpu.feature(sysal::CpuFeatureName{"sse3"});
+    label("SSE3 reported CPUs", sse3.reported_cpu_ids.size());
+
     if(!sys.info.cpu.isa_extensions.empty())
     {
-        std::cout << "  ISA extensions:";
+        std::cout << "  Legacy first-CPU ISA sample:";
         for(const auto &ext : sys.info.cpu.isa_extensions)
         {
             std::cout << " " << isa_str(ext);

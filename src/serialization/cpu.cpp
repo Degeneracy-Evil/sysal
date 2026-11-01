@@ -1,4 +1,5 @@
 #include "serialization/cpu.hpp"
+#include "serialization/cpu_features.hpp"
 #include "serialization/json_values.hpp"
 
 #include <limits>
@@ -112,6 +113,7 @@ namespace sysal::detail
             j["architecture"] = identity.architecture;
             j["microcode"] = identity.microcode;
             j["features"] = identity.features;
+            j["features_reported"] = identity.features_reported;
             return j;
         }
 
@@ -134,6 +136,7 @@ namespace sysal::detail
             identity.architecture = j.value("architecture", std::string{});
             identity.microcode = j.value("microcode", std::string{});
             identity.features = j.value("features", std::vector<std::string>{});
+            identity.features_reported = j.value("features_reported", false);
             return identity;
         }
 
@@ -368,6 +371,8 @@ namespace sysal::detail
         if(c.boost_enabled)
             j["boost_enabled"] = *c.boost_enabled;
         j["smt_control"] = c.smt_control;
+        // Derived query output is never restored as an independent source of truth.
+        j["feature_summary"] = cpu_feature_summary_to_json(c.feature_summary());
         return j;
     }
 

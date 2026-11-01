@@ -5,6 +5,7 @@
 
 #pragma once
 
+#include "sysal/model/cpu_features.hpp"
 #include "sysal/types/enums.hpp"
 #include "sysal/types/ids.hpp"
 #include "sysal/types/units.hpp"
@@ -50,6 +51,9 @@ namespace sysal
         std::string architecture; ///< /proc/cpuinfo 的架构描述，不是微架构代号
         std::string microcode;
         std::vector<std::string> features; ///< 当前逻辑 CPU 的完整内核能力标识
+        bool features_reported{false};     ///< Feature field read, including an explicitly empty field.
+
+        CpuFeatureState feature(const CpuFeatureName &name) const;
     };
 
     /// @brief 一个 Linux CPUFreq policy；频率均为 Hz，成员包含在线与离线 CPU。
@@ -121,7 +125,7 @@ namespace sysal
         std::vector<CpuCore> cores;               ///< 物理核列表
         std::vector<LogicalCpu> logical_cpus;     ///< 逻辑 CPU 列表
         std::vector<NumaNode> numa_nodes;         ///< NUMA 节点列表
-        std::vector<IsaExtension> isa_extensions; ///< 支持的 ISA 扩展列表
+        std::vector<IsaExtension> isa_extensions; ///< Legacy first-CPU sample; not a machine-wide capability guarantee.
         std::vector<CpuCache> caches;             ///< CPU 缓存实例列表（按层级/类型）
         std::string governor;                     ///< cpufreq 调频策略（如 performance）
         std::vector<ThermalZone> thermal_zones;   ///< 温度传感器列表
@@ -166,6 +170,12 @@ namespace sysal
         /// @brief 获取当前进程可见的全部逻辑 CPU
         /// @return 指向可见逻辑 CPU 的指针向量
         std::vector<const LogicalCpu *> visible_logical_cpus() const;
+
+        /// @brief Derive reporting states from current per-CPU evidence, accepting known aliases.
+        CpuFeatureReport feature(const CpuFeatureName &name) const;
+
+        /// @brief Derive union, intersection and per-feature reports without storing duplicate state.
+        CpuFeatureSummary feature_summary() const;
     };
 
 } // namespace sysal
