@@ -159,10 +159,10 @@ namespace sysal::detail
             return entries;
         }
 
-        /// @brief 从 flags 字符串解析 ISA 扩展列表
+        /// @brief Historical first-CPU ISA projection; new queries use Cpu::feature_summary().
         /// @param flags CPU flags 字符串
         /// @return ISA 扩展列表
-        std::vector<IsaExtension> parse_isa_extensions(const std::string &flags)
+        std::vector<IsaExtension> legacy_isa_extensions(const std::string &flags)
         {
             std::vector<IsaExtension> extensions;
             auto parts = split(flags, ' ');
@@ -882,7 +882,7 @@ namespace sysal::detail
         // 解析 ISA 扩展（从第一个条目的 flags）
         if(!entries.empty() && !entries[0].flags.empty())
         {
-            cpu.isa_extensions = parse_isa_extensions(entries[0].flags);
+            cpu.isa_extensions = legacy_isa_extensions(entries[0].flags);
         }
 
         // 读取 cpufreq 频率信息（每个封装从属于该封装的 CPU 读取）

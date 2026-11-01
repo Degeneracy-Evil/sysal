@@ -98,8 +98,10 @@ public:
     // 失败时抛出 SysalError
     static System collect(Collect flags = full);
 
-    // 在已有对象上重新采集，替换内部状态
-    // 失败时抛出 SysalError
+    // 显式选择只读采集策略
+    static System collect(Collect flags, const CollectOptions &options);
+
+    // 复用已知策略刷新；旧快照缺少请求时需要显式 collect
     void refresh();
 
 public:
@@ -156,7 +158,8 @@ System
 
 ## 错误处理
 
-`System::collect()` 和 `refresh()` 在失败时抛出 `SysalError`。
+采集失败时抛出 `SysalError`。非法请求、无效策略或对未知采集请求的快照调用 `refresh()` 时，
+在发起采集前抛出 `std::invalid_argument`。
 sysal **不使用** `Expected<T, E>` 或其他非抛出式结果类型。
 
 调用方若需捕获错误，使用标准 `try / catch`：
@@ -219,3 +222,41 @@ sys.refresh();
 判断空库存时必须结合采集状态。`meta.observations` 描述来源状态，域成功不保证字段完整。
 
 StorageHealth 请求只读设备健康查询；库的 full 预设包含这些查询，概要用途宜显式选择域。
+
+## 采集请求与恢复
+
+`CollectOptions` 包含两个类型化策略：
+
+| 选项 | 默认值 | 可选值 |
+| --- | --- | --- |
+| filesystems | FilesystemQuery::Local | None、Local、AllMounted |
+| sensors | SensorDevices::All | All、ExcludeDisplay |
+
+`None` 不请求容量；`Local` 仅查询已分类的本地/内存文件系统；`AllMounted` 允许查询其他已挂载类型，
+包含未知类型。伪文件系统和 ramfs 不提供容量查询。所有策略都避开 automount，不追踪符号链接，
+通过描述符核对设备号后调用 `fstatvfs`。同步 I/O 可能等待后端，不能将等待超时当作查询已经取消。
+`ExcludeDisplay` 只排除具有 PCI 显示类证据的传感器设备；无法确认设备类别时保留数据。
+这些策略也适用于 CPU 域依赖的 thermal 读取。
+
+`meta.requested_flags` 是当前采集或回放选择的解析域。`meta.collection_request` 是已知的原始采集
+请求，含原始 flags 和 options；保留 RawStore 时，其 `collection_request` 同样记录采集来源。
+实时采集两者一致；回放可选择不同解析域，并保留原始请求证据。
+
+`refresh()` 使用当前 `requested_flags` 和保存的原始策略重新采集，成功后整体替换快照。
+没有 `collection_request` 的旧快照保持请求未知，`refresh()` 不猜测默认策略，调用方应显式
+`System::collect(flags, options)`。`from_json()` 和 `collect_from_raw()` 不执行系统 I/O，
+也不依据当前默认策略删除原始证据中的统计值。
+
+## 查询与兼容
+
+`Cpu::feature()` / `feature_summary()` 从逐 CPU 原始 token 与 `features_reported` 按需生成结果。
+共同项仅覆盖返回的逻辑 CPU ID 范围，缺少完整报告时为未知。JSON 的 `feature_summary` 为派生输出，
+恢复时重新计算，不成为第二份证据。旧 `isa_extensions` 是兼容的首 CPU 采样字段，不能用作全机保证。
+
+存储新接口为 `StorageDevice::classification`，分别表达层级、用途、协议和已报告传输方式；
+`rotational` 保持独立。旧 `kind` 和 `layer` 的历史行为隔离在兼容适配器中，新分类不读取它们。
+旧 JSON 缺少新字段时保持未知，不根据名称或本机环境补全。
+
+`ReadFailure` 表达读取失败；`SkipReason` 表达未尝试原因。`BudgetExhausted` 是可表达的原因值，
+当前未增加通用采集预算或全局超时参数。原始值、来源和可选字段继续保留。新增枚举不改变旧编号。
+公共模型变化要求重新编译并匹配头文件与库；不承诺跨版本二进制结构布局兼容。

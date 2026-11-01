@@ -31,7 +31,7 @@ sysal 在采集系统信息时，按以下优先级选择数据源：
 
 ### 命令执行最后
 
-- 依赖外部工具的存在性（如 nvidia-smi、lspci、df、udevadm）。
+- 依赖外部工具的存在性（如 nvidia-smi、lspci、udevadm）。
 - 有子进程创建和 IPC 开销。
 - 输出格式可能因工具版本变化，且不同语言环境（locale）可能影响输出。
 - 在最小化容器中可能完全不可用。
@@ -45,6 +45,7 @@ sysal 在采集系统信息时，按以下优先级选择数据源：
 | 网络接口 IP 地址 | `getifaddrs()` | POSIX 标准，返回结构化地址列表，无解析开销 |
 | CPU 架构 / 内核版本 | `uname()` | POSIX 标准，单次调用获取全部信息，替代多次文件读取 |
 | 主机名 | `gethostname()` | POSIX 标准，比读取 `/proc/sys/kernel/hostname` 更可靠 |
+| 文件系统容量 | `fstatvfs()` | 按明确策略查询，描述符核对挂载身份；不进入 automount |
 | PCI 符号链接解析 | `readlink()` | 标准 C 库函数，解析 sysfs 符号链接获取 PCI 地址 |
 
 ### 使用文件读取的数据源
@@ -56,7 +57,8 @@ sysal 在采集系统信息时，按以下优先级选择数据源：
 | cgroup 信息 | `/proc/self/cgroup`、`/proc/1/cgroup` | 无 syscall 替代 |
 | NUMA 拓扑 | `/sys/devices/system/node/*` | 无 syscall 替代 |
 | 网络接口信息 | `/sys/class/net/*` | 无 syscall 替代 |
-| 块设备信息 | `/sys/block/*` | 无 syscall 替代 |
+| 块设备信息 | `/sys/class/block/*` | 含整设备、分区与虚拟层 |
+| 挂载清单 | `/proc/self/mountinfo` | 当前命名空间的设备号、根、挂载路径及类型 |
 | DMI 信息 | `/sys/class/dmi/id/*` | 无 syscall 替代 |
 | PCI 设备 | `/sys/bus/pci/devices/*` | 无 syscall 替代 |
 | OS 发行版 | `/etc/os-release` | 标准来源，无 syscall 替代 |
@@ -70,7 +72,7 @@ sysal 在采集系统信息时，按以下优先级选择数据源：
 | GPU 信息 | `nvidia-smi` | 无 syscall 替代，NVML 库为可选后端 |
 | CUDA 版本 | `nvcc --version` | 无 syscall 替代 |
 | PCI 设备名 | `lspci` | 补充 sysfs 中缺失的设备名称和 vendor 信息 |
-| 存储挂载信息 | `df -Th` | 比 `statvfs()` 更简单，一次性获取所有挂载点和文件系统类型 |
+| 存储健康报告 | 只读 `smartctl` / `nvme smart-log` | 可选后端，保留执行结果与原因，不执行扫描或配置写入 |
 | 硬件数据库 | `udevadm info -e` | 无 syscall 替代，提供最完整的 DIMM 信息 |
 
 ## 例外规则
@@ -105,3 +107,6 @@ voluntary_ctxt_switches 等），因此保留文件读取方式。
    - 检查命令的默认安装情况。
    - 考虑容器环境下的可用性。
    - 如果命令可能不存在，必须有降级策略（optional 字段或回退方案）。
+
+`df -Th` 仅保留在旧 RawStore 的兼容解析中，当前 Reader 不执行该命令。
+数据源可用性与清单完整性分别表达；分类未知不等于统计接口不支持。

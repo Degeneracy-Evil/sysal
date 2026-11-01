@@ -1,6 +1,6 @@
 # sysal
 
-C++ 系统信息抽象库。采集服务器硬件与软件信息，归一化为强类型数据结构，一次调用返回采集快照。
+C++ 系统信息抽象库。采集服务器硬件与软件信息，归一化为强类型数据结构，一次调用返回采集快照。采集能力独立于 SystemCard 的终端展示选择。
 
 ## 快速开始
 
@@ -14,8 +14,8 @@ xmake run sysal_info   # 编译并运行演示程序，终端输出全部采集�
 
 sysal::System sys = sysal::System::collect();
 
-const auto& cpu  = sys.info.cpu;        // packages, cores, logical, isa
-const auto& mem  = sys.info.memory;     // total_bytes, numa_nodes, dimms
+const auto& cpu  = sys.info.cpu;        // packages, cores, logical_cpus, feature_summary()
+const auto& mem  = sys.info.memory;     // total_memory, numa_nodes, dimms
 const auto& gpus = sys.info.accelerators;
 ```
 
@@ -27,19 +27,38 @@ sysal::System partial = sysal::System::collect(
 );
 ```
 
-`System` 的公开成员可修改；没有并发修改或刷新时，多线程读取同一快照安全。采集失败抛出 `SysalError`，部分失败记录到 `sys.warnings`。调用 `sys.refresh()` 重新采集。
+`System` 的公开成员可修改；没有并发修改或刷新时，多线程读取同一快照安全。采集失败抛出 `SysalError`，部分失败记录到 `sys.warnings`。调用 `sys.refresh()` 复用原采集策略重新采集；旧快照没有请求信息时需要显式调用 `collect`。
+
+## 采集策略与证据
+
+```cpp
+sysal::CollectOptions options;
+options.filesystems = sysal::FilesystemQuery::None;
+options.sensors = sysal::SensorDevices::ExcludeDisplay;
+auto snapshot = sysal::System::collect(sysal::Collect::Cpu | sysal::Collect::Storage, options);
+auto avx2 = snapshot.info.cpu.feature(sysal::CpuFeatureName{"avx2"});
+```
+
+默认容量策略仅查询本地和内存文件系统，默认传感器范围为系统公开的全部设备。
+额外文件系统查询由调用方明确选择；查询不进入 automount，不追踪挂载路径中的符号链接。
+同步文件系统 I/O 不承诺硬超时。
+
+清单完整性通过 `meta.inventory_completeness()` 查询；空清单只有在来源范围完整时才能解释成零。
+CPU 能力区分已报告、未报告和未知，缺少 flag 不等于不支持。
+存储的旋转属性不证明物理介质；NVMe、ATA、SCSI 与 PCIe、SATA、SAS 等传输方式分别表达。
+详细契约见[职责与数据契约](docs/responsibility-migration.md)和[公共 API](docs/design/public_api.md)。
 
 ## 数据模型
 
 | 成员 | 类型 | 说明 |
 |------|------|------|
 | platform | Platform | 主机、OS、内核、架构、固件、虚拟化 |
-| cpu | Cpu | packages、cores、逻辑 CPU、ISA 扩展 |
+| cpu | Cpu | 拓扑、逐 CPU 标识与能力、特征并集/共同项查询 |
 | memory | Memory | 总量、内存类型、配置速率、NUMA、DIMM 拓扑 |
 | accelerators | Accelerators | GPU、NPU、FPGA |
 | network | Network | 网卡、链路状态、IP、PCI 地址 |
-| storage | Storage | 块设备、容量、类型、挂载点 |
-| storage health | StorageHealth | 只读 NVMe / SMART 报告、明确设备关联与失败原因 |
+| storage | Storage | 块设备、分层、用途、协议、传输、挂载与文件系统统计 |
+| storage.health | vector<StorageHealthReport> | 只读 NVMe / SMART 报告、明确设备关联与失败原因 |
 | pci | Pci | PCI 设备清单 |
 | software | SoftwareStack | 驱动、运行时、CUDA、ROCm、MPI、RDMA |
 | execution | ExecutionContext | 进程环境、cgroup、cpuset、容器、可见性 |

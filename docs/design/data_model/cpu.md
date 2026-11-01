@@ -26,10 +26,19 @@
 | implementer / part / variant | ARM 的原始对应编号，保持与 x86 的语义区别 |
 | revision / architecture | ARM 修订和 `/proc/cpuinfo` 的架构描述 |
 | microcode | 系统报告的微码版本原值 |
-| features | 当前线程完整内核能力标识，排序、去重 |
+| features | 当前线程原始内核能力 token，排序、去重 |
+| features_reported | 是否完整取得特征字段；明确空字段与未取得不同 |
 
-缺失编号保持未知。`isa_extensions` 保留既有枚举接口，完整能力查询使用线程的
-`features`；能力标识还包含其他 CPU/内核能力，不等于芯片全部物理能力。
+缺失编号保持未知。`isa_extensions` 保留兼容的首 CPU 采样结果，不能代表全机。
+新查询使用 `feature(CpuFeatureName)` 和 `feature_summary()`；归一化已知别名，其他 token 原样保留。
+报告区分已报告、未报告和未知，未报告不等于硬件不支持。
+
+汇总明确列出逻辑 CPU ID 和取得完整字段的 CPU ID，提供观察到的并集。
+完整共同项仅在非空范围的每个 CPU 都有完整字段时提供，否则为未知；离线或重复 ID 不伪造能力。
+每种能力的报告包含 reported/not_reported/unknown 三组 CPU ID。查询结果按需生成，不保存在快照中。
+JSON 的派生汇总在恢复时重新计算。旧数据未记录字段完整性时仅保留明确的正面报告。
+
+能力标识还包含其他 CPU/内核能力，不等于芯片全部物理能力。
 不从型号字符串推导制程、微架构代号、IPC 或内存控制器理论规格。
 
 ## 频率策略

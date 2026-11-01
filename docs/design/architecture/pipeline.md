@@ -8,7 +8,7 @@ Reader → RawStore → Parser → ParseResult → Resolver → System
 
 - **Reader**：将原始信息收集到 `RawStore`。数据来源包括 procfs（`/proc`）、
   sysfs（`/sys`）、POSIX syscall（`getifaddrs()`、`uname()`、`gethostname()`、
-  `readlink()`）、命令执行（`lspci`、`nvidia-smi`、`df -Th`、`udevadm`）、
+  `readlink()`）、命令执行（`lspci`、`nvidia-smi`、`udevadm`）、
   以及 EDAC sysfs（`/sys/devices/system/edac`）。
 - **Parser**：将 `RawStore` 转换为按域划分的 `ParseResult`（无跨域引用，直接使用公共类型）。
 - **Resolver**：合并 `ParseResult`，解决冲突，计算可见性，组装 `System` 对象。
@@ -58,3 +58,13 @@ parser/storage_connections 仅解析原始协议库存。领域序列化函数�
 公共序列化入口仍位于 include/sysal/serialization/serialization.hpp。
 
 完整字段契约以公共头文件为准，避免在设计文档复制全部文件列表。
+
+## 策略、证据与消费者
+
+公共 `CollectionRequest` 在读取前验证；Reader 将策略跳过写成 `SkipReason`，
+将独立枚举结果写入 `RawStore.enumerations`。可选属性缺失不能直接降级整个清单。
+Parser 保留来源语义，Resolver 对照归一化身份生成具体清单状态。
+CPU 能力查询位于 model，文件系统类型分类由 common 共享，避免 Reader 与 Parser 各自维护规则。
+
+SystemCard 在 Python 中生成栏目采集计划。其原生绑定只接收公共领域枚举和选项，
+调用 `System::collect` 与序列化；栏目名称和终端布局不进入 Sysal 管线。

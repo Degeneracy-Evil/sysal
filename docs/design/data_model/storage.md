@@ -2,42 +2,25 @@
 
 存储子系统描述系统中的块设备信息。
 
-## 数据结构
+## 分类契约
 
-### StorageDevice
+公共定义见 `storage.hpp`、`storage_classification.hpp` 和 `storage_connections.hpp`。
+`StorageDevice.classification` 的维度相互独立：
 
-单个存储设备。
+| 字段 | 含义 |
+| --- | --- |
+| layer | 整块设备、分区、device mapper、RAID、loop、其他虚拟层或未知 |
+| purpose | 磁盘设备、光学介质、其他或未知 |
+| protocol | 内核暴露的 NVMe、ATA、SCSI 或未知 |
+| transports | 系统明确报告的不同传输方式；不保证构成完整路径清单 |
 
-```cpp
-struct StorageDevice
-{
-    StorageId id;                          // 存储设备 ID
-    DeviceName name;                       // 设备名称
-    std::optional<MemorySize> capacity;    // 容量（可能未知）
-    std::optional<PciAddress> pci_address; // PCI 地址（可能无）
-    StorageKind kind{};                    // 存储类型
-    std::optional<MountPoint> mount_point; // 挂载点
-    std::optional<FilesystemType> fs_type; // 文件系统类型
-};
-```
+`rotational` 独立保留内核布尔报告，非旋转不等于物理介质必为 SSD。
+NVMe namespace 证据不依赖设备名；SCSI 地址不证明 SAS，ATA 端口不证明 SATA。
+NVMe 多路径保留各关联控制器已报告的传输，不能取首控制器作为唯一传输。
+分区和虚拟叠加层不继承其底层设备协议。
 
-### Storage
-
-存储子系统聚合。
-
-```cpp
-struct Storage
-{
-    std::vector<StorageDevice> devices; // 存储设备列表
-};
-```
-
-## 设计说明
-
-- v0.0.3 仅提供基本设备清单：设备名、容量、类型与可选的 PCI 地址。
-- v0.0.4 新增 `mount_point` 和 `fs_type` 字段，旧版通过 `df -Th` 命令采集；当前采集使用 mountinfo。
-  挂载点和文件系统类型为 `std::optional`，因为部分设备（如未挂载的
-  NVMe 盘）可能没有挂载信息。
+旧 `kind`、`layer` 为兼容字段，历史名称猜测集中在 `storage_compatibility`，新模型与客户端不使用它们。
+缺少新分类的旧 JSON 保持未知，现有身份、容量和原始连接信息继续保留。
 
 ## 设备身份与内核配置
 

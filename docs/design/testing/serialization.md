@@ -107,3 +107,13 @@ System from_json(std::string_view json);
 
 `from_json` 失败时抛出 `SysalError`，不返回 `Expected`。
 失败原因包括 JSON 语法错误、版本不兼容、必填字段缺失等。
+
+## 采集请求与派生数据
+
+新快照与 RawStore 可包含 `collection_request`（flags 与 options）；旧数据缺失时保持未知。
+`requested_flags` 记录当前解析域，回放不能据此伪造原始采集范围。
+新增的 skip 与 inventory 完整性字段保持失败、未尝试、未知和有效零值的区别。
+
+CPU 的 `feature_summary` 是查询派生输出；恢复时以逐 CPU features 与 features_reported 重新生成，
+忽略外部提供的派生汇总。存储 classification 缺失时保持未知，不从旧 kind、名称或当前主机推断。
+序列化和回放不触发新采集；刷新必须具有明确的原始策略。
