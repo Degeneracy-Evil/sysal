@@ -5,6 +5,7 @@
 #pragma once
 
 #include "sysal/core/collect.hpp"
+#include "sysal/core/collect_options.hpp"
 #include "sysal/model/raw_store.hpp"
 
 namespace sysal::reader
@@ -13,6 +14,6 @@ namespace sysal::reader
     /// @brief 采集 sysfs 来源的原始数据
     /// @param raw 原始证据存储
     /// @param flags 采集范围位掩码
-    void read_sysfs(RawStore &raw, Collect flags);
+    void read_sysfs(RawStore &raw, Collect flags, const CollectOptions &options = {});
 
 } // namespace sysal::reader

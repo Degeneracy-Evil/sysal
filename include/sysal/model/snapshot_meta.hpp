@@ -23,6 +23,7 @@ namespace sysal
         std::string origin;
         CollectStatus status;
         std::optional<ReadFailure> failure{};
+        std::optional<SkipReason> skip{};
     };
 
     /// @brief 采集元数据
@@ -31,11 +32,12 @@ namespace sysal
         std::chrono::system_clock::time_point collect_time; ///< 采集时刻
         std::string sysal_version;                          ///< sysal 版本
         std::chrono::duration<double> collect_duration;     ///< 采集耗时
-        Collect requested_flags;                            ///< 请求的采集域
+        Collect requested_flags{};                          ///< 当前采集/回放选择的解析域
         std::vector<std::string> succeeded_collectors;      ///< 成功的采集器
         std::vector<std::string> failed_collectors;         ///< 失败的采集器
         std::vector<CollectionObservation> observations{};
         std::vector<InventoryReport> inventories{};
+        std::optional<CollectionRequest> collection_request{}; ///< Original acquisition request, if known.
 
         /// @brief Missing or conflicting reports do not establish completeness.
         InventoryCompleteness inventory_completeness(InventoryKind inventory) const

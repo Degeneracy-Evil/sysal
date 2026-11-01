@@ -7,6 +7,7 @@
 #pragma once
 
 #include "sysal/core/collect.hpp"
+#include "sysal/core/collect_options.hpp"
 #include "sysal/core/error.hpp"
 #include "sysal/model/accelerator.hpp"
 #include "sysal/model/cpu.hpp"
@@ -56,8 +57,12 @@ namespace sysal
         /// @param flags 采集范围位掩码
         /// @return 采集结果
         static System collect(Collect flags = full);
+        /// @brief Collect with explicit policies, validated before any system I/O.
+        /// @throws std::invalid_argument Invalid flags or policy values.
+        static System collect(Collect flags, const CollectOptions &options);
 
         /// @brief 在已有对象上重新采集，替换内部状态
+        /// @throws std::invalid_argument Acquisition options are unknown; use explicit collect.
         /// @throws SysalError 采集彻底失败时抛出
         void refresh();
 

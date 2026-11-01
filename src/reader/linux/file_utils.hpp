@@ -73,10 +73,11 @@ namespace sysal::reader
     /// @param payload 原始内容
     /// @param status 采集状态
     inline void add_record(RawStore &raw, RawSource source, const std::string &path_or_command,
-                           const std::string &payload, CollectStatus status, std::optional<ReadFailure> failure = {})
+                           const std::string &payload, CollectStatus status, std::optional<ReadFailure> failure = {},
+                           std::optional<SkipReason> skip = {})
     {
         raw.records.push_back(
-            RawRecord{source, path_or_command, payload, status, std::chrono::system_clock::now(), failure});
+            RawRecord{source, path_or_command, payload, status, std::chrono::system_clock::now(), failure, skip});
     }
 
     inline std::optional<ReadFailure> command_failure(const CommandResult &result)

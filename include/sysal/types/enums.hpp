@@ -180,6 +180,16 @@ namespace sysal
         LowPower
     };
 
+    /// @brief Why a query was not attempted; separate from read failures.
+    enum class SkipReason
+    {
+        Unknown,
+        NotRequested,
+        PolicyExcluded,
+        BudgetExhausted,
+        NotApplicable
+    };
+
     /// @brief 虚拟化类型
     enum class VirtualizationKind
     {

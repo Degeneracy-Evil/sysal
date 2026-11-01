@@ -234,6 +234,7 @@ namespace sysal::detail
         meta.succeeded_collectors = std::move(succeeded_collectors);
         meta.failed_collectors = std::move(failed_collectors);
         meta.inventories = inventory_reports(info, raw, flags);
+        meta.collection_request = raw.collection_request;
 
         for(const auto &record : raw.records)
         {
@@ -248,8 +249,8 @@ namespace sysal::detail
                     status = CollectStatus::Partial;
                     failure = ReadFailure::NotProvided;
                 }
-                meta.observations.push_back(
-                    CollectionObservation{std::move(domain), record.source, record.path_or_command, status, failure});
+                meta.observations.push_back(CollectionObservation{
+                    std::move(domain), record.source, record.path_or_command, status, failure, record.skip});
             }
         }
 
@@ -262,14 +263,15 @@ namespace sysal::detail
         return sys;
     }
 
-    System run_pipeline(Collect flags, std::vector<std::string> &warnings)
+    System run_pipeline(Collect flags, const CollectOptions &options, std::vector<std::string> &warnings)
     {
         const auto start = std::chrono::system_clock::now();
         const auto timer = std::chrono::steady_clock::now();
         // Reader 阶段：采集原始数据
         RawStore raw;
-        reader::read_procfs(raw, flags);
-        reader::read_sysfs(raw, flags);
+        raw.collection_request = CollectionRequest{flags, options};
+        reader::read_procfs(raw, flags, options);
+        reader::read_sysfs(raw, flags, options);
 
         // 回放管线：Parser → Resolver
         auto sys = run_replay(raw, flags, warnings);
@@ -292,6 +294,7 @@ namespace sysal::test
 
     System collect_from_raw(const RawStore &raw, Collect flags)
     {
+        CollectionRequest{flags, {}}.validate();
         std::vector<std::string> warnings;
         return detail::run_replay(raw, flags, warnings);
     }

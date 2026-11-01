@@ -399,35 +399,9 @@ namespace sysal::reader
         /// @param raw 原始证据存储
         /// @details 遍历 /sys/class/thermal/thermal_zoneN/，读取 type 与 temp
         ///          （temp 单位为毫摄氏度）。无热区（容器/虚拟化）时静默跳过。
-        void read_thermal_sysfs(RawStore &raw)
-        {
-            const fs::path thermal_base = "/sys/class/thermal";
-            if(!path_exists(raw, RawSource::SysfsThermal, thermal_base).value_or(false))
-            {
-                return;
-            }
-
-            std::error_code ec;
-            for(const auto &entry : directory_entries(thermal_base, ec))
-            {
-                if(!directory_entry_is_directory(raw, RawSource::SysfsThermal, entry))
-                {
-                    continue;
-                }
-                const auto &name = entry.path().filename().string();
-                if(name.size() < 12 || name.substr(0, 12) != "thermal_zone")
-                {
-                    continue;
-                }
-                read_sysfs_file(raw, RawSource::SysfsThermal, (entry.path() / "type").string());
-                read_sysfs_file(raw, RawSource::SysfsThermal, (entry.path() / "temp").string());
-            }
-            record_directory_failure(raw, RawSource::SysfsThermal, thermal_base, ec);
-        }
-
     } // namespace
 
-    void read_sysfs(RawStore &raw, Collect flags)
+    void read_sysfs(RawStore &raw, Collect flags, const CollectOptions &options)
     {
         struct ReaderDispatch
         {
@@ -446,7 +420,6 @@ namespace sysal::reader
             {Collect::Platform, read_dmi_sysfs},
             {Collect::Platform, read_hypervisor_type},
             {Collect::Memory, read_edac_sysfs},
-            {Collect::Sensors, read_sensors},
             {Collect::StorageHealth, read_storage_health},
         };
 
@@ -457,8 +430,10 @@ namespace sysal::reader
                 entry.read(raw);
             }
         }
-        if(has(flags, Collect::Cpu) && !has(flags, Collect::Sensors))
-            read_thermal_sysfs(raw);
+        if(has(flags, Collect::Sensors))
+            read_sensors(raw, options.sensors);
+        else if(has(flags, Collect::Cpu))
+            read_thermal_sensors(raw, options.sensors);
     }
 
 } // namespace sysal::reader

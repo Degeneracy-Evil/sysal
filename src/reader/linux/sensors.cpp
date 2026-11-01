@@ -38,7 +38,7 @@ namespace sysal::reader
                             return (*code >> 16) == 3;
             return false;
         }
-        void scan(RawStore &raw, const fs::path &base, RawSource source)
+        void scan(RawStore &raw, const fs::path &base, RawSource source, SensorDevices policy)
         {
             std::error_code ec;
             const auto entries = directory_entries(base, ec);
@@ -57,9 +57,13 @@ namespace sysal::reader
                 auto device = fs::canonical(entry.path() / "device", link_ec);
                 if(link_ec)
                     device = fs::canonical(entry.path(), link_ec);
-                if(!link_ec && display_device(device))
-                    continue;
                 found = true;
+                if(policy == SensorDevices::ExcludeDisplay && !link_ec && display_device(device))
+                {
+                    add_record(raw, source, entry.path().string(), "", CollectStatus::NotCollected, std::nullopt,
+                               SkipReason::PolicyExcluded);
+                    continue;
+                }
                 if(!link_ec)
                     add_record(raw, source, (entry.path() / "device_path").string(), device.string(),
                                CollectStatus::Success);
@@ -98,9 +102,13 @@ namespace sysal::reader
                 add_record(raw, source, base.string(), "", CollectStatus::NotCollected, ReadFailure::NotPresent);
         }
     } // namespace
-    void read_sensors(RawStore &raw)
+    void read_sensors(RawStore &raw, SensorDevices policy)
     {
-        scan(raw, "/sys/class/hwmon", RawSource::SysfsHwmon);
-        scan(raw, "/sys/class/thermal", RawSource::SysfsThermal);
+        scan(raw, "/sys/class/hwmon", RawSource::SysfsHwmon, policy);
+        read_thermal_sensors(raw, policy);
+    }
+    void read_thermal_sensors(RawStore &raw, SensorDevices policy)
+    {
+        scan(raw, "/sys/class/thermal", RawSource::SysfsThermal, policy);
     }
 } // namespace sysal::reader

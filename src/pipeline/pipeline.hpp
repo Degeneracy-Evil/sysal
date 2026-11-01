@@ -6,6 +6,7 @@
 #pragma once
 
 #include "sysal/core/collect.hpp"
+#include "sysal/core/collect_options.hpp"
 #include "sysal/core/system.hpp"
 #include "sysal/model/raw_store.hpp"
 
@@ -19,7 +20,7 @@ namespace sysal::detail
     /// @param flags 采集范围位掩码
     /// @param warnings 警告列表（追加写入）
     /// @return 采集结果
-    System run_pipeline(Collect flags, std::vector<std::string> &warnings);
+    System run_pipeline(Collect flags, const CollectOptions &options, std::vector<std::string> &warnings);
 
     /// @brief 从已有 RawStore 执行回放管线：Parser → Resolver
     /// @param raw 原始证据存储

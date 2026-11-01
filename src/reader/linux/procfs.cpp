@@ -177,7 +177,7 @@ namespace sysal::reader
 
     } // namespace
 
-    void read_procfs(RawStore &raw, Collect flags)
+    void read_procfs(RawStore &raw, Collect flags, const CollectOptions &options)
     {
         // 三个域存在跨域依赖，无法扁平化为表驱动分派：
         //   Cpu → Platform（共享 ProcCpuInfo）
@@ -245,7 +245,7 @@ namespace sysal::reader
         if(has(flags, Collect::Storage))
         {
             read_proc_file(raw, RawSource::StorageMountInfo, "/proc/self/mountinfo");
-            read_filesystems(raw);
+            read_filesystems(raw, options.filesystems);
         }
 
         // ---- Pci 域 ----

@@ -39,5 +39,6 @@ namespace sysal
         std::optional<ReadFailure> failure;
         std::string note;
         std::optional<FilesystemUsage> usage;
+        std::optional<SkipReason> skip{};
     };
 } // namespace sysal

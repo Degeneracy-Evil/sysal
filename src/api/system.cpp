@@ -7,6 +7,7 @@
 
 #include "sysal/core/system.hpp"
 
+#include <stdexcept>
 #include <utility>
 #include <vector>
 
@@ -15,15 +16,21 @@ namespace sysal
 
     System System::collect(Collect flags)
     {
+        return collect(flags, CollectOptions{});
+    }
+
+    System System::collect(Collect flags, const CollectOptions &options)
+    {
+        CollectionRequest{flags, options}.validate();
         std::vector<std::string> warnings;
-        return detail::run_pipeline(flags, warnings);
+        return detail::run_pipeline(flags, options, warnings);
     }
 
     void System::refresh()
     {
-        auto flags = meta.requested_flags;
-        std::vector<std::string> warnings;
-        auto new_sys = detail::run_pipeline(flags, warnings);
+        if(!meta.collection_request)
+            throw std::invalid_argument("snapshot acquisition options are unknown; collect with an explicit request");
+        auto new_sys = collect(meta.requested_flags, meta.collection_request->options);
         *this = std::move(new_sys);
     }
 

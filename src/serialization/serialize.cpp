@@ -5,6 +5,7 @@
 ///          raw 四个字段。使用 nlohmann/json 库进行 JSON 处理。
 
 #include "serialization/accelerator.hpp"
+#include "serialization/collect_options.hpp"
 #include "serialization/cpu.hpp"
 #include "serialization/execution.hpp"
 #include "serialization/hardware.hpp"
@@ -81,6 +82,8 @@ namespace sysal
             };
             if(rec.failure)
                 j["failure"] = static_cast<std::uint32_t>(*rec.failure);
+            if(rec.skip)
+                j["skip"] = static_cast<unsigned>(*rec.skip);
             return j;
         }
 
@@ -97,6 +100,8 @@ namespace sysal
             if(j.contains("failure"))
                 rec.failure =
                     validate_enum(uint32_from_json(j.at("failure"), "failure"), ReadFailure::LowPower, "failure");
+            if(j.contains("skip"))
+                rec.skip = validate_enum(uint32_from_json(j.at("skip"), "skip"), SkipReason::NotApplicable, "skip");
             return rec;
         }
 
@@ -110,7 +115,10 @@ namespace sysal
             json enumerations = json::array();
             for(const auto &enumeration : store.enumerations)
                 enumerations.push_back(detail::enumeration_to_json(enumeration));
-            return json{{"records", std::move(arr)}, {"enumerations", std::move(enumerations)}};
+            json root{{"records", std::move(arr)}, {"enumerations", std::move(enumerations)}};
+            if(store.collection_request)
+                root["collection_request"] = detail::collection_request_to_json(*store.collection_request);
+            return root;
         }
 
         [[nodiscard]] RawStore raw_store_from_json(const json &root)
@@ -123,6 +131,8 @@ namespace sysal
             if(root.contains("enumerations"))
                 for(const auto &elem : root.at("enumerations").get_ref<const json::array_t &>())
                     store.enumerations.push_back(detail::enumeration_from_json(elem));
+            if(root.contains("collection_request"))
+                store.collection_request = detail::collection_request_from_json(root.at("collection_request"));
             return store;
         }
 
@@ -134,6 +144,8 @@ namespace sysal
                    {"status", static_cast<std::uint32_t>(o.status)}};
             if(o.failure)
                 j["failure"] = static_cast<std::uint32_t>(*o.failure);
+            if(o.skip)
+                j["skip"] = static_cast<unsigned>(*o.skip);
             return j;
         }
         [[nodiscard]] CollectionObservation observation_from_json(const json &j)
@@ -146,6 +158,8 @@ namespace sysal
             if(j.contains("failure"))
                 o.failure =
                     validate_enum(uint32_from_json(j.at("failure"), "failure"), ReadFailure::LowPower, "failure");
+            if(j.contains("skip"))
+                o.skip = validate_enum(uint32_from_json(j.at("skip"), "skip"), SkipReason::NotApplicable, "skip");
             return o;
         }
 
@@ -211,6 +225,8 @@ namespace sysal
                 fail.push_back(f);
             }
             j["failed_collectors"] = std::move(fail);
+            if(m.collection_request)
+                j["collection_request"] = detail::collection_request_to_json(*m.collection_request);
 
             j["inventories"] = json::array();
             for(const auto &report : m.inventories)
@@ -234,6 +250,8 @@ namespace sysal
             m.requested_flags = static_cast<Collect>(uint32_from_json(j.at("requested_flags"), "requested_flags"));
             m.succeeded_collectors = str_array_from_json(j.at("succeeded_collectors"));
             m.failed_collectors = str_array_from_json(j.at("failed_collectors"));
+            if(j.contains("collection_request"))
+                m.collection_request = detail::collection_request_from_json(j.at("collection_request"));
             if(j.contains("inventories"))
                 for(const auto &report : j.at("inventories").get_ref<const json::array_t &>())
                     m.inventories.push_back(detail::inventory_from_json(report));

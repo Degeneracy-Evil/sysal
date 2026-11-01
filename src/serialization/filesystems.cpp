@@ -25,6 +25,8 @@ namespace sysal::detail
                                  {"note", report.note}};
             if(report.failure)
                 value["failure"] = static_cast<unsigned>(*report.failure);
+            if(report.skip)
+                value["skip"] = static_cast<unsigned>(*report.skip);
             if(report.usage)
             {
                 const auto &usage = *report.usage;
@@ -56,6 +58,9 @@ namespace sysal::detail
             if(value.contains("failure"))
                 report.failure = validate_enum(uint32_from_json(value.at("failure"), "filesystem failure"),
                                                ReadFailure::LowPower, "filesystem failure");
+            if(value.contains("skip"))
+                report.skip = validate_enum(uint32_from_json(value.at("skip"), "filesystem skip"),
+                                            SkipReason::NotApplicable, "filesystem skip");
             report.note = value.value("note", std::string{});
             if(value.contains("usage"))
             {

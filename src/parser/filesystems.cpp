@@ -1,4 +1,5 @@
 #include "parser/filesystems.hpp"
+#include "common/filesystem.hpp"
 #include <limits>
 #include <nlohmann/json.hpp>
 #include <set>
@@ -83,8 +84,13 @@ namespace sysal::detail
                     report.mount_ids.push_back(static_cast<std::uint32_t>(*parsed));
             if(report.mount_ids.empty())
                 continue;
-            if(const auto kind = field(value, "kind"); kind && *kind <= static_cast<unsigned>(FilesystemKind::Unknown))
-                report.kind = static_cast<FilesystemKind>(*kind);
+            for(const auto &mount : storage.mounts)
+                if(mount.mount_id == report.mount_ids.front())
+                {
+                    report.kind = filesystem_kind(mount.filesystem.value);
+                    break;
+                }
+            report.skip = record->skip;
             report.status = record->status;
             report.failure = record->failure;
             if(const auto note = value.find("note"); note != value.end() && note->is_string())

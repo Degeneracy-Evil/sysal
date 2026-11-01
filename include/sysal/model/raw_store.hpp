@@ -5,6 +5,7 @@
 
 #pragma once
 
+#include "sysal/core/collect_options.hpp"
 #include "sysal/model/inventory.hpp"
 #include "sysal/types/enums.hpp"
 
@@ -27,14 +28,16 @@ namespace sysal
         CollectStatus status;                               ///< 采集状态
         std::chrono::system_clock::time_point collected_at; ///< 采集时刻
         std::optional<ReadFailure> failure{};               ///< 缺失原因；无原因不等于权限不足
+        std::optional<SkipReason> skip{};
     };
 
     /// @brief 原始证据存储
     /// @details 持有全部原始记录，并提供按来源与次级键的查询接口。
     struct RawStore
     {
-        std::vector<RawRecord> records;                   ///< 原始记录列表
-        std::vector<InventoryEnumeration> enumerations{}; ///< Independent enumeration evidence.
+        std::vector<RawRecord> records;                        ///< 原始记录列表
+        std::vector<InventoryEnumeration> enumerations{};      ///< Independent enumeration evidence.
+        std::optional<CollectionRequest> collection_request{}; ///< Actual acquisition request, if known.
 
         /// @brief A unique enumeration report; absent or conflicting evidence is unknown.
         const InventoryEnumeration *enumeration(InventoryKind inventory) const
