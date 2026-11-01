@@ -27,12 +27,21 @@ namespace sysal
         Unknown
     };
 
-    /// @brief 存储设备类型
+    /// @brief Kernel/backend protocol; does not establish the physical transport.
+    enum class StorageProtocol
+    {
+        Unknown,
+        Nvme,
+        Ata,
+        Scsi
+    };
+
+    /// @brief Legacy mixed protocol/media classification; use StorageClassification for new code.
     enum class StorageKind
     {
-        Nvme, ///< NVMe SSD
-        Ssd,  ///< SATA/SAS SSD（rotational=0）
-        Hdd,  ///< 机械硬盘（rotational=1）
+        Nvme, ///< Historical NVMe name label; not protocol or medium evidence.
+        Ssd,  ///< Legacy label for non-rotating disk devices.
+        Hdd,  ///< Legacy label for rotating disk devices.
         Other ///< 其他或未知
     };
 

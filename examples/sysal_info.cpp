@@ -188,22 +188,6 @@ namespace
         return "?";
     }
 
-    const char *storage_kind_str(sysal::StorageKind k)
-    {
-        switch(k)
-        {
-        case sysal::StorageKind::Nvme:
-            return "NVMe";
-        case sysal::StorageKind::Ssd:
-            return "SSD";
-        case sysal::StorageKind::Hdd:
-            return "HDD";
-        case sysal::StorageKind::Other:
-            return "Other";
-        }
-        return "?";
-    }
-
     const char *accel_kind_str(sysal::AcceleratorKind k)
     {
         switch(k)
@@ -769,7 +753,18 @@ int main()
     label("Devices", sys.info.storage.devices.size());
     for(const auto &dev : sys.info.storage.devices)
     {
-        std::cout << "  " << dev.name.value << " (" << storage_kind_str(dev.kind) << ")\n";
+        std::cout << "  " << dev.name.value << "\n";
+        const auto &classification = dev.classification;
+        label("  Purpose", classification.purpose == sysal::StoragePurpose::Disk      ? "disk"
+                           : classification.purpose == sysal::StoragePurpose::Optical ? "optical"
+                           : classification.purpose == sysal::StoragePurpose::Other   ? "other"
+                                                                                      : "unknown");
+        label("  Protocol", classification.protocol == sysal::StorageProtocol::Nvme   ? "NVMe"
+                            : classification.protocol == sysal::StorageProtocol::Ata  ? "ATA"
+                            : classification.protocol == sysal::StorageProtocol::Scsi ? "SCSI"
+                                                                                      : "unknown");
+        if(dev.rotational)
+            label("  Rotational report", *dev.rotational ? "rotating" : "non-rotating");
         if(dev.capacity.has_value())
         {
             label("  Capacity", format_memory(dev.capacity->value));

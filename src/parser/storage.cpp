@@ -3,6 +3,8 @@
 /// @details 从 sysfs 块设备数据解析存储设备信息。
 
 #include "storage.hpp"
+#include "parser/storage_classification.hpp"
+#include "parser/storage_compatibility.hpp"
 #include "parser/storage_connections.hpp"
 
 #include "parse_utils.hpp"
@@ -19,36 +21,6 @@ namespace sysal::detail
 
     namespace
     {
-
-        /// @brief 从块设备名称与 rotational 属性推断存储类型
-        /// @param name 块设备名称（如 "nvme0n1"、"sda"）
-        /// @param rotational sysfs queue/rotational 内容（"0"=SSD, "1"=HDD），可能为空
-        /// @return 推断的存储类型
-        StorageKind infer_storage_kind(std::string_view name, const std::string &rotational)
-        {
-            if(name.find("nvme") == 0)
-            {
-                return StorageKind::Nvme;
-            }
-            // 虚拟设备不按 rotational 分类
-            static constexpr std::string_view virtual_prefixes[] = {"loop", "ram", "sr", "dm-", "md", "zram", "fd"};
-            for(auto prefix : virtual_prefixes)
-            {
-                if(name.find(prefix) == 0)
-                {
-                    return StorageKind::Other;
-                }
-            }
-            if(rotational == "0")
-            {
-                return StorageKind::Ssd;
-            }
-            if(rotational == "1")
-            {
-                return StorageKind::Hdd;
-            }
-            return StorageKind::Other;
-        }
 
         /// @brief 从 sysfs 路径提取块设备名称
         /// @param path sysfs 路径（如 "/sys/block/nvme0n1/size"）
@@ -208,10 +180,6 @@ namespace sysal::detail
             dev.id = StorageId{seq};
             dev.name = DeviceName{dev_name};
 
-            auto rot_it = attrs.find("rotational");
-            std::string rotational = (rot_it != attrs.end()) ? trim(rot_it->second) : std::string{};
-            dev.kind = infer_storage_kind(dev_name, rotational);
-
             // 从 size 文件读取容量（512 字节扇区数）
             auto size_it = attrs.find("size");
             if(size_it != attrs.end())
@@ -245,7 +213,7 @@ namespace sysal::detail
             };
             dev.device_number = parse_device_number(attribute("dev"));
             const auto partition = parse_uint(attribute("partition"));
-            if(partition && *partition <= std::numeric_limits<std::uint32_t>::max())
+            if(partition && *partition > 0 && *partition <= std::numeric_limits<std::uint32_t>::max())
                 dev.partition_number = static_cast<std::uint32_t>(*partition);
             const auto parent = attribute("parent");
             if(!parent.empty())
@@ -263,12 +231,16 @@ namespace sysal::detail
                    number && *number <= std::numeric_limits<std::uint32_t>::max())
                     *destination = static_cast<std::uint32_t>(*number);
             const auto target = attribute("device");
-            dev.layer = dev.partition_number                                   ? "partition"
-                        : !dev.mapper_uuid.empty() || !dev.mapper_name.empty() ? "device-mapper"
-                        : !dev.raid_level.empty()                              ? "md"
-                        : target.find("/virtual/") != std::string::npos        ? "virtual"
-                        : target.empty()                                       ? "unknown"
-                                                                               : "disk";
+            dev.classification.layer =
+                dev.partition_number                                       ? BlockDeviceLayer::Partition
+                : attrs.contains("partition")                              ? BlockDeviceLayer::Unknown
+                : attrs.contains("name") || attrs.contains("uuid")         ? BlockDeviceLayer::DeviceMapper
+                : attrs.contains("level") || attrs.contains("array_state") ? BlockDeviceLayer::Raid
+                : attribute("loop_present") == "1"                         ? BlockDeviceLayer::Loop
+                : target.find("/virtual/") != std::string::npos            ? BlockDeviceLayer::Virtual
+                : target.empty()                                           ? BlockDeviceLayer::Unknown
+                                                                           : BlockDeviceLayer::Device;
+            dev.driver = hardware_text(attribute("driver"));
 
             const std::pair<std::string_view, std::string *> text_fields[] = {{"model", &dev.model},
                                                                               {"vendor", &dev.vendor.value},
@@ -362,11 +334,13 @@ namespace sysal::detail
                 }
             }
 
+            apply_storage_compatibility(dev, target);
             storage.devices.push_back(std::move(dev));
             ++seq;
         }
 
         apply_storage_connections(storage, raw);
+        apply_storage_classification(storage);
         apply_storage_mounts(storage, raw, warnings);
         apply_filesystems(storage, raw, warnings);
         return storage;

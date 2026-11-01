@@ -6,6 +6,7 @@
 #pragma once
 
 #include "sysal/model/filesystem.hpp"
+#include "sysal/model/storage_classification.hpp"
 #include "sysal/model/storage_connections.hpp"
 #include "sysal/model/storage_health.hpp"
 #include "sysal/types/enums.hpp"
@@ -42,7 +43,7 @@ namespace sysal
         DeviceName name;                       ///< 设备名称
         std::optional<MemorySize> capacity;    ///< 容量（可能未知）
         std::optional<PciAddress> pci_address; ///< PCI 地址（可能无）
-        StorageKind kind{};                    ///< 存储类型
+        StorageKind kind{StorageKind::Other};  ///< Legacy mixed classification; prefer classification + rotational.
         std::optional<MountPoint> mount_point; ///< 挂载点
         std::optional<FilesystemType> fs_type; ///< 文件系统类型
         std::string model{};
@@ -65,7 +66,7 @@ namespace sysal
         std::optional<std::uint32_t> partition_number{};
         std::optional<DeviceName> parent{};
         std::vector<DeviceName> slaves{}; ///< 下层块设备，由 sysfs 提供
-        std::string layer{};              ///< disk/partition/device-mapper/md/virtual
+        std::string layer{};              ///< Legacy string classification; prefer classification.layer.
         std::string mapper_name{};
         std::string mapper_uuid{};
         std::string raid_level{};
@@ -74,6 +75,8 @@ namespace sysal
         std::optional<std::uint32_t> raid_degraded{};
         std::optional<NvmeNamespaceInfo> nvme_namespace{};
         std::optional<ScsiDeviceInfo> scsi_device{};
+        std::string driver{}; ///< Kernel device driver, when explicitly available.
+        StorageClassification classification{};
     };
 
     /// @brief 存储子系统聚合

@@ -1,6 +1,7 @@
 #include "serialization/storage.hpp"
 #include "serialization/filesystems.hpp"
 #include "serialization/json_values.hpp"
+#include "serialization/storage_classification.hpp"
 #include "serialization/storage_connections.hpp"
 #include "serialization/storage_health.hpp"
 
@@ -60,6 +61,7 @@ namespace sysal::detail
                 {"id", sd.id.value()},
                 {"name", sd.name.value},
                 {"kind", static_cast<std::uint32_t>(sd.kind)},
+                {"classification", storage_classification_to_json(sd.classification)},
             };
             if(sd.capacity)
             {
@@ -137,6 +139,8 @@ namespace sysal::detail
             {
                 j["transport"] = sd.transport;
             }
+            if(!sd.driver.empty())
+                j["driver"] = sd.driver;
             if(!sd.controller_name.empty())
             {
                 j["controller_name"] = sd.controller_name;
@@ -251,6 +255,9 @@ namespace sysal::detail
                 sd.numa_node = NumaNodeId{uint32_from_json(j.at("numa_node"), "numa_node")};
             }
             sd.transport = j.value("transport", std::string{});
+            sd.driver = j.value("driver", std::string{});
+            if(j.contains("classification"))
+                sd.classification = storage_classification_from_json(j.at("classification"));
             sd.controller_name = j.value("controller_name", std::string{});
             sd.layer = j.value("layer", std::string{});
             sd.mapper_name = j.value("mapper_name", std::string{});

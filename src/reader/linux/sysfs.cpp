@@ -280,7 +280,19 @@ namespace sysal::reader
 
                 read_sysfs_file(raw, RawSource::SysfsBlock, (dir / "size").string());
 
-                // queue/rotational: "0"=SSD, "1"=HDD
+                if(const auto loop = path_exists(raw, RawSource::SysfsBlock, dir / "loop"))
+                    add_record(raw, RawSource::SysfsBlock, (dir / "loop_present").string(), *loop ? "1" : "0",
+                               CollectStatus::Success);
+                std::error_code driver_ec;
+                const auto driver = fs::read_symlink(dir / "device" / "driver", driver_ec);
+                if(!driver_ec)
+                    add_record(raw, RawSource::SysfsBlock, (dir / "driver").string(), driver.filename().string(),
+                               CollectStatus::Success);
+                else if(driver_ec.value() != ENOENT && driver_ec.value() != ENOTDIR)
+                    add_record(raw, RawSource::SysfsBlock, (dir / "driver").string(), "", CollectStatus::Failed,
+                               file_failure(driver_ec.value()));
+
+                // Kernel-reported rotational property; it does not prove physical medium.
                 read_sysfs_file(raw, RawSource::SysfsBlock, (dir / "queue" / "rotational").string());
 
                 static constexpr std::string_view fields[] = {"ro",

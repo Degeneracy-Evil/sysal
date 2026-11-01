@@ -1,6 +1,7 @@
 #pragma once
 
 #include "sysal/model/sensors.hpp"
+#include "sysal/types/enums.hpp"
 #include "sysal/types/value_types.hpp"
 
 #include <optional>
@@ -13,13 +14,6 @@ namespace sysal
     struct StorageCounter
     {
         std::string decimal;
-    };
-    enum class StorageProtocol
-    {
-        Unknown,
-        Nvme,
-        Ata,
-        Scsi
     };
     struct NvmeHealth
     {
