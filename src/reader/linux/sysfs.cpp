@@ -403,6 +403,12 @@ namespace sysal::reader
         /// @details 读取 /sys/class/dmi/id 下的固件与产品信息文件
         void read_dmi_sysfs(RawStore &raw)
         {
+            // Boot evidence is independent of SMBIOS availability and permissions.
+            if(path_exists(raw, RawSource::SysfsDmi, "/sys/firmware/efi").value_or(false))
+            {
+                add_record(raw, RawSource::SysfsDmi, "/sys/firmware/efi", "1", CollectStatus::Success);
+            }
+
             const fs::path dmi_base = "/sys/class/dmi/id";
             const auto exists = path_exists(raw, RawSource::SysfsDmi, dmi_base);
             if(!exists || !*exists)
@@ -423,12 +429,6 @@ namespace sysal::reader
             for(auto field : fields)
             {
                 read_sysfs_file(raw, RawSource::SysfsDmi, (dmi_base / field).string());
-            }
-
-            // UEFI 检测：/sys/firmware/efi 在 UEFI 系统上存在
-            if(path_exists(raw, RawSource::SysfsDmi, "/sys/firmware/efi").value_or(false))
-            {
-                add_record(raw, RawSource::SysfsDmi, "/sys/firmware/efi", "1", CollectStatus::Success);
             }
         }
 
