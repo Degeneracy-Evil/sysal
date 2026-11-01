@@ -5,6 +5,7 @@
 
 #pragma once
 
+#include "sysal/model/filesystem.hpp"
 #include "sysal/model/storage_connections.hpp"
 #include "sysal/model/storage_health.hpp"
 #include "sysal/types/enums.hpp"
@@ -78,8 +79,9 @@ namespace sysal
     /// @brief 存储子系统聚合
     struct Storage
     {
-        std::vector<StorageDevice> devices; ///< 存储设备列表
-        std::vector<StorageMount> mounts{}; ///< 完整挂载清单
+        std::vector<StorageDevice> devices;          ///< 存储设备列表
+        std::vector<FilesystemReport> filesystems{}; ///< Filesystem views; never sum as disk capacity.
+        std::vector<StorageMount> mounts{};          ///< 完整挂载清单
         std::vector<StorageHealthReport> health{};
         std::vector<StorageController> controllers{};
         std::vector<NvmeController> nvme_controllers{};

@@ -6,6 +6,7 @@
 #include "parser/storage_connections.hpp"
 
 #include "parse_utils.hpp"
+#include "parser/filesystems.hpp"
 #include "storage_topology.hpp"
 
 #include <cctype>
@@ -110,7 +111,8 @@ namespace sysal::detail
     std::optional<Storage> parse_storage(const RawStore &raw, std::vector<std::string> &warnings)
     {
         auto block_records = raw.get_all(RawSource::SysfsBlock);
-        if(block_records.empty() && raw.get_all(RawSource::SysfsStorageConnections).empty())
+        if(block_records.empty() && raw.get_all(RawSource::SysfsStorageConnections).empty() &&
+           !raw.has_success(RawSource::StorageMountInfo))
         {
             warnings.push_back("parse_storage: 缺少 SysfsBlock 数据");
             return std::nullopt;
@@ -136,8 +138,9 @@ namespace sysal::detail
 
         if(device_attrs.empty())
         {
-            warnings.push_back("parse_storage: SysfsBlock 记录中无有效块设备");
-            if(raw.get_all(RawSource::SysfsStorageConnections).empty())
+            if(!raw.has_success(RawSource::StorageMountInfo))
+                warnings.push_back("parse_storage: SysfsBlock 记录中无有效块设备");
+            if(raw.get_all(RawSource::SysfsStorageConnections).empty() && !raw.has_success(RawSource::StorageMountInfo))
                 return std::nullopt;
         }
 
@@ -364,6 +367,7 @@ namespace sysal::detail
 
         apply_storage_connections(storage, raw);
         apply_storage_mounts(storage, raw, warnings);
+        apply_filesystems(storage, raw, warnings);
         return storage;
     }
 

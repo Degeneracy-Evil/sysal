@@ -7,6 +7,7 @@
 #include "reader/linux/accelerator.hpp"
 #include "reader/linux/cgroup.hpp"
 #include "reader/linux/file_utils.hpp"
+#include "reader/linux/filesystems.hpp"
 
 #include <nlohmann/json.hpp>
 
@@ -244,6 +245,7 @@ namespace sysal::reader
         if(has(flags, Collect::Storage))
         {
             read_proc_file(raw, RawSource::StorageMountInfo, "/proc/self/mountinfo");
+            read_filesystems(raw);
         }
 
         // ---- Pci 域 ----

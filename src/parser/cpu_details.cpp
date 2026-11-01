@@ -123,7 +123,13 @@ namespace sysal::detail
                     warnings.push_back("parse_cpu: invalid CPU list in " + record->path_or_command);
             }
             else if(path == std::string{base} + "smt/control")
+            {
                 cpu.smt_control = trim(record->payload);
+                if(cpu.smt_control == "notsupported")
+                    cpu.smt_supported = false;
+                else if(cpu.smt_control == "on" || cpu.smt_control == "off" || cpu.smt_control == "forceoff")
+                    cpu.smt_supported = true;
+            }
             else if(path == std::string{base} + "smt/active" || path == std::string{base} + "cpufreq/boost")
             {
                 const auto value = trim(record->payload);

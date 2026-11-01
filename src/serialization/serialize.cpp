@@ -87,7 +87,7 @@ namespace sysal
         {
             RawRecord rec;
             rec.source =
-                validate_enum(uint32_from_json(j.at("source"), "source"), RawSource::SysfsStorageConnections, "source");
+                validate_enum(uint32_from_json(j.at("source"), "source"), RawSource::FilesystemUsage, "source");
             j.at("path_or_command").get_to(rec.path_or_command);
             j.at("payload").get_to(rec.payload);
             rec.status =
@@ -133,8 +133,7 @@ namespace sysal
         {
             CollectionObservation o;
             o.domain = j.at("domain").get<std::string>();
-            o.source =
-                validate_enum(uint32_from_json(j.at("source"), "source"), RawSource::SysfsStorageConnections, "source");
+            o.source = validate_enum(uint32_from_json(j.at("source"), "source"), RawSource::FilesystemUsage, "source");
             o.origin = j.at("origin").get<std::string>();
             o.status = validate_enum(uint32_from_json(j.at("status"), "status"), CollectStatus::NotCollected, "status");
             if(j.contains("failure"))

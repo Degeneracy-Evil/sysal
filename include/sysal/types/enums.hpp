@@ -146,6 +146,7 @@ namespace sysal
         NvmeSmartLog,            ///< Controller-wide NVMe SMART log query
         SysfsRdma,               ///< /sys/class/infiniband 基础设备与端口报告
         SysfsStorageConnections, ///< NVMe/SCSI host 和块设备的明确 sysfs 连接
+        FilesystemUsage,         ///< Read-only filesystem capacity and inode statistics
     };
 
     /// @brief 单个原始记录的采集状态

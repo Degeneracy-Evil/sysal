@@ -1,4 +1,5 @@
 #include "serialization/storage.hpp"
+#include "serialization/filesystems.hpp"
 #include "serialization/json_values.hpp"
 #include "serialization/storage_connections.hpp"
 #include "serialization/storage_health.hpp"
@@ -304,6 +305,7 @@ namespace sysal::detail
                 j["mounts"].push_back(storage_mount_to_json(mount));
         }
         detail::storage_connections_to_json(j, s);
+        detail::filesystems_to_json(j, s);
         return j;
     }
 
@@ -321,6 +323,7 @@ namespace sysal::detail
             for(const auto &mount : j.at("mounts"))
                 s.mounts.push_back(storage_mount_from_json(mount));
         detail::storage_connections_from_json(j, s);
+        detail::filesystems_from_json(j, s);
         return s;
     }
 

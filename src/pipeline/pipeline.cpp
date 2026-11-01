@@ -71,6 +71,7 @@ namespace sysal::detail
             case RawSource::SysfsStorageConnections:
             case RawSource::SysfsBlock:
             case RawSource::StorageMountInfo:
+            case RawSource::FilesystemUsage:
                 return "storage";
             case RawSource::SysfsPci:
             case RawSource::Lspci:

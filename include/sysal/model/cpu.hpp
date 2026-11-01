@@ -128,6 +128,7 @@ namespace sysal
         std::vector<CpuFrequencyPolicy> frequency_policies{};
         std::optional<std::vector<LogicalCpuId>> present_cpu_ids{};
         std::optional<std::vector<LogicalCpuId>> online_cpu_ids{};
+        std::optional<bool> smt_supported{}; ///< 内核明确报告的 SMT 支持；不等同于当前启用
         std::optional<bool> smt_active{};    ///< 内核报告是否有核心正在使用 SMT
         std::string smt_control{};           ///< on/off/forceoff/notsupported/notimplemented 等原值
         std::optional<bool> boost_enabled{}; ///< 仅在通用 cpufreq/boost 明确提供时设置

@@ -361,6 +361,8 @@ namespace sysal::detail
             j["present_cpu_ids"] = cpu_ids_to_json(*c.present_cpu_ids);
         if(c.online_cpu_ids)
             j["online_cpu_ids"] = cpu_ids_to_json(*c.online_cpu_ids);
+        if(c.smt_supported)
+            j["smt_supported"] = *c.smt_supported;
         if(c.smt_active)
             j["smt_active"] = *c.smt_active;
         if(c.boost_enabled)
@@ -421,6 +423,8 @@ namespace sysal::detail
             c.present_cpu_ids = cpu_ids_from_json(j.at("present_cpu_ids"));
         if(j.contains("online_cpu_ids"))
             c.online_cpu_ids = cpu_ids_from_json(j.at("online_cpu_ids"));
+        if(j.contains("smt_supported"))
+            c.smt_supported = j.at("smt_supported").get<bool>();
         if(j.contains("smt_active"))
             c.smt_active = j.at("smt_active").get<bool>();
         if(j.contains("boost_enabled"))
