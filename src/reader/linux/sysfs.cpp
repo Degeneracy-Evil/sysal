@@ -50,15 +50,6 @@ namespace sysal::reader
         void read_cpu_sysfs(RawStore &raw)
         {
             const fs::path cpu_base = "/sys/devices/system/cpu";
-            const auto exists = path_exists(raw, RawSource::SysfsCpu, cpu_base);
-            if(!exists || !*exists)
-            {
-                if(exists)
-                    add_record(raw, RawSource::SysfsCpu, cpu_base.string(), "", CollectStatus::Failed,
-                               ReadFailure::NotPresent);
-                return;
-            }
-
             for(const auto *field : {"present", "online", "smt/active", "smt/control", "cpufreq/boost"})
             {
                 read_sysfs_file(raw, RawSource::SysfsCpu, (cpu_base / field).string());
@@ -82,9 +73,9 @@ namespace sysal::reader
             }
             record_directory_failure(raw, RawSource::SysfsCpu, policy_base, policy_ec);
 
-            bool found_any = false;
             std::error_code ec;
-            for(const auto &entry : directory_entries(cpu_base, ec))
+            for(const auto &entry :
+                inventory_entries(raw, InventoryKind::LogicalCpus, RawSource::SysfsCpu, cpu_base, ec, "cpu"))
             {
                 if(!directory_entry_is_directory(raw, RawSource::SysfsCpu, entry))
                 {
@@ -98,7 +89,6 @@ namespace sysal::reader
                     continue;
                 }
 
-                found_any = true;
                 const auto &dir = entry.path();
 
                 // topology 文件
@@ -150,11 +140,6 @@ namespace sysal::reader
                 record_directory_failure(raw, RawSource::SysfsCpu, cache_dir, cache_ec);
             }
             record_directory_failure(raw, RawSource::SysfsCpu, cpu_base, ec);
-
-            if(!found_any && !ec)
-            {
-                add_record(raw, RawSource::SysfsCpu, cpu_base.string(), "", CollectStatus::Failed);
-            }
         }
 
         /// @brief 采集 NUMA 节点信息
@@ -163,18 +148,9 @@ namespace sysal::reader
         void read_numa_sysfs(RawStore &raw)
         {
             const fs::path node_base = "/sys/devices/system/node";
-            const auto exists = path_exists(raw, RawSource::SysfsNuma, node_base);
-            if(!exists || !*exists)
-            {
-                if(exists)
-                    add_record(raw, RawSource::SysfsNuma, node_base.string(), "", CollectStatus::Failed,
-                               ReadFailure::NotPresent);
-                return;
-            }
-
-            bool found_any = false;
             std::error_code ec;
-            for(const auto &entry : directory_entries(node_base, ec))
+            for(const auto &entry :
+                inventory_entries(raw, InventoryKind::NumaNodes, RawSource::SysfsNuma, node_base, ec, "node"))
             {
                 if(!directory_entry_is_directory(raw, RawSource::SysfsNuma, entry))
                 {
@@ -187,18 +163,12 @@ namespace sysal::reader
                     continue;
                 }
 
-                found_any = true;
                 const auto &dir = entry.path();
 
                 read_sysfs_file(raw, RawSource::SysfsNuma, (dir / "cpulist").string());
                 read_sysfs_file(raw, RawSource::SysfsNuma, (dir / "meminfo").string());
             }
             record_directory_failure(raw, RawSource::SysfsNuma, node_base, ec);
-
-            if(!found_any && !ec)
-            {
-                add_record(raw, RawSource::SysfsNuma, node_base.string(), "", CollectStatus::Failed);
-            }
         }
 
         /// @brief 采集网络接口信息
@@ -207,18 +177,9 @@ namespace sysal::reader
         void read_net_sysfs(RawStore &raw)
         {
             const fs::path net_base = "/sys/class/net";
-            const auto exists = path_exists(raw, RawSource::SysfsNet, net_base);
-            if(!exists || !*exists)
-            {
-                if(exists)
-                    add_record(raw, RawSource::SysfsNet, net_base.string(), "", CollectStatus::Failed,
-                               ReadFailure::NotPresent);
-                return;
-            }
-
-            bool found_any = false;
             std::error_code ec;
-            for(const auto &entry : directory_entries(net_base, ec))
+            for(const auto &entry :
+                inventory_entries(raw, InventoryKind::NetworkInterfaces, RawSource::SysfsNet, net_base, ec))
             {
                 if(!directory_entry_is_directory(raw, RawSource::SysfsNet, entry))
                 {
@@ -230,7 +191,6 @@ namespace sysal::reader
                     continue;
                 }
 
-                found_any = true;
                 const auto &dir = entry.path();
 
                 read_sysfs_file(raw, RawSource::SysfsNet, (dir / "address").string());
@@ -294,10 +254,6 @@ namespace sysal::reader
             }
 
             record_directory_failure(raw, RawSource::SysfsNet, net_base, ec);
-            if(!found_any && !ec)
-            {
-                add_record(raw, RawSource::SysfsNet, net_base.string(), "", CollectStatus::Failed);
-            }
         }
 
         /// @brief 采集块设备信息
@@ -306,18 +262,9 @@ namespace sysal::reader
         void read_block_sysfs(RawStore &raw)
         {
             const fs::path block_base = "/sys/class/block";
-            const auto exists = path_exists(raw, RawSource::SysfsBlock, block_base);
-            if(!exists || !*exists)
-            {
-                if(exists)
-                    add_record(raw, RawSource::SysfsBlock, block_base.string(), "", CollectStatus::Failed,
-                               ReadFailure::NotPresent);
-                return;
-            }
-
-            bool found_any = false;
             std::error_code ec;
-            for(const auto &entry : directory_entries(block_base, ec))
+            for(const auto &entry :
+                inventory_entries(raw, InventoryKind::BlockDevices, RawSource::SysfsBlock, block_base, ec))
             {
                 if(!directory_entry_is_directory(raw, RawSource::SysfsBlock, entry))
                 {
@@ -329,7 +276,6 @@ namespace sysal::reader
                     continue;
                 }
 
-                found_any = true;
                 const auto &dir = entry.path();
 
                 read_sysfs_file(raw, RawSource::SysfsBlock, (dir / "size").string());
@@ -392,10 +338,6 @@ namespace sysal::reader
             }
 
             record_directory_failure(raw, RawSource::SysfsBlock, block_base, ec);
-            if(!found_any && !ec)
-            {
-                add_record(raw, RawSource::SysfsBlock, block_base.string(), "", CollectStatus::Failed);
-            }
         }
 
         /// @brief 采集 DMI/BIOS 信息

@@ -5,6 +5,7 @@
 
 #pragma once
 
+#include "sysal/model/inventory.hpp"
 #include "sysal/types/enums.hpp"
 
 #include <chrono>
@@ -32,7 +33,22 @@ namespace sysal
     /// @details 持有全部原始记录，并提供按来源与次级键的查询接口。
     struct RawStore
     {
-        std::vector<RawRecord> records; ///< 原始记录列表
+        std::vector<RawRecord> records;                   ///< 原始记录列表
+        std::vector<InventoryEnumeration> enumerations{}; ///< Independent enumeration evidence.
+
+        /// @brief A unique enumeration report; absent or conflicting evidence is unknown.
+        const InventoryEnumeration *enumeration(InventoryKind inventory) const
+        {
+            const InventoryEnumeration *result = nullptr;
+            for(const auto &entry : enumerations)
+                if(entry.inventory == inventory)
+                {
+                    if(result != nullptr)
+                        return nullptr;
+                    result = &entry;
+                }
+            return result;
+        }
 
         /// @brief 获取指定来源的全部记录
         /// @param source 原始数据来源

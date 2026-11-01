@@ -119,7 +119,7 @@ namespace sysal::detail
     std::optional<Pci> parse_pci(const RawStore &raw, std::vector<std::string> &warnings)
     {
         auto pci_records = raw.get_all(RawSource::SysfsPci);
-        if(pci_records.empty())
+        if(pci_records.empty() && raw.enumeration(InventoryKind::PciDevices) == nullptr)
         {
             warnings.push_back("parse_pci: 缺少 SysfsPci 数据");
             return std::nullopt;

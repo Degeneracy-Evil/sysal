@@ -19,6 +19,7 @@
 #include "reader/linux/procfs.hpp"
 #include "reader/linux/sysfs.hpp"
 #include "resolver/hardware_health.hpp"
+#include "resolver/inventory.hpp"
 #include "resolver/resolve.hpp"
 
 #include "parser/parse_utils.hpp"
@@ -232,6 +233,7 @@ namespace sysal::detail
         meta.requested_flags = flags;
         meta.succeeded_collectors = std::move(succeeded_collectors);
         meta.failed_collectors = std::move(failed_collectors);
+        meta.inventories = inventory_reports(info, raw, flags);
 
         for(const auto &record : raw.records)
         {

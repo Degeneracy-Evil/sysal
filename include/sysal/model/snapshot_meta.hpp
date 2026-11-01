@@ -35,6 +35,21 @@ namespace sysal
         std::vector<std::string> succeeded_collectors;      ///< 成功的采集器
         std::vector<std::string> failed_collectors;         ///< 失败的采集器
         std::vector<CollectionObservation> observations{};
+        std::vector<InventoryReport> inventories{};
+
+        /// @brief Missing or conflicting reports do not establish completeness.
+        InventoryCompleteness inventory_completeness(InventoryKind inventory) const
+        {
+            const InventoryReport *result = nullptr;
+            for(const auto &entry : inventories)
+                if(entry.inventory == inventory)
+                {
+                    if(result != nullptr)
+                        return InventoryCompleteness::Unknown;
+                    result = &entry;
+                }
+            return result ? result->completeness : InventoryCompleteness::Unknown;
+        }
     };
 
 } // namespace sysal

@@ -123,6 +123,30 @@ namespace sysal::reader
             add_record(raw, source, path.string(), "", CollectStatus::Partial, file_failure(error.value()));
     }
 
+    /// @brief Retain enumeration outcome before reading any optional attributes.
+    inline std::vector<std::filesystem::directory_entry>
+    inventory_entries(RawStore &raw, InventoryKind inventory, RawSource source, const std::filesystem::path &path,
+                      std::error_code &error, std::string_view prefix = {})
+    {
+        auto entries = directory_entries(path, error);
+        const auto status = !error            ? CollectStatus::Success
+                            : entries.empty() ? CollectStatus::Failed
+                                              : CollectStatus::Partial;
+        InventoryEnumeration enumeration{inventory, source, path.string(), {}, status};
+        if(error)
+            enumeration.failure = file_failure(error.value());
+        for(const auto &entry : entries)
+        {
+            const auto name = entry.path().filename().string();
+            if(!prefix.empty() && (!name.starts_with(prefix) || name.size() == prefix.size() ||
+                                   name.find_first_not_of("0123456789", prefix.size()) != std::string::npos))
+                continue;
+            enumeration.entries.push_back(name);
+        }
+        raw.enumerations.push_back(std::move(enumeration));
+        return entries;
+    }
+
     inline bool directory_entry_is_directory(RawStore &raw, RawSource source,
                                              const std::filesystem::directory_entry &entry)
     {

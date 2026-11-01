@@ -8,6 +8,7 @@
 #include "serialization/cpu.hpp"
 #include "serialization/execution.hpp"
 #include "serialization/hardware.hpp"
+#include "serialization/inventory.hpp"
 #include "serialization/json_values.hpp"
 #include "serialization/memory.hpp"
 #include "serialization/network.hpp"
@@ -106,7 +107,10 @@ namespace sysal
             {
                 arr.push_back(raw_record_to_json(rec));
             }
-            return json{{"records", std::move(arr)}};
+            json enumerations = json::array();
+            for(const auto &enumeration : store.enumerations)
+                enumerations.push_back(detail::enumeration_to_json(enumeration));
+            return json{{"records", std::move(arr)}, {"enumerations", std::move(enumerations)}};
         }
 
         [[nodiscard]] RawStore raw_store_from_json(const json &root)
@@ -116,6 +120,9 @@ namespace sysal
             {
                 store.records.push_back(raw_record_from_json(elem));
             }
+            if(root.contains("enumerations"))
+                for(const auto &elem : root.at("enumerations").get_ref<const json::array_t &>())
+                    store.enumerations.push_back(detail::enumeration_from_json(elem));
             return store;
         }
 
@@ -205,6 +212,10 @@ namespace sysal
             }
             j["failed_collectors"] = std::move(fail);
 
+            j["inventories"] = json::array();
+            for(const auto &report : m.inventories)
+                j["inventories"].push_back(detail::inventory_to_json(report));
+
             if(!m.observations.empty())
             {
                 j["observations"] = json::array();
@@ -223,6 +234,9 @@ namespace sysal
             m.requested_flags = static_cast<Collect>(uint32_from_json(j.at("requested_flags"), "requested_flags"));
             m.succeeded_collectors = str_array_from_json(j.at("succeeded_collectors"));
             m.failed_collectors = str_array_from_json(j.at("failed_collectors"));
+            if(j.contains("inventories"))
+                for(const auto &report : j.at("inventories").get_ref<const json::array_t &>())
+                    m.inventories.push_back(detail::inventory_from_json(report));
             if(j.contains("observations"))
                 for(const auto &observation : j.at("observations"))
                     m.observations.push_back(observation_from_json(observation));

@@ -23,18 +23,10 @@ namespace sysal::reader
     {
         const fs::path base = "/sys/bus/pci/devices";
         std::error_code error;
-        fs::directory_iterator entry(base, error);
-        if(error)
+        const auto entries = inventory_entries(raw, InventoryKind::PciDevices, RawSource::SysfsPci, base, error);
+        for(const auto &entry : entries)
         {
-            add_record(raw, RawSource::SysfsPci, base.string(), "", CollectStatus::Failed, file_failure(error.value()));
-            return;
-        }
-        bool found = false;
-        const fs::directory_iterator end;
-        for(; entry != end && !error; entry.increment(error))
-        {
-            const auto &directory = entry->path();
-            found = true;
+            const auto &directory = entry.path();
             for(const auto *field : {"vendor", "device", "class", "numa_node", "physical_slot", "label",
                                      "current_link_speed", "max_link_speed", "current_link_width", "max_link_width",
                                      "local_cpulist", "sriov_totalvfs", "sriov_numvfs"})
@@ -51,7 +43,5 @@ namespace sysal::reader
         if(error)
             add_record(raw, RawSource::SysfsPci, base.string(), "", CollectStatus::Partial,
                        file_failure(error.value()));
-        else if(!found)
-            add_record(raw, RawSource::SysfsPci, base.string(), "", CollectStatus::Failed, ReadFailure::NotPresent);
     }
 } // namespace sysal::reader

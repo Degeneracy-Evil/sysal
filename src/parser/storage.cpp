@@ -112,7 +112,7 @@ namespace sysal::detail
     {
         auto block_records = raw.get_all(RawSource::SysfsBlock);
         if(block_records.empty() && raw.get_all(RawSource::SysfsStorageConnections).empty() &&
-           !raw.has_success(RawSource::StorageMountInfo))
+           !raw.has_success(RawSource::StorageMountInfo) && raw.enumeration(InventoryKind::BlockDevices) == nullptr)
         {
             warnings.push_back("parse_storage: 缺少 SysfsBlock 数据");
             return std::nullopt;
@@ -138,9 +138,10 @@ namespace sysal::detail
 
         if(device_attrs.empty())
         {
-            if(!raw.has_success(RawSource::StorageMountInfo))
+            if(!raw.has_success(RawSource::StorageMountInfo) && raw.enumeration(InventoryKind::BlockDevices) == nullptr)
                 warnings.push_back("parse_storage: SysfsBlock 记录中无有效块设备");
-            if(raw.get_all(RawSource::SysfsStorageConnections).empty() && !raw.has_success(RawSource::StorageMountInfo))
+            if(raw.get_all(RawSource::SysfsStorageConnections).empty() &&
+               !raw.has_success(RawSource::StorageMountInfo) && raw.enumeration(InventoryKind::BlockDevices) == nullptr)
                 return std::nullopt;
         }
 

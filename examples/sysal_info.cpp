@@ -977,6 +977,16 @@ int main()
     }
     label("sysal_version", sys.meta.sysal_version);
     label("requested_flags", std::to_string(static_cast<unsigned>(sys.meta.requested_flags)));
+    for(const auto &[kind, name] : {std::pair{sysal::InventoryKind::LogicalCpus, "Logical CPU inventory"},
+                                    std::pair{sysal::InventoryKind::NumaNodes, "NUMA inventory"},
+                                    std::pair{sysal::InventoryKind::NetworkInterfaces, "Network inventory"},
+                                    std::pair{sysal::InventoryKind::BlockDevices, "Block inventory"}})
+    {
+        const auto state = sys.meta.inventory_completeness(kind);
+        label(name, state == sysal::InventoryCompleteness::Complete  ? "complete within source scope"
+                    : state == sysal::InventoryCompleteness::Partial ? "known portion"
+                                                                     : "unknown");
+    }
 
     // ── 14. JSON Serialization Round-trip ───────────────────────────────
     section("14. JSON Serialization Round-trip");
